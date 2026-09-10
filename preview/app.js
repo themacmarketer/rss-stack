@@ -1,4 +1,4 @@
-// Quick RSS 3-Column macOS Reader with Live MCP Data & Drag & Drop Folders
+// Quick RSS 3-Column macOS Reader with Live MCP Data, Drag & Drop Folders, and Settings Modal
 
 const MCP_URL = 'http://127.0.0.1:8745/mcp?token=MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1';
 const MCP_TOKEN = 'MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1';
@@ -63,7 +63,6 @@ let treeData = [
 // App State
 let loadedArticles = [];
 let currentArticle = null;
-let currentFilter = 'all';
 let selectedNodeId = null;
 let contextNodeId = null;
 let draggedNodeId = null;
@@ -184,7 +183,6 @@ function createNodeElement(node, depth) {
   // Row Selection & Drag and Drop Events
   row.onclick = () => {
     selectedNodeId = node.id;
-    currentFilter = null;
     document.querySelectorAll('.node-row, .filter-item').forEach(el => el.classList.remove('selected', 'active'));
     row.classList.add('selected');
     fetchAndDisplayArticles(node);
@@ -335,7 +333,7 @@ async function fetchAndDisplayArticles(target) {
   if (mcpData && mcpData.items && mcpData.items.length > 0) {
     loadedArticles = mcpData.items;
   } else {
-    // Fallback real mock articles
+    // Fallback real articles
     loadedArticles = [
       {
         id: 'EE16BD02-20BC-48EF-B406-FDF152FD68E6',
@@ -430,7 +428,6 @@ async function selectArticle(art, cardEl) {
   const readerContainer = document.getElementById('reader-container');
   readerContainer.innerHTML = '<div style="color:#8e8e93;">Loading full article...</div>';
 
-  // Fetch full item via MCP
   const itemDetail = await callMCP('get_item', { id: art.id, include_content: true });
   const fullContent = itemDetail && itemDetail.content ? itemDetail.content : (art.summary || 'Full article content available in reader.');
 
@@ -448,14 +445,83 @@ async function selectArticle(art, cardEl) {
   `;
 }
 
+// Settings Modal & Preferences Event Listeners
+const settingsModal = document.getElementById('settings-modal');
+const settingsBtn = document.getElementById('settings-btn');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+function openSettings() {
+  settingsModal.classList.remove('hidden');
+}
+function closeSettings() {
+  settingsModal.classList.add('hidden');
+}
+
+if (settingsBtn) settingsBtn.onclick = openSettings;
+if (closeSettingsBtn) closeSettingsBtn.onclick = closeSettings;
+
+// Cmd + , Shortcut for Settings
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+    e.preventDefault();
+    openSettings();
+  }
+});
+
+// Settings Modal Tabs Switching
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const targetPane = document.getElementById(`pane-${tab.dataset.tab}`);
+    if (targetPane) targetPane.classList.add('active');
+  };
+});
+
+// Copy Buttons in Settings
+document.getElementById('copy-token-btn').onclick = () => {
+  navigator.clipboard.writeText(MCP_TOKEN);
+  alert('MCP Token copied to clipboard!');
+};
+
+document.getElementById('copy-mcp-cmd-btn').onclick = () => {
+  const cmd = document.getElementById('mcp-code-snippet').textContent;
+  navigator.clipboard.writeText(cmd);
+  alert('MCP Command copied to clipboard!');
+};
+
+// Add Feed Modal
+const addFeedModal = document.getElementById('add-feed-modal');
+const addFeedBtn = document.getElementById('add-feed-btn');
+const closeAddFeedBtn = document.getElementById('close-add-feed-btn');
+const cancelAddFeedBtn = document.getElementById('cancel-add-feed-btn');
+const confirmAddFeedBtn = document.getElementById('confirm-add-feed-btn');
+
+if (addFeedBtn) addFeedBtn.onclick = () => addFeedModal.classList.remove('hidden');
+if (closeAddFeedBtn) closeAddFeedBtn.onclick = () => addFeedModal.classList.add('hidden');
+if (cancelAddFeedBtn) cancelAddFeedBtn.onclick = () => addFeedModal.classList.add('hidden');
+
+if (confirmAddFeedBtn) {
+  confirmAddFeedBtn.onclick = async () => {
+    const url = document.getElementById('new-feed-url-input').value;
+    const title = document.getElementById('new-feed-title-input').value || 'New Feed';
+    if (url) {
+      await callMCP('add_feed', { url, title });
+      treeData[0].children.unshift({ id: `feed-${Date.now()}`, type: 'feed', name: title, url, unreadCount: 1 });
+      renderTree();
+      addFeedModal.classList.add('hidden');
+    }
+  };
+}
+
 // Filter Clicks
 document.querySelectorAll('.filter-item').forEach(item => {
   item.onclick = () => {
     document.querySelectorAll('.nav-item, .node-row').forEach(el => el.classList.remove('active', 'selected'));
     item.classList.add('active');
     selectedNodeId = null;
-    const filter = item.dataset.filter;
-    fetchAndDisplayArticles(filter);
+    fetchAndDisplayArticles(item.dataset.filter);
   };
 });
 
@@ -475,20 +541,13 @@ document.getElementById('open-browser-btn').onclick = () => {
   }
 };
 
-// Toolbar Buttons
+// Add Folder Toolbar Button
 document.getElementById('add-folder-btn').onclick = () => {
   const name = prompt('New folder name:', 'New Folder');
   if (name) {
     treeData.unshift({ id: `f-${Date.now()}`, type: 'folder', name, expanded: false, children: [] });
     renderTree();
   }
-};
-
-document.getElementById('expand-all-btn').onclick = () => {
-  const toggle = (nodes, exp) => nodes.forEach(n => { if (n.type === 'folder') { n.expanded = exp; if (n.children) toggle(n.children, exp); } });
-  const anyCollapsed = treeData.some(n => n.type === 'folder' && !n.expanded);
-  toggle(treeData, anyCollapsed);
-  renderTree();
 };
 
 // Context Menu

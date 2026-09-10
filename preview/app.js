@@ -1,10 +1,10 @@
 // Quick RSS Production Engine
-// Live Feed & Article Filtering Engine + MCP Integration
+// Live Per-Feed Article Database & Interactive Reader Renderer
 
 const MCP_URL = 'http://127.0.0.1:8745/mcp?token=MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1';
 const MCP_TOKEN = 'MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1';
 
-// Full Feed Tree Structure matching screenshot exactly
+// Full Feed Tree Structure
 let treeData = [
   { id: 'f-1', type: 'folder', name: 'AI Company Blogs', expanded: true, children: [
     { id: 'feed-openai', type: 'feed', name: 'OpenAI Blog', url: 'https://openai.com/news', unreadCount: 42 },
@@ -61,76 +61,145 @@ let treeData = [
   ]}
 ];
 
-// Rich Per-Feed Article Database
+// Complete Per-Feed Database for ALL Feeds
 const articleDatabase = {
-  'arXiv - Artificial Intelligence': [
+  'Google Research Blog': [
     {
-      id: 'ARXIV-AI-1',
-      feedTitle: 'arXiv - Artificial Intelligence',
-      title: 'cs.AI: Symbolic Reasoning Integration in Frontier Neural Architectures',
-      pubDate: '2026-09-10T08:30:00Z',
-      summary: 'This paper presents a novel framework combining neuro-symbolic logic with transformer architectures for verifiable multi-step mathematical reasoning.',
-      content: '<p>Abstract: We propose <strong>NeuroSymbolic-R1</strong>, a hybrid architecture integrating formal logic solvers directly into transformer self-attention layers. Benchmark evaluation on MATH-500 shows a 14.2% gain in proof accuracy while maintaining sub-second inference speeds.</p>',
+      id: 'GOOG-1',
+      feedTitle: 'Google Research Blog',
+      title: 'Scaling Multimodal Transformers for Long-Context Reasoning',
+      pubDate: '2026-09-10T14:20:00Z',
+      author: 'Jeff Dean & Gemini Team',
+      summary: 'Exploring architecture enhancements in Gemini 1.5 Pro to maintain dynamic attention efficiency across 2,000,000 token context windows.',
+      content: '<p>Long-context multimodal transformers enable novel agentic workflows across video, audio, and large codebase inputs. In this research update, we detail architectural optimizations including FlashAttention-3 integration, KV cache compression, and token pruning methods that achieve 3.4x faster time-to-first-token.</p><p>We also evaluate long-context retrieval accuracy on Needle In A Haystack benchmarks, demonstrating 99.8% recall up to 2M tokens.</p>',
       isRead: false,
-      link: 'https://arxiv.org/abs/2609.00101'
+      link: 'https://research.google/blog/'
     },
     {
-      id: 'ARXIV-AI-2',
-      feedTitle: 'arXiv - Artificial Intelligence',
-      title: 'cs.AI: Benchmark Protocols for Agentic Problem Solving & Tool Orchestration',
-      pubDate: '2026-09-09T22:15:00Z',
-      summary: 'Establishing rigorous evaluation standards for long-horizon autonomous coding and environment exploration agents.',
-      content: '<p>Abstract: Evaluating autonomous AI agents requires environments that test multi-step planning, tool interaction, and dynamic failure recovery. We release <em>AgentBench 2.0</em> featuring 1,200 real-world software engineering scenarios.</p>',
+      id: 'GOOG-2',
+      feedTitle: 'Google Research Blog',
+      title: 'Quantum Supremacy Benchmarks in Error-Corrected Qubits',
+      pubDate: '2026-09-08T10:00:00Z',
+      author: 'Sycamore Quantum Team',
+      summary: 'Demonstrating sub-10-5 error rates in surface code logical qubits operating on Sycamore processors.',
+      content: '<p>Fault-tolerant quantum computing requires quantum error correction protocols that suppress physical noise. Our latest experimental results confirm logical qubit lifetimes exceeding physical component relaxation times by a factor of 2.1x.</p>',
       isRead: false,
-      link: 'https://arxiv.org/abs/2609.00102'
+      link: 'https://research.google/blog/'
     }
   ],
-  'arXiv - Machine Learning': [
+  'Microsoft Research Blog': [
     {
-      id: 'ARXIV-LG-1',
-      feedTitle: 'arXiv - Machine Learning',
-      title: 'cs.LG: Convergence Bounds for Direct Preference Optimization (DPO)',
-      pubDate: '2026-09-10T06:10:00Z',
-      summary: 'Theoretical analysis of gradient dynamics in direct preference alignment without explicit reward model training.',
-      content: '<p>Abstract: Direct Preference Optimization (DPO) has emerged as a lightweight alternative to RLHF. In this work, we prove tight convergence bounds under non-convex loss surfaces.</p>',
+      id: 'MSFT-1',
+      feedTitle: 'Microsoft Research Blog',
+      title: 'AutoGen: Orchestration Framework for Multi-Agent AI Systems',
+      pubDate: '2026-09-09T16:00:00Z',
+      author: 'Chi Wang & AutoGen Core Team',
+      summary: 'Building complex LLM applications with conversational multi-agent workflows, tool execution, and human-in-the-loop validation.',
+      content: '<p>AutoGen enables next-generation agentic applications by allowing multiple specialized agents to converse, solve coding tasks, execute bash commands, and iterate on complex software engineering workflows.</p>',
       isRead: false,
-      link: 'https://arxiv.org/abs/2609.00201'
+      link: 'https://www.microsoft.com/en-us/research/blog/'
+    },
+    {
+      id: 'MSFT-2',
+      feedTitle: 'Microsoft Research Blog',
+      title: 'Phi-3 Technical Report: High-Performance Small Language Models',
+      pubDate: '2026-09-07T09:30:00Z',
+      author: 'SLM Research Group',
+      summary: 'Achieving GPT-3.5 level reasoning in 3.8B parameter models trained on filtered textbook-quality synthetic datasets.',
+      content: '<p>Small language models (SLMs) redefine edge intelligence. Phi-3-mini delivers state-of-the-art reasoning, math, and code generation directly on mobile and Mac hardware without requiring cloud GPUs.</p>',
+      isRead: false,
+      link: 'https://www.microsoft.com/en-us/research/blog/'
     }
   ],
-  'arXiv - Computer Vision': [
+  'NVIDIA AI Blog': [
     {
-      id: 'ARXIV-CV-1',
-      feedTitle: 'arXiv - Computer Vision',
-      title: 'cs.CV: 3D Gaussian Splatting for Real-Time Dynamic Scene Reconstruction',
-      pubDate: '2026-09-09T19:40:00Z',
-      summary: 'High-fidelity 60FPS rendering of complex dynamic scenes captured from sparse monocular video streams.',
-      content: '<p>Abstract: We present 4D-Splat, extending 3D Gaussian Splatting to dynamic temporal dimensions with neural deformation fields.</p>',
+      id: 'NV-1',
+      feedTitle: 'NVIDIA AI Blog',
+      title: 'Blackwell Architecture Deep Dive & TensorRT-LLM Acceleration',
+      pubDate: '2026-09-09T20:00:00Z',
+      author: 'Jensen Huang & Applied Deep Learning Team',
+      summary: '20 petaflops of FP4 AI performance enabling real-time trillion-parameter model inference.',
+      content: '<p>The NVIDIA Blackwell B200 GPU features second-generation Transformer Engine technology, FP4 precision support, and 800Gb/s NVLink interconnects for massive scale-out cluster training.</p>',
       isRead: false,
-      link: 'https://arxiv.org/abs/2609.00301'
+      link: 'https://blogs.nvidia.com/'
     }
   ],
   'OpenAI Blog': [
     {
-      id: 'OPENAI-101',
+      id: 'OPENAI-1',
       feedTitle: 'OpenAI Blog',
       title: 'GPT-5 Architecture & Frontier Capabilities Deep Dive',
       pubDate: '2026-09-08T18:00:00Z',
+      author: 'OpenAI Research',
       summary: 'Detailed research release on multimodal reasoning, extended context windows, and agentic tool orchestration.',
-      content: '<p>Today we are sharing technical insights into our frontier model family, featuring enhanced reasoning capabilities and native tool invocation.</p>',
+      content: '<p>Today we are sharing technical insights into our frontier model family, featuring enhanced reasoning capabilities, native tool invocation, and low-latency audio/video processing.</p>',
       isRead: false,
       link: 'https://openai.com/news'
     }
   ],
   'DeepMind Blog': [
     {
-      id: 'DEEPMIND-202',
+      id: 'DEEPMIND-1',
       feedTitle: 'DeepMind Blog',
       title: 'AlphaFold 3 Benchmarks in Complex Protein Drug Design',
       pubDate: '2026-09-08T12:30:00Z',
+      author: 'Demis Hassabis & AlphaFold Team',
       summary: 'Accelerating molecular structure prediction with combined cellular interaction modeling.',
-      content: '<p>AlphaFold 3 expands molecular structure prediction to proteins, nucleic acids, small molecules, and chemical modifications.</p>',
+      content: '<p>AlphaFold 3 expands molecular structure prediction to proteins, nucleic acids, small molecules, ions, and chemical modifications with unprecedented accuracy.</p>',
       isRead: false,
       link: 'https://deepmind.google/blog/'
+    }
+  ],
+  'MacStories': [
+    {
+      id: 'MAC-1',
+      feedTitle: 'MacStories',
+      title: 'macOS 15 Sequoia Window Tiling & System Settings Deep Dive',
+      pubDate: '2026-09-08T14:00:00Z',
+      author: 'John Voorhees',
+      summary: 'Exploring native window tiling keyboard shortcuts, snap regions, and modern System Settings in macOS Sequoia.',
+      content: '<p>macOS Sequoia brings long-awaited native window tiling support with drag-to-edge snapping, custom hotkeys, and multi-monitor window management.</p>',
+      isRead: false,
+      link: 'https://www.macstories.net'
+    }
+  ],
+  'SwiftUI Recipes': [
+    {
+      id: 'SWIFTUI-1',
+      feedTitle: 'SwiftUI Recipes',
+      title: 'Building Custom Outline Group Trees with Transferable Drag & Drop',
+      pubDate: '2026-09-07T11:00:00Z',
+      author: 'Mateusz Szdel',
+      summary: 'Comprehensive guide to building hierarchical sidebar trees in SwiftUI using SwiftData models.',
+      content: '<p>Learn how to implement multi-level folder trees in SwiftUI macOS apps using OutlineGroup, Transferable protocols, and dropDestination handlers.</p>',
+      isRead: false,
+      link: 'https://swiftuirecipes.com'
+    }
+  ],
+  "Fatbobman's Swift Weekly": [
+    {
+      id: 'SWIFT-WK-1',
+      feedTitle: "Fatbobman's Swift Weekly",
+      title: 'Swift 6 Data Race Safety & Strict Concurrency in Practice',
+      pubDate: '2026-09-06T15:00:00Z',
+      author: 'Fatbobman',
+      summary: 'Navigating Sendable warnings, MainActor isolation, and concurrent actor mutability in Swift 6 compiler modes.',
+      content: '<p>Swift 6 turns data race safety from an opt-in warning to a compile-time guarantee. This article breaks down common migration traps and Sendable conformance pattern solutions.</p>',
+      isRead: false,
+      link: 'https://weekly.fatbobman.com'
+    }
+  ],
+  'Marco.org': [
+    {
+      id: 'MARCO-1',
+      feedTitle: 'Marco.org',
+      title: 'Overcast 2026 Redesign Retrospective',
+      pubDate: '2026-09-05T18:20:00Z',
+      author: 'Marco Arment',
+      summary: 'Reflections on modernizing a decade-old Swift codebase to modern SwiftUI and Swift Concurrency.',
+      content: '<p>Rewriting Overcast from Objective-C and early Swift to modern SwiftUI has been a multi-year effort. Here is what worked, what failed, and how performance improved.</p>',
+      isRead: false,
+      link: 'https://marco.org'
     }
   ],
   'TechCrunch AI': [
@@ -139,6 +208,7 @@ const articleDatabase = {
       feedTitle: 'TechCrunch AI',
       title: '‘Gambling with our lives’: Anthropic researcher quits, warns against self-improving AI',
       pubDate: '2026-09-09T15:02:47Z',
+      author: 'Kyle Wiggers',
       summary: 'Anthropic researcher Jacob Coxon resigned over AI extinction fears, calling for pacing agreements between labs.',
       content: '<p>Jacob Coxon, a senior safety alignment researcher at Anthropic, published an open letter detailing risks of rapid recursive self-improvement.</p>',
       isRead: false,
@@ -149,6 +219,7 @@ const articleDatabase = {
       feedTitle: 'TechCrunch AI',
       title: 'Shipt becomes the latest delivery app with an AI shopping assistant',
       pubDate: '2026-09-09T14:51:45Z',
+      author: 'Aria Alamalhodaei',
       summary: 'Users can ask the assistant to create custom grocery carts based on event prompts.',
       content: '<p>Shipt is rolling out an AI-powered conversational assistant to help users quickly construct curated carts.</p>',
       isRead: true,
@@ -161,6 +232,7 @@ const articleDatabase = {
       feedTitle: 'The Verge',
       title: 'The Switch 2 is getting a 2D Metroid called Ravenous',
       pubDate: '2026-09-09T14:46:50Z',
+      author: 'Jay Peters',
       summary: 'Nintendo announced Metroid Ravenous launching on January 28th, 2027.',
       content: '<p>Nintendo revealed Metroid Ravenous, a brand-new 2D entry in the Metroid franchise built exclusively for the Nintendo Switch 2.</p>',
       isRead: true,
@@ -171,10 +243,178 @@ const articleDatabase = {
       feedTitle: 'The Verge',
       title: 'I spent an hour riding inside Tesla’s steering-wheel-free Cybercab',
       pubDate: '2026-09-09T14:41:07Z',
+      author: 'Mack DeGeurin',
       summary: 'Hands-on test ride in Tesla robotaxi across Austin test routes.',
       content: '<p>Riding in a vehicle without a steering wheel or pedals feels uncanny at first, but Tesla Cybercab demo routes showed steady autonomous navigation.</p>',
       isRead: false,
       link: 'https://www.theverge.com'
+    }
+  ],
+  'Wired': [
+    {
+      id: 'WIRED-1',
+      feedTitle: 'Wired',
+      title: 'Inside the Next-Generation Quantum Cryptography Arms Race',
+      pubDate: '2026-09-09T10:00:00Z',
+      author: 'Andy Greenberg',
+      summary: 'Governments and financial institutions race to migrate key exchange protocols to Post-Quantum Cryptography (PQC).',
+      content: '<p>NIST has finalized post-quantum encryption standards. Organizations around the globe are now replacing RSA and ECC algorithms before quantum decryption hardware arrives.</p>',
+      isRead: false,
+      link: 'https://www.wired.com'
+    }
+  ],
+  'MIT Technology Review': [
+    {
+      id: 'MIT-TECH-1',
+      feedTitle: 'MIT Technology Review',
+      title: '10 Breakthrough Technologies of 2026',
+      pubDate: '2026-09-08T09:00:00Z',
+      author: 'MIT Tech Review Editors',
+      summary: 'Our annual list of technological advances that will change the way we live and work.',
+      content: '<p>From generative AI agents in drug design to solid-state sodium batteries and commercial fusion milestones, here are the 10 breakthrough technologies shaping 2026.</p>',
+      isRead: false,
+      link: 'https://www.technologyreview.com'
+    }
+  ],
+  'Stanford AI Lab (SAIL)': [
+    {
+      id: 'SAIL-1',
+      feedTitle: 'Stanford AI Lab (SAIL)',
+      title: 'Foundation Models for Embodied Robot Manipulation',
+      pubDate: '2026-09-07T16:40:00Z',
+      author: 'Chelsea Finn & SAIL Vision Lab',
+      summary: 'Training cross-robot manipulation primitives across 50,000 hours of heterogeneous robot trajectory data.',
+      content: '<p>Embodied foundation models bridge high-level natural language instruction and low-level motor joint controls. We demonstrate zero-shot generalization across 12 unseen robotic arm topologies.</p>',
+      isRead: false,
+      link: 'http://ai.stanford.edu/blog/'
+    }
+  ],
+  'MIT CSAIL News - AI': [
+    {
+      id: 'CSAIL-1',
+      feedTitle: 'MIT CSAIL News - AI',
+      title: 'Autonomous Robot Navigation in Unstructured Terrains',
+      pubDate: '2026-09-06T13:20:00Z',
+      author: 'CSAIL Robotics Group',
+      summary: 'Combining vision-language navigation with real-time haptic feedback for search and rescue operations.',
+      content: '<p>MIT CSAIL researchers have deployed quadrupeds equipped with vision-language navigation models capable of traversing dense forest and earthquake rubble environments without GPS access.</p>',
+      isRead: false,
+      link: 'https://news.mit.edu'
+    }
+  ],
+  'AI Alignment Forum': [
+    {
+      id: 'ALIGN-1',
+      feedTitle: 'AI Alignment Forum',
+      title: 'Scalable Oversight Protocols for Superintelligent Agents',
+      pubDate: '2026-09-08T17:15:00Z',
+      author: 'Eliezer Yudkowsky & Alignment Researchers',
+      summary: 'Evaluating debate protocols, market-based mechanisms, and sparse autoencoder decomposition for alignment auditing.',
+      content: '<p>How can humans evaluate outputs from AI models operating beyond human comprehension? We propose a structured debate protocol using non-interactive zero-knowledge proofs.</p>',
+      isRead: false,
+      link: 'https://www.alignmentforum.org'
+    }
+  ],
+  'AWS Machine Learning Blog': [
+    {
+      id: 'AWS-ML-1',
+      feedTitle: 'AWS Machine Learning Blog',
+      title: 'Deploying Llama 3 on AWS Bedrock & SageMaker HyperPod',
+      pubDate: '2026-09-08T15:30:00Z',
+      author: 'AWS AI Specialist Team',
+      summary: 'Step-by-step architecture for high-throughput distributed inference using Neuron Core accelerators.',
+      content: '<p>Amazon Bedrock now supports custom neuron accelerator compilation, boosting token generation throughput by 45% while reducing inference latency.</p>',
+      isRead: false,
+      link: 'https://aws.amazon.com/blogs/machine-learning/'
+    }
+  ],
+  'Azure AI Blog': [
+    {
+      id: 'AZURE-1',
+      feedTitle: 'Azure AI Blog',
+      title: 'Building Enterprise RAG with Azure AI Search & Provisioned Throughput',
+      pubDate: '2026-09-07T14:10:00Z',
+      author: 'Azure OpenAI Product Team',
+      summary: 'Scaling vector retrieval and hybrid BM25 search across millions of internal corporate documents.',
+      content: '<p>Learn how to architect enterprise Retrieval-Augmented Generation (RAG) pipelines with Azure OpenAI Service, custom embeddings, and integrated vector search security controls.</p>',
+      isRead: false,
+      link: 'https://azure.microsoft.com'
+    }
+  ],
+  'Hugging Face Blog': [
+    {
+      id: 'HF-1',
+      feedTitle: 'Hugging Face Blog',
+      title: 'SmolLM: Ultra-Lightweight Open Models for On-Device Inference',
+      pubDate: '2026-09-09T11:00:00Z',
+      author: 'Loubna Ben Allal & HF Team',
+      summary: 'Introducing SmolLM 135M, 360M, and 1.7B models optimized for web browser WebGPU execution.',
+      content: '<p>SmolLM brings open source intelligence to edge devices. Trained on curated Cosmopedia synthetic datasets, SmolLM-1.7B outperforms models twice its size on reasoning tasks.</p>',
+      isRead: false,
+      link: 'https://huggingface.co/blog'
+    }
+  ],
+  'arXiv - Artificial Intelligence': [
+    {
+      id: 'ARXIV-AI-1',
+      feedTitle: 'arXiv - Artificial Intelligence',
+      title: 'cs.AI: Neuro-Symbolic Integration in Frontier Reasoning Models',
+      pubDate: '2026-09-10T08:30:00Z',
+      author: 'cs.AI Research Team',
+      summary: 'A hybrid framework combining formal logic solvers with self-attention layers for mathematical proofs.',
+      content: '<p>Abstract: We introduce NeuroSymbolic-R1, combining formal automated theorem provers directly into transformer self-attention computations for verifiable reasoning.</p>',
+      isRead: false,
+      link: 'https://arxiv.org/abs/2609.00101'
+    },
+    {
+      id: 'ARXIV-AI-2',
+      feedTitle: 'arXiv - Artificial Intelligence',
+      title: 'cs.AI: Benchmark Protocols for Agentic Problem Solving',
+      pubDate: '2026-09-09T22:15:00Z',
+      author: 'cs.AI Research Team',
+      summary: 'Establishing rigorous evaluation standards for long-horizon autonomous software engineering agents.',
+      content: '<p>Abstract: Evaluating autonomous AI agents requires environments that test multi-step planning, tool interaction, and dynamic failure recovery.</p>',
+      isRead: false,
+      link: 'https://arxiv.org/abs/2609.00102'
+    }
+  ],
+  'arXiv - Machine Learning': [
+    {
+      id: 'ARXIV-LG-1',
+      feedTitle: 'arXiv - Machine Learning',
+      title: 'cs.LG: Convergence Bounds for Direct Preference Optimization (DPO)',
+      pubDate: '2026-09-10T06:10:00Z',
+      author: 'cs.LG Research Team',
+      summary: 'Theoretical analysis of gradient dynamics in direct preference alignment without explicit reward model training.',
+      content: '<p>Abstract: Direct Preference Optimization (DPO) has emerged as a lightweight alternative to RLHF. We prove tight convergence bounds under non-convex loss surfaces.</p>',
+      isRead: false,
+      link: 'https://arxiv.org/abs/2609.00201'
+    }
+  ],
+  'arXiv - Computer Vision': [
+    {
+      id: 'ARXIV-CV-1',
+      feedTitle: 'arXiv - Computer Vision',
+      title: 'cs.CV: 3D Gaussian Splatting for Real-Time Dynamic Scene Reconstruction',
+      pubDate: '2026-09-09T19:40:00Z',
+      author: 'cs.CV Research Team',
+      summary: 'High-fidelity 60FPS rendering of complex dynamic scenes captured from sparse monocular video streams.',
+      content: '<p>Abstract: We present 4D-Splat, extending 3D Gaussian Splatting to dynamic temporal dimensions with neural deformation fields.</p>',
+      isRead: false,
+      link: 'https://arxiv.org/abs/2609.00301'
+    }
+  ],
+  'Towards Data Science': [
+    {
+      id: 'TDS-1',
+      feedTitle: 'Towards Data Science',
+      title: 'Complete Guide to Graph Neural Networks in PyTorch Geometric',
+      pubDate: '2026-09-08T16:00:00Z',
+      author: 'Michael Schlichtkrull',
+      summary: 'Step-by-step tutorial on message passing, GCN layers, and node classification algorithms.',
+      content: '<p>Graph Neural Networks (GNNs) revolutionize learning on non-Euclidean data structures. Learn how to construct custom MessagePassing layers in PyTorch Geometric.</p>',
+      isRead: false,
+      link: 'https://towardsdatascience.com'
     }
   ],
   'Unite.AI': [
@@ -183,50 +423,111 @@ const articleDatabase = {
       feedTitle: 'Unite.AI',
       title: 'Anthropic Releases Interactive Model of AI’s Possible Economic Futures',
       pubDate: '2026-09-09T14:42:02Z',
+      author: 'Unite.AI News',
       summary: 'Anthropic released the Econ Scenario Explorer projecting how AI could affect US economic labor.',
       content: '<p>Anthropic Economic Research team introduced an interactive simulation tool modeling wage dynamics, displacement rates, and productivity gains.</p>',
       isRead: false,
       link: 'https://www.unite.ai'
     }
   ],
-  'MacStories': [
+  'KDnuggets': [
     {
-      id: 'MACSTORIES-1',
-      feedTitle: 'MacStories',
-      title: 'macOS 15 Sequoia Window Tiling & System Settings Deep Dive',
-      pubDate: '2026-09-08T14:00:00Z',
-      summary: 'Exploring native window tiling keyboard shortcuts and modern System Settings in macOS Sequoia.',
-      content: '<p>macOS Sequoia brings long-awaited native window tiling support with drag-to-edge snapping and customizable hotkeys.</p>',
+      id: 'KDN-1',
+      feedTitle: 'KDnuggets',
+      title: 'Top 7 Python Libraries for Machine Learning & LLM App Development 2026',
+      pubDate: '2026-09-07T08:00:00Z',
+      author: 'KDnuggets Editors',
+      summary: 'Essential open source libraries for data processing, vector indexing, and model evaluation.',
+      content: '<p>From Polars for high-speed dataframes to LanceDB for vector search and Instructor for structured outputs, here are the top 7 Python packages for AI engineers.</p>',
       isRead: false,
-      link: 'https://www.macstories.net'
+      link: 'https://www.kdnuggets.com'
     }
   ],
-  'SwiftUI Recipes': [
+  'Import AI (Jack Clark)': [
     {
-      id: 'SWIFTUI-1',
-      feedTitle: 'SwiftUI Recipes',
-      title: 'Building Custom Outline Group Trees with Transferable Drag & Drop',
-      pubDate: '2026-09-07T11:00:00Z',
-      summary: 'Comprehensive guide to building hierarchical sidebar trees in SwiftUI using SwiftData models.',
-      content: '<p>Learn how to implement multi-level folder trees in SwiftUI macOS apps using OutlineGroup, Transferable protocols, and dropDestination handlers.</p>',
+      id: 'IMP-1',
+      feedTitle: 'Import AI (Jack Clark)',
+      title: 'Import AI #412: Compute Governance & Model Benchmarks',
+      pubDate: '2026-09-08T19:00:00Z',
+      author: 'Jack Clark',
+      summary: 'Analysis of global compute cluster tracking, semiconductor supply chains, and safety evaluations.',
+      content: '<p>Welcome to Import AI #412. In this issue: international compute governance frameworks, autonomous agent benchmark saturation, and synthetic data quality bounds.</p>',
       isRead: false,
-      link: 'https://swiftuirecipes.com'
+      link: 'https://jack-clark.net'
+    }
+  ],
+  'AI Weekly': [
+    {
+      id: 'AIW-1',
+      feedTitle: 'AI Weekly',
+      title: 'AI Weekly Issue 450: The State of Open Weights',
+      pubDate: '2026-09-07T12:00:00Z',
+      author: 'AI Weekly Editors',
+      summary: 'Weekly curation of frontier open weights releases, fine-tuning guides, and agentic workflows.',
+      content: '<p>Issue 450 highlights open weight model releases, parameter-efficient fine-tuning (PEFT) optimizations, and low-latency audio LLM architectures.</p>',
+      isRead: false,
+      link: 'https://aiweekly.co'
+    }
+  ],
+  'hermesagent': [
+    {
+      id: 'HERMES-1',
+      feedTitle: 'hermesagent',
+      title: 'r/hermesagent: Autonomous Tool Calling Framework Release',
+      pubDate: '2026-09-09T04:15:00Z',
+      author: 'u/hermes_dev',
+      summary: 'Community announcement for Hermes Agent v3 featuring zero-shot MCP tool discovery and zsh command execution.',
+      content: '<p>Hermes Agent v3 brings native Model Context Protocol (MCP) tool binding, automatic retry loops, and local process sandbox isolation.</p>',
+      isRead: false,
+      link: 'https://www.reddit.com/r/hermesagent/'
+    }
+  ],
+  'Chiefmartec': [
+    {
+      id: 'CHIEF-1',
+      feedTitle: 'Chiefmartec',
+      title: 'Martech 2026 Stack Architecture & AI Agent Workflows',
+      pubDate: '2026-09-06T17:00:00Z',
+      author: 'Scott Brinker',
+      summary: 'Exploring how autonomous AI agents are transforming marketing ops and CRM data orchestration.',
+      content: '<p>The landscape of marketing technology is shifting from point solution tools to composable AI agent networks that automate lead lifecycle routing and customer data enrichment.</p>',
+      isRead: false,
+      link: 'https://chiefmartec.com'
+    }
+  ],
+  'Marketing AI Institute': [
+    {
+      id: 'MAI-1',
+      feedTitle: 'Marketing AI Institute',
+      title: 'How AI Transforms Real-Time Content Personalization',
+      pubDate: '2026-09-07T10:30:00Z',
+      author: 'Paul Roetzer',
+      summary: 'Actionable strategies for leveraging generative models in enterprise content strategy and customer journeys.',
+      content: '<p>Generative AI enables hyper-personalized messaging at scale. This article details frameworks for integrating AI copy generation into automated CRM flows.</p>',
+      isRead: false,
+      link: 'https://www.marketingaiinstitute.com'
+    }
+  ],
+  'WordLift Blog (AI/SEO)': [
+    {
+      id: 'WL-1',
+      feedTitle: 'WordLift Blog (AI/SEO)',
+      title: 'Generative Engine Optimization (GEO) Best Practices',
+      pubDate: '2026-09-08T11:45:00Z',
+      author: 'Teodora Petkova',
+      summary: 'Optimizing web content to be cited and surfaced by LLMs, Perplexity, and AI Search Overviews.',
+      content: '<p>Generative Engine Optimization (GEO) is the evolution of SEO. Learn how to structure entity data, JSON-LD schema, and semantic quotes for maximum AI search visibility.</p>',
+      isRead: false,
+      link: 'https://wordlift.io'
     }
   ]
 };
-
-// App State
-let loadedArticles = [];
-let currentArticle = null;
-let selectedNodeId = null;
-let contextNodeId = null;
-let draggedNodeId = null;
 
 // Call MCP Tool via HTTP API
 async function callMCP(method, params = {}) {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     const res = await fetch(MCP_URL, {
       method: 'POST',
@@ -249,7 +550,7 @@ async function callMCP(method, params = {}) {
       return JSON.parse(json.result.content[0].text);
     }
   } catch (err) {
-    // Console output muted for clean user experience
+    // Muted for fast local responsiveness
   }
   return null;
 }
@@ -480,68 +781,60 @@ function updateBadges() {
   document.getElementById('badge-latest').textContent = Math.round(total * 0.6);
 }
 
-// Fetch & Filter Articles for Selected Target (Filter, Folder, or Feed)
+// Fetch & Display Articles for Filter, Folder, or Feed
 async function fetchAndDisplayArticles(target) {
   const container = document.getElementById('article-list-container');
   container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Loading articles...</div>';
 
   let items = [];
-  let filterType = 'latest';
 
   if (typeof target === 'string') {
-    filterType = target;
-  }
+    // All, Read, Latest filters
+    let pool = [];
+    Object.values(articleDatabase).forEach(list => { pool = pool.concat(list); });
+    
+    // Check live MCP items as well
+    const mcpData = await callMCP('list_items', { filter: target, limit: 30 });
+    if (mcpData && mcpData.items && mcpData.items.length > 0) {
+      pool = mcpData.items.concat(pool);
+    }
 
-  // Attempt live MCP call
-  const mcpData = await callMCP('list_items', { filter: filterType, limit: 50 });
-  let pool = (mcpData && mcpData.items && mcpData.items.length > 0) ? mcpData.items : [];
-
-  // Combine database fallback articles
-  let allLocalArticles = [];
-  Object.values(articleDatabase).forEach(list => {
-    allLocalArticles = allLocalArticles.concat(list);
-  });
-
-  const fullPool = pool.concat(allLocalArticles);
-
-  if (typeof target === 'string') {
-    // Filter view: 'all', 'read', 'latest'
-    if (target === 'read') items = fullPool.filter(a => a.isRead);
-    else items = fullPool;
+    if (target === 'read') items = pool.filter(a => a.isRead);
+    else items = pool;
   } else if (target && target.type === 'feed') {
-    // Feed view: lookup articles by exact feed name or url
-    const feedName = target.name;
-    items = articleDatabase[feedName] || fullPool.filter(a => a.feedTitle && a.feedTitle.toLowerCase() === feedName.toLowerCase());
+    // Feed view: match feed name in articleDatabase
+    const name = target.name;
+    items = articleDatabase[name] || [];
+
+    // Fallback if no static entry exists
     if (items.length === 0) {
       items = [
         {
           id: `feed-placeholder-${Date.now()}`,
-          feedTitle: feedName,
-          title: `Latest Update from ${feedName}`,
+          feedTitle: name,
+          title: `Latest Updates from ${name}`,
           pubDate: new Date().toISOString(),
-          summary: `Showing current article stream for ${feedName}. No new unread items.`,
-          content: `<p>Welcome to ${feedName}. You are up to date on all items in this subscription feed.</p>`,
+          author: name,
+          summary: `Showing current articles for ${name}.`,
+          content: `<p>Welcome to ${name}. All items in this feed are up to date.</p>`,
           isRead: true,
           link: target.url || '#'
         }
       ];
     }
   } else if (target && target.type === 'folder') {
-    // Folder view: collect all feed names in this folder & subfolders
-    const targetFeeds = new Set();
+    // Folder view: collect feeds in folder
+    const feedNames = new Set();
     const collectFeeds = (n) => {
-      if (n.type === 'feed') targetFeeds.add(n.name);
+      if (n.type === 'feed') feedNames.add(n.name);
       if (n.children) n.children.forEach(collectFeeds);
     };
     collectFeeds(target);
 
     items = [];
-    targetFeeds.forEach(fn => {
+    feedNames.forEach(fn => {
       if (articleDatabase[fn]) items = items.concat(articleDatabase[fn]);
     });
-    if (items.length === 0) {
-      items = fullPool.filter(a => a.feedTitle && targetFeeds.has(a.feedTitle));
-    }
   }
 
   loadedArticles = items;
@@ -552,7 +845,7 @@ function renderArticleList(articles) {
   const container = document.getElementById('article-list-container');
   container.innerHTML = '';
 
-  if (articles.length === 0) {
+  if (!articles || articles.length === 0) {
     container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">No articles in this feed.</div>';
     return;
   }
@@ -560,7 +853,12 @@ function renderArticleList(articles) {
   articles.forEach((art, idx) => {
     const card = document.createElement('div');
     card.className = `article-item-card ${currentArticle && currentArticle.id === art.id ? 'selected' : ''}`;
-    card.onclick = () => selectArticle(art, card);
+    
+    // Explicit click handler for instant article preview
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      selectArticle(art, card);
+    });
 
     const dateStr = art.pubDate ? new Date(art.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
@@ -575,6 +873,7 @@ function renderArticleList(articles) {
     `;
     container.appendChild(card);
 
+    // Auto-select first article in list
     if (idx === 0) {
       selectArticle(art, card);
     }
@@ -582,7 +881,7 @@ function renderArticleList(articles) {
 }
 
 // Select Article & Render Reader View
-async function selectArticle(art, cardEl) {
+function selectArticle(art, cardEl) {
   currentArticle = art;
   document.querySelectorAll('.article-item-card').forEach(c => c.classList.remove('selected'));
   if (cardEl) cardEl.classList.add('selected');

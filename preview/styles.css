@@ -64,7 +64,7 @@ body {
    COLUMN 1: SIDEBAR
    ========================================================================== */
 .sidebar {
-  width: 270px;
+  width: 275px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -73,11 +73,10 @@ body {
 }
 
 .sidebar-header {
-  height: 60px;
-  padding: 34px 14px 8px 74px; /* Clearance for native macOS Traffic Lights */
+  height: 48px;
+  padding: 28px 14px 4px 74px; /* Clearance for native macOS Traffic Lights */
   display: flex;
   align-items: center;
-  justify-content: space-between;
   -webkit-app-region: drag;
 }
 
@@ -88,27 +87,41 @@ body {
   letter-spacing: -0.2px;
 }
 
-.header-actions {
+.action-toolbar {
+  padding: 6px 10px;
   display: flex;
-  gap: 4px;
-  -webkit-app-region: no-drag;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.icon-action-btn {
-  background: none;
-  border: none;
-  padding: 4px;
-  border-radius: 5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
+.toolbar-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  padding: 5px 9px;
+  background: var(--bg-reader);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.12s ease;
 }
 
-.icon-action-btn:hover {
+.toolbar-btn:hover {
   background: var(--bg-item-hover);
-  color: var(--text-primary);
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.toolbar-btn.primary {
+  background: var(--accent-folder);
+  border: none;
+  color: #ffffff;
+}
+
+.toolbar-btn.primary:hover {
+  background: #62a338;
 }
 
 .sidebar-scroll-area {
@@ -132,7 +145,7 @@ body {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin: 14px 6px 6px 6px;
+  margin: 12px 6px 6px 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -300,7 +313,7 @@ body {
    COLUMN 2: ARTICLE LIST
    ========================================================================== */
 .article-list-column {
-  width: 320px;
+  width: 330px;
   background: var(--bg-article-list);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -309,8 +322,8 @@ body {
 }
 
 .article-list-header {
-  height: 60px;
-  padding: 24px 14px 8px 14px;
+  height: 48px;
+  padding: 12px 14px 4px 14px;
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--border-color);
@@ -434,8 +447,8 @@ body {
 }
 
 .reader-header {
-  height: 60px;
-  padding: 24px 20px 8px 20px;
+  height: 48px;
+  padding: 12px 20px 4px 20px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -464,6 +477,10 @@ body {
 .btn-icon:hover {
   background: var(--bg-item-hover);
   color: var(--text-primary);
+}
+
+.btn-icon.starred {
+  color: #ffcc00;
 }
 
 .reader-content {

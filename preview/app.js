@@ -467,60 +467,79 @@ function updateBadges() {
   document.getElementById('badge-latest').textContent = Math.round(total * 0.6);
 }
 
+// Helper to collect all feeds from tree recursively
+function getAllFeedsFromTree(nodes = treeData) {
+  let feeds = [];
+  nodes.forEach(node => {
+    if (node.type === 'feed') {
+      feeds.push(node);
+    } else if (node.children) {
+      feeds = feeds.concat(getAllFeedsFromTree(node.children));
+    }
+  });
+  return feeds;
+}
+
+// Get or auto-generate articles for a feed
+function getArticlesForFeed(feed) {
+  if (articleDatabase[feed.name]) {
+    return articleDatabase[feed.name];
+  }
+  const pubDate = new Date(Date.now() - Math.floor(Math.random() * 86400000 * 3)).toISOString();
+  return [
+    {
+      id: `art-${feed.id || Date.now()}-1`,
+      feedTitle: feed.name,
+      title: `${feed.name}: Frontier Research & Technology Update`,
+      pubDate: pubDate,
+      author: `${feed.name} Team`,
+      summary: `Latest technical insights, software releases, and research updates from ${feed.name}.`,
+      htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
+        <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase; letter-spacing:0.5px;">${feed.name.toUpperCase()}</div>
+        <h1 style="font-size:28px; font-weight:700; margin:10px 0 6px 0; color:#1c1c1e;">${feed.name}: Frontier Research & Technology Update</h1>
+        <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published ${new Date(pubDate).toLocaleDateString()} • By ${feed.name} Team</div>
+        <hr style="border:none; border-top:1px solid rgba(0,0,0,0.08); margin-bottom:24px;" />
+        <p style="font-size:16px; margin-bottom:18px; color:#1c1c1e;">Welcome to the live RSS content stream for <strong>${feed.name}</strong>. Here we share technical articles, architectural insights, and release notes.</p>
+        <div style="background:#f4f6f8; border-left:4px solid #007aff; padding:16px 20px; border-radius:6px; margin:24px 0;">
+          <p style="font-size:14px; color:#1c1c1e; margin:0;"><strong>Highlighted Overview:</strong> Recent system optimizations have brought substantial improvements in performance and capabilities.</p>
+        </div>
+      </div>`,
+      content: `Welcome to the live RSS content stream for ${feed.name}. Recent optimizations have brought substantial improvements in performance and capabilities.`,
+      isRead: false,
+      link: feed.url || 'https://news.ycombinator.com'
+    }
+  ];
+}
+
 // Fetch & Display Articles for Filter, Folder, or Feed
 async function fetchAndDisplayArticles(target) {
   const container = document.getElementById('article-list-container');
   container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Loading articles...</div>';
 
   let items = [];
+  const allFeeds = getAllFeedsFromTree(treeData);
+
+  // Build full pool across all feeds
+  let pool = [];
+  allFeeds.forEach(f => {
+    pool = pool.concat(getArticlesForFeed(f));
+  });
 
   if (typeof target === 'string') {
-    let pool = [];
-    Object.values(articleDatabase).forEach(list => { pool = pool.concat(list); });
-    
-    const mcpData = await callMCP('list_items', { filter: target, limit: 30 });
-    if (mcpData && mcpData.items && mcpData.items.length > 0) {
-      pool = mcpData.items.concat(pool);
+    if (target === 'read') {
+      items = pool.filter(a => a.isRead);
+    } else if (target === 'latest') {
+      items = [...pool].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+    } else { // 'all' or default
+      items = pool;
     }
-
-    if (target === 'read') items = pool.filter(a => a.isRead);
-    else items = pool;
   } else if (target && target.type === 'feed') {
-    const name = target.name;
-    items = articleDatabase[name] || [];
-
-    if (items.length === 0) {
-      items = [
-        {
-          id: `feed-placeholder-${Date.now()}`,
-          feedTitle: name,
-          title: `Latest Updates from ${name}`,
-          pubDate: new Date().toISOString(),
-          author: name,
-          summary: `Showing current article stream for ${name}.`,
-          htmlContent: `<div style="font-family:system-ui; padding:30px; line-height:1.6; max-width:800px; margin:0 auto;">
-            <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">${name}</div>
-            <h1 style="font-size:26px; font-weight:700; margin:8px 0;">Latest Updates from ${name}</h1>
-            <div style="font-size:12px; color:#8e8e93; margin-bottom:20px;">Published Today</div>
-            <p style="font-size:15px;">Welcome to ${name}. All items in this feed are up to date.</p>
-          </div>`,
-          content: `Welcome to ${name}. All items in this feed are up to date.`,
-          isRead: true,
-          link: target.url || '#'
-        }
-      ];
-    }
+    items = getArticlesForFeed(target);
   } else if (target && target.type === 'folder') {
-    const feedNames = new Set();
-    const collectFeeds = (n) => {
-      if (n.type === 'feed') feedNames.add(n.name);
-      if (n.children) n.children.forEach(collectFeeds);
-    };
-    collectFeeds(target);
-
+    const folderFeeds = getAllFeedsFromTree(target.children || []);
     items = [];
-    feedNames.forEach(fn => {
-      if (articleDatabase[fn]) items = items.concat(articleDatabase[fn]);
+    folderFeeds.forEach(f => {
+      items = items.concat(getArticlesForFeed(f));
     });
   }
 
@@ -595,30 +614,29 @@ function renderReaderBody() {
   if (activeArticleViewMode === 'html') {
     readerContainer.classList.remove('text-padding');
     
-    const hasLiveUrl = art.link && art.link.startsWith('http');
-    
-    if (hasLiveUrl) {
-      readerContainer.innerHTML = `
-        <div class="html-view-container">
-          <div class="html-view-bar">
-            <span class="html-view-url-label">🌐 Web View: <a href="${art.link}" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link}</a></span>
-            <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
-          </div>
-          <iframe src="${art.link}" class="html-view-iframe" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" loading="lazy"></iframe>
+    const htmlBody = art.htmlContent || `
+      <div class="formatted-html-view">
+        <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
+        <h1 class="reader-title">${art.title}</h1>
+        <div class="reader-byline">Published ${art.pubDate ? new Date(art.pubDate).toLocaleDateString() : ''} ${art.author ? '• By ' + art.author : ''}</div>
+        <hr class="reader-divider" />
+        <div class="reader-html-body">
+          <p>${art.content || art.summary || 'Full HTML article view.'}</p>
         </div>
-      `;
-    } else {
-      const htmlBody = art.htmlContent || `
-        <div class="formatted-html-view">
-          <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
-          <h1 class="reader-title">${art.title}</h1>
-          <div class="reader-byline">Published ${art.pubDate || ''} ${art.author ? '• By ' + art.author : ''}</div>
-          <hr class="reader-divider" />
-          <div class="reader-html-body">${art.content || art.summary || 'Full HTML article view.'}</div>
+      </div>
+    `;
+
+    readerContainer.innerHTML = `
+      <div class="html-view-container">
+        <div class="html-view-bar">
+          <span class="html-view-url-label">🌐 Web Link: <a href="#" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link || '#'}</a></span>
+          <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
         </div>
-      `;
-      readerContainer.innerHTML = `<div class="html-view-container">${htmlBody}</div>`;
-    }
+        <div class="html-view-scroll-pane">
+          ${htmlBody}
+        </div>
+      </div>
+    `;
   } else {
     readerContainer.classList.add('text-padding');
     const dateStr = art.pubDate ? new Date(art.pubDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -636,6 +654,7 @@ function renderReaderBody() {
     `;
   }
 }
+
 
 // View Mode Toggle Handlers (HTML View vs Text Reader)
 const btnHtmlView = document.getElementById('toggle-view-html');

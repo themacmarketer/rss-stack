@@ -915,11 +915,18 @@ body {
   background: #ffffff;
 }
 
+.html-view-scroll-pane {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-reader);
+}
+
 .formatted-html-view {
   padding: 30px 40px;
   max-width: 820px;
   margin: 0 auto;
 }
+
 
 .reader-divider {
   border: none;

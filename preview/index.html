@@ -24,7 +24,7 @@
           <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
             <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/>
           </svg>
-          <span>+ Feed</span>
+          <span>Feed</span>
         </button>
 
         <button id="add-folder-btn" class="toolbar-btn" title="Create New Folder">
@@ -181,6 +181,16 @@
               </select>
             </div>
             <div class="setting-row">
+              <label>Article Description Lines</label>
+              <select id="setting-description-lines">
+                <option value="0">0 lines (Titles only)</option>
+                <option value="1">1 line</option>
+                <option value="2" selected>2 lines (Default)</option>
+                <option value="3">3 lines</option>
+                <option value="4">4 lines</option>
+              </select>
+            </div>
+            <div class="setting-row">
               <label>Auto Refresh Feeds</label>
               <select id="setting-refresh-interval">
                 <option value="15">Every 15 minutes</option>
@@ -212,7 +222,14 @@
               <label>Enable MCP Service</label>
               <input type="checkbox" id="mcp-enable-toggle" checked>
             </div>
-            <div class="setting-block">
+            <div class="setting-row">
+              <label>Server Status</label>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="mcp-status-badge" class="mcp-status-tag active">Active (Port 8745)</span>
+                <button class="btn-sm" id="test-mcp-btn">Check Status</button>
+              </div>
+            </div>
+            <div class="setting-block" style="margin-top: 10px;">
               <label>Server URL</label>
               <input type="text" id="mcp-url-input" value="http://127.0.0.1:8745/mcp" readonly>
             </div>
@@ -224,7 +241,12 @@
               </div>
             </div>
             <div class="setting-block">
-              <label>Grok / Claude / Cursor CLI Config Command</label>
+              <label>MCP Client Configuration Examples</label>
+              <div class="mcp-client-tabs">
+                <button class="mcp-client-tab active" data-client="grok">Grok CLI</button>
+                <button class="mcp-client-tab" data-client="claude">Claude CLI</button>
+                <button class="mcp-client-tab" data-client="cursor">Cursor / Claude Desktop</button>
+              </div>
               <pre class="code-box" id="mcp-code-snippet">grok mcp add --transport http quickrss "http://127.0.0.1:8745/mcp?token=MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1"</pre>
               <button class="btn-sm" id="copy-mcp-cmd-btn">Copy Command</button>
             </div>
@@ -275,10 +297,34 @@
         <input type="url" id="new-feed-url-input" placeholder="https://example.com/feed.xml">
         <label style="margin-top: 12px;">Display Title (Optional)</label>
         <input type="text" id="new-feed-title-input" placeholder="e.g. Ars Technica">
+        <label style="margin-top: 12px;">Target Folder</label>
+        <select id="new-feed-folder-select"></select>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" id="cancel-add-feed-btn">Cancel</button>
         <button class="btn-primary" id="confirm-add-feed-btn">Subscribe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Feed Modal -->
+  <div id="edit-feed-modal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <div class="modal-header">
+        <h3>Edit Feed Details</h3>
+        <button class="close-modal-btn" id="close-edit-feed-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label>Display Title</label>
+        <input type="text" id="edit-feed-title-input" placeholder="Feed Name">
+        <label style="margin-top: 12px;">RSS / Atom Feed URL</label>
+        <input type="url" id="edit-feed-url-input" placeholder="https://example.com/feed.xml">
+        <label style="margin-top: 12px;">Location Folder</label>
+        <select id="edit-feed-folder-select"></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancel-edit-feed-btn">Cancel</button>
+        <button class="btn-primary" id="confirm-edit-feed-btn">Save Changes</button>
       </div>
     </div>
   </div>
@@ -301,11 +347,11 @@
     </div>
   </div>
 
-  <!-- Delete Folder Modal -->
+  <!-- Delete Item Modal -->
   <div id="delete-folder-modal" class="modal-overlay hidden">
     <div class="modal-card dialog-card">
       <div class="modal-header">
-        <h3>Delete Folder</h3>
+        <h3 id="delete-modal-title">Delete Folder</h3>
         <button class="close-modal-btn" id="close-delete-folder-btn">&times;</button>
       </div>
       <div class="modal-body">
@@ -354,21 +400,32 @@
     </div>
   </div>
 
-
   <!-- Context Menu -->
   <div id="context-menu" class="context-menu hidden">
+    <button class="ctx-item" id="ctx-add-feed">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/></svg>
+      Add Feed Here
+    </button>
     <button class="ctx-item" id="ctx-new-subfolder">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4v8M4 8h8"/></svg>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 3l.04.87a1.99 1.99 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H13.174a2 2 0 0 0 1.991-1.819l.637-7A1.99 1.99 0 0 0 15.46 3.87L15.5 3A1.5 1.5 0 0 0 14 1.5H8.828a1.5 1.5 0 0 1-1.06-.44L6.44.73A1.5 1.5 0 0 0 5.378.293H2A1.5 1.5 0 0 0 .5 1.793V3z"/></svg>
       New Subfolder
+    </button>
+    <button class="ctx-item" id="ctx-edit-feed">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.854 2.146a.5.5 0 0 0-.707 0L3.5 10.793V13h2.207l8.647-8.646a.5.5 0 0 0 0-.708l-1.5-1.5z"/></svg>
+      Edit Feed
+    </button>
+    <button class="ctx-item" id="ctx-open-website">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.715 6.542L3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.586-.586a1.002 1.002 0 0 0 .154-.199 2 2 0 0 1-.861-3.337L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
+      View Feed Website
     </button>
     <button class="ctx-item" id="ctx-rename">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.854 2.146a.5.5 0 0 0-.707 0L3.5 10.793V13h2.207l8.647-8.646a.5.5 0 0 0 0-.708l-1.5-1.5z"/></svg>
-      Rename
+      Rename Folder
     </button>
     <div class="ctx-divider"></div>
     <button class="ctx-item danger" id="ctx-delete">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1h2.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-      Delete Folder
+      Delete Item
     </button>
   </div>
 

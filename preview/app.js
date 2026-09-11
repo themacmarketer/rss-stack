@@ -1814,27 +1814,153 @@ if (testMCPBtn) {
   };
 }
 
-// Add Feed Modal
+// Folder Dropdown Population Helper
+function populateFolderDropdown(selectEl, selectedFolderId = '', defaultText = '📁 Root / Top Level') {
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
+  
+  const rootOpt = document.createElement('option');
+  rootOpt.value = 'root';
+  rootOpt.textContent = defaultText;
+  selectEl.appendChild(rootOpt);
+
+  function appendOptions(nodes, depth = 0) {
+    nodes.forEach(node => {
+      if (node.type === 'folder') {
+        const opt = document.createElement('option');
+        opt.value = node.id;
+        const indent = '\u00A0\u00A0\u00A0\u00A0'.repeat(depth);
+        opt.textContent = `${indent}📁 ${node.name}`;
+        if (node.id === selectedFolderId) opt.selected = true;
+        selectEl.appendChild(opt);
+
+        if (node.children && node.children.length > 0) {
+          appendOptions(node.children, depth + 1);
+        }
+      }
+    });
+  }
+
+  appendOptions(treeData, 0);
+}
+
+// Find Parent Node of Target Node
+function findParentOfNode(nodes, targetId, parentNode = null) {
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].id === targetId) {
+      return { parentArray: nodes, parentNode: parentNode, index: i, node: nodes[i] };
+    }
+    if (nodes[i].children) {
+      const found = findParentOfNode(nodes[i].children, targetId, nodes[i]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+// Add Feed Modal & Setup
 const addFeedModal = document.getElementById('add-feed-modal');
 const addFeedBtn = document.getElementById('add-feed-btn');
 const closeAddFeedBtn = document.getElementById('close-add-feed-btn');
 const cancelAddFeedBtn = document.getElementById('cancel-add-feed-btn');
 const confirmAddFeedBtn = document.getElementById('confirm-add-feed-btn');
+const newFeedFolderSelect = document.getElementById('new-feed-folder-select');
 
-if (addFeedBtn) addFeedBtn.onclick = () => addFeedModal.classList.remove('hidden');
+if (addFeedBtn) {
+  addFeedBtn.onclick = () => {
+    document.getElementById('new-feed-url-input').value = '';
+    document.getElementById('new-feed-title-input').value = '';
+    populateFolderDropdown(newFeedFolderSelect, selectedNodeId || '');
+    addFeedModal.classList.remove('hidden');
+  };
+}
+
 if (closeAddFeedBtn) closeAddFeedBtn.onclick = () => addFeedModal.classList.add('hidden');
 if (cancelAddFeedBtn) cancelAddFeedBtn.onclick = () => addFeedModal.classList.add('hidden');
 
 if (confirmAddFeedBtn) {
   confirmAddFeedBtn.onclick = async () => {
-    const url = document.getElementById('new-feed-url-input').value;
-    const title = document.getElementById('new-feed-title-input').value || 'New Feed';
+    const url = document.getElementById('new-feed-url-input').value.trim();
+    const title = document.getElementById('new-feed-title-input').value.trim() || url;
+    const targetFolderId = newFeedFolderSelect ? newFeedFolderSelect.value : 'root';
+
     if (url) {
+      const newFeed = { id: `feed-${Date.now()}`, type: 'feed', name: title, url: url, unreadCount: 1 };
+      
+      if (targetFolderId === 'root') {
+        treeData.unshift(newFeed);
+      } else {
+        const targetPos = findNodePosition(treeData, targetFolderId);
+        if (targetPos && targetPos.node.type === 'folder') {
+          targetPos.node.children = targetPos.node.children || [];
+          targetPos.node.children.unshift(newFeed);
+          targetPos.node.expanded = true;
+        } else {
+          treeData.unshift(newFeed);
+        }
+      }
+
       await callMCP('add_feed', { url, title });
-      treeData[0].children.unshift({ id: `feed-${Date.now()}`, type: 'feed', name: title, url, unreadCount: 1 });
       renderTree();
+      fetchAndDisplayArticles(newFeed);
+      showToast(`Subscribed to feed "${title}"`, 'success');
       addFeedModal.classList.add('hidden');
     }
+  };
+}
+
+// Edit Feed Modal & Setup
+const editFeedModal = document.getElementById('edit-feed-modal');
+const closeEditFeedBtn = document.getElementById('close-edit-feed-btn');
+const cancelEditFeedBtn = document.getElementById('cancel-edit-feed-btn');
+const confirmEditFeedBtn = document.getElementById('confirm-edit-feed-btn');
+const editFeedFolderSelect = document.getElementById('edit-feed-folder-select');
+
+if (closeEditFeedBtn) closeEditFeedBtn.onclick = () => editFeedModal.classList.add('hidden');
+if (cancelEditFeedBtn) cancelEditFeedBtn.onclick = () => editFeedModal.classList.add('hidden');
+
+if (confirmEditFeedBtn) {
+  confirmEditFeedBtn.onclick = () => {
+    if (!contextNodeId) return;
+    const pos = findNodePosition(treeData, contextNodeId);
+    if (pos && pos.node.type === 'feed') {
+      const newTitle = document.getElementById('edit-feed-title-input').value.trim();
+      const newUrl = document.getElementById('edit-feed-url-input').value.trim();
+      const newFolderId = editFeedFolderSelect ? editFeedFolderSelect.value : 'root';
+
+      if (newTitle) pos.node.name = newTitle;
+      if (newUrl && newUrl !== pos.node.url) {
+        delete feedArticleCache[pos.node.url];
+        pos.node.url = newUrl;
+      }
+
+      // Check if folder location changed
+      const parentInfo = findParentOfNode(treeData, contextNodeId);
+      const currentParentId = parentInfo && parentInfo.parentNode ? parentInfo.parentNode.id : 'root';
+
+      if (newFolderId !== currentParentId) {
+        const removed = removeNodeById(treeData, contextNodeId);
+        if (removed) {
+          if (newFolderId === 'root') {
+            treeData.unshift(removed);
+          } else {
+            const targetPos = findNodePosition(treeData, newFolderId);
+            if (targetPos && targetPos.node.type === 'folder') {
+              targetPos.node.children = targetPos.node.children || [];
+              targetPos.node.children.unshift(removed);
+              targetPos.node.expanded = true;
+            } else {
+              treeData.unshift(removed);
+            }
+          }
+        }
+      }
+
+      renderTree();
+      fetchAndDisplayArticles(pos.node);
+      showToast(`Updated feed "${pos.node.name}"`, 'success');
+    }
+    editFeedModal.classList.add('hidden');
   };
 }
 
@@ -1879,12 +2005,10 @@ if (searchInput) {
         container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Searching articles...</div>';
       }
 
-      // Collect all feeds from the tree
       const allFeeds = getAllFeedsFromTree(treeData);
       const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f)));
       const allArticlesPool = articlesLists.flat();
 
-      // Deduplicate pool by article ID or title+feed
       const seenKeys = new Set();
       const uniquePool = [];
       allArticlesPool.forEach(art => {
@@ -1943,6 +2067,7 @@ if (confirmAddFolderBtn) {
     const name = document.getElementById('new-folder-name-input').value.trim() || 'New Folder';
     treeData.unshift({ id: `f-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
     renderTree();
+    showToast(`Created folder "${name}"`, 'success');
     addFolderModal.classList.add('hidden');
   };
 }
@@ -1954,7 +2079,37 @@ function showContextMenu(x, y, isFolder) {
   contextMenu.style.left = `${x}px`;
   contextMenu.style.top = `${y}px`;
   contextMenu.classList.remove('hidden');
-  document.getElementById('ctx-new-subfolder').style.display = isFolder ? 'flex' : 'none';
+
+  const addFeedBtn = document.getElementById('ctx-add-feed');
+  const newSubfolderBtn = document.getElementById('ctx-new-subfolder');
+  const editFeedBtn = document.getElementById('ctx-edit-feed');
+  const openWebBtn = document.getElementById('ctx-open-website');
+  const renameBtn = document.getElementById('ctx-rename');
+  const deleteBtn = document.getElementById('ctx-delete');
+
+  if (isFolder) {
+    if (addFeedBtn) addFeedBtn.style.display = 'flex';
+    if (newSubfolderBtn) newSubfolderBtn.style.display = 'flex';
+    if (renameBtn) renameBtn.style.display = 'flex';
+    if (editFeedBtn) editFeedBtn.style.display = 'none';
+    if (openWebBtn) openWebBtn.style.display = 'none';
+    if (deleteBtn) {
+      deleteBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1h2.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+        Delete Folder`;
+    }
+  } else {
+    if (addFeedBtn) addFeedBtn.style.display = 'none';
+    if (newSubfolderBtn) newSubfolderBtn.style.display = 'none';
+    if (renameBtn) renameBtn.style.display = 'none';
+    if (editFeedBtn) editFeedBtn.style.display = 'flex';
+    if (openWebBtn) openWebBtn.style.display = 'flex';
+    if (deleteBtn) {
+      deleteBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1h2.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+        Delete Feed`;
+    }
+  }
 }
 
 document.addEventListener('click', (e) => {
@@ -1963,7 +2118,58 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Context Menu Action 1: New Subfolder Modal
+// Context Menu Action: Add Feed Here
+const ctxAddFeedBtn = document.getElementById('ctx-add-feed');
+if (ctxAddFeedBtn) {
+  ctxAddFeedBtn.onclick = (e) => {
+    e.stopPropagation();
+    contextMenu.classList.add('hidden');
+    document.getElementById('new-feed-url-input').value = '';
+    document.getElementById('new-feed-title-input').value = '';
+    populateFolderDropdown(newFeedFolderSelect, contextNodeId || '');
+    addFeedModal.classList.remove('hidden');
+  };
+}
+
+// Context Menu Action: Edit Feed Details
+const ctxEditFeedBtn = document.getElementById('ctx-edit-feed');
+if (ctxEditFeedBtn) {
+  ctxEditFeedBtn.onclick = (e) => {
+    e.stopPropagation();
+    contextMenu.classList.add('hidden');
+    if (!contextNodeId) return;
+
+    const pos = findNodePosition(treeData, contextNodeId);
+    if (pos && pos.node.type === 'feed') {
+      document.getElementById('edit-feed-title-input').value = pos.node.name;
+      document.getElementById('edit-feed-url-input').value = pos.node.url || '';
+      
+      const parentInfo = findParentOfNode(treeData, contextNodeId);
+      const currentParentId = parentInfo && parentInfo.parentNode ? parentInfo.parentNode.id : 'root';
+      populateFolderDropdown(editFeedFolderSelect, currentParentId);
+      
+      editFeedModal.classList.remove('hidden');
+    }
+  };
+}
+
+// Context Menu Action: View Feed Website
+const ctxOpenWebBtn = document.getElementById('ctx-open-website');
+if (ctxOpenWebBtn) {
+  ctxOpenWebBtn.onclick = (e) => {
+    e.stopPropagation();
+    contextMenu.classList.add('hidden');
+    if (!contextNodeId) return;
+
+    const pos = findNodePosition(treeData, contextNodeId);
+    if (pos && pos.node.type === 'feed') {
+      const webUrl = getCleanWebUrl(pos.node.url);
+      openInDefaultBrowser(webUrl);
+    }
+  };
+}
+
+// Context Menu Action: New Subfolder Modal
 document.getElementById('ctx-new-subfolder').onclick = (e) => {
   e.stopPropagation();
   contextMenu.classList.add('hidden');
@@ -1989,13 +2195,14 @@ if (confirmSubfolderBtn) {
         pos.node.children.unshift({ id: `subf-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
         pos.node.expanded = true;
         renderTree();
+        showToast(`Created subfolder "${name}"`, 'success');
       }
     }
     subfolderModal.classList.add('hidden');
   };
 }
 
-// Context Menu Action 2: Rename Folder Modal
+// Context Menu Action: Rename Folder Modal
 document.getElementById('ctx-rename').onclick = (e) => {
   e.stopPropagation();
   contextMenu.classList.add('hidden');
@@ -2022,20 +2229,30 @@ if (confirmRenameFolderBtn) {
       if (pos) {
         pos.node.name = newName;
         renderTree();
+        showToast(`Renamed folder to "${newName}"`, 'success');
       }
     }
     renameFolderModal.classList.add('hidden');
   };
 }
 
-// Context Menu Action 3: Delete Folder Modal
+// Context Menu Action: Delete Modal (Folder or Feed)
 document.getElementById('ctx-delete').onclick = (e) => {
   e.stopPropagation();
   contextMenu.classList.add('hidden');
   if (!contextNodeId) return;
   const pos = findNodePosition(treeData, contextNodeId);
   if (pos) {
-    document.getElementById('delete-folder-message').textContent = `Are you sure you want to delete folder "${pos.node.name}" and all its contents?`;
+    const isFolder = pos.node.type === 'folder';
+    const modalTitle = document.getElementById('delete-modal-title');
+    const msgEl = document.getElementById('delete-folder-message');
+
+    if (modalTitle) modalTitle.textContent = isFolder ? 'Delete Folder' : 'Delete Feed';
+    if (msgEl) {
+      msgEl.textContent = isFolder
+        ? `Are you sure you want to delete folder "${pos.node.name}" and all subfolders/feeds inside?`
+        : `Are you sure you want to delete feed "${pos.node.name}"?`;
+    }
     deleteFolderModal.classList.remove('hidden');
   }
 };
@@ -2050,9 +2267,14 @@ if (cancelDeleteFolderBtn) cancelDeleteFolderBtn.onclick = () => deleteFolderMod
 if (confirmDeleteFolderBtn) {
   confirmDeleteFolderBtn.onclick = () => {
     if (contextNodeId) {
+      const pos = findNodePosition(treeData, contextNodeId);
+      const itemName = pos ? pos.node.name : 'Item';
+      const isFolder = pos ? pos.node.type === 'folder' : false;
+
       removeNodeById(treeData, contextNodeId);
       renderTree();
       fetchAndDisplayArticles('latest');
+      showToast(`Deleted ${isFolder ? 'folder' : 'feed'} "${itemName}"`, 'info');
     }
     deleteFolderModal.classList.add('hidden');
   };

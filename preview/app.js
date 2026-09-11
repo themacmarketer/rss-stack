@@ -1073,15 +1073,36 @@ window.executeMCPTool = async function(name, args = {}) {
     }
 
     if (name === 'delete_feed') {
-      const feedId = args.id;
-      if (!feedId) return { error: 'Missing feed ID' };
-      const pos = findNodePosition(treeData, feedId);
-      if (!pos) return { error: `Feed '${feedId}' not found` };
+      const target = args.id || args.feed_id || args.url || args.title;
+      if (!target) return { error: 'Missing feed id, url, or title' };
+      
+      const targetLower = String(target).trim().toLowerCase();
+      function searchFeed(nodes) {
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i];
+          if (n.type === 'feed') {
+            if (n.id === target || (n.url && n.url.toLowerCase() === targetLower) || (n.name && n.name.toLowerCase() === targetLower)) {
+              return n;
+            }
+          }
+          if (n.children) {
+            const found = searchFeed(n.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
 
+      const targetFeed = searchFeed(treeData);
+      if (!targetFeed) return { error: `Feed '${target}' not found` };
+
+      const feedName = targetFeed.name;
+      const feedId = targetFeed.id;
       removeNodeById(treeData, feedId);
       renderTree();
-      showToast(`Deleted feed via MCP`, 'info');
-      return { success: true, id: feedId };
+      fetchAndDisplayArticles('latest');
+      showToast(`Deleted feed "${feedName}" via MCP`, 'info');
+      return { success: true, id: feedId, title: feedName };
     }
 
     if (name === 'get_folder_articles') {

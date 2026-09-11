@@ -435,13 +435,14 @@ class MCPServer {
                 ],
                 [
                     "name": "delete_feed",
-                    "description": "Unsubscribe and delete an RSS feed",
+                    "description": "Unsubscribe and delete an RSS feed by ID, URL, or Title",
                     "inputSchema": [
                         "type": "object",
                         "properties": [
-                            "id": ["type": "string", "description": "Feed ID"]
-                        ],
-                        "required": ["id"]
+                            "id": ["type": "string", "description": "Feed ID, RSS URL, or Title to delete"],
+                            "url": ["type": "string", "description": "RSS Feed URL (optional alternative to id)"],
+                            "title": ["type": "string", "description": "Feed Title (optional alternative to id)"]
+                        ]
                     ]
                 ],
                 [

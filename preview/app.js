@@ -1094,13 +1094,158 @@ function getAllFeedsFromTree(nodes = treeData) {
   return feeds;
 }
 
-// Get or auto-generate articles for a feed
-function getArticlesForFeed(feed) {
+// Cache for fetched live feed articles
+const feedArticleCache = {};
+
+function getCleanWebUrl(feedUrl) {
+  if (!feedUrl) return 'https://news.ycombinator.com';
+  let webUrl = feedUrl
+    .replace(/\/feed\/?rss\/?$/i, '/')
+    .replace(/\/feed\/?$/i, '/')
+    .replace(/\/rss\/?$/i, '/')
+    .replace(/\/rss\.xml$/i, '')
+    .replace(/\/feed\.xml$/i, '')
+    .replace(/\/issues\.rss$/i, '')
+    .replace(/\/index\.xml$/i, '')
+    .replace(/http:\/\/feeds\.feedburner\.com\//i, 'https://');
+  if (webUrl.includes('arxiv.org/rss/')) {
+    webUrl = webUrl.replace('rss.arxiv.org/rss/', 'arxiv.org/list/').toUpperCase() + '/recent';
+  }
+  return webUrl;
+}
+
+function parseRssXml(xmlText, feed) {
+  if (!xmlText) return [];
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+    if (xmlDoc.querySelector('parsererror')) return [];
+
+    const items = [];
+    const cleanWebUrl = getCleanWebUrl(feed.url);
+
+    // Parse RSS <item>
+    const rssItems = xmlDoc.querySelectorAll('item');
+    if (rssItems && rssItems.length > 0) {
+      rssItems.forEach((node, index) => {
+        const titleNode = node.querySelector('title');
+        const linkNode = node.querySelector('link');
+        const pubDateNode = node.querySelector('pubDate') || node.querySelector('date');
+        const creatorNode = node.querySelector('creator') || node.querySelector('author');
+        const descNode = node.querySelector('encoded') || node.querySelector('description');
+
+        const title = titleNode ? titleNode.textContent.trim() : `${feed.name} Article #${index+1}`;
+        let link = linkNode ? linkNode.textContent.trim() : '';
+        if (!link || link.endsWith('/feed/') || link.endsWith('.xml') || link.endsWith('/rss')) {
+          const guidNode = node.querySelector('guid');
+          if (guidNode && guidNode.textContent.startsWith('http')) {
+            link = guidNode.textContent.trim();
+          }
+        }
+        if (!link) link = cleanWebUrl;
+
+        const pubDateStr = pubDateNode ? pubDateNode.textContent.trim() : new Date(Date.now() - index * 3600000).toISOString();
+        const author = creatorNode ? creatorNode.textContent.trim() : (feed.name + ' Team');
+
+        let rawContent = descNode ? descNode.textContent.trim() : '';
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = rawContent;
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        const summary = plainText.slice(0, 200).trim() + (plainText.length > 200 ? '...' : '');
+
+        items.push({
+          id: `live-${feed.id || 'f'}-${index}`,
+          feedTitle: feed.name,
+          title: title,
+          pubDate: pubDateStr,
+          author: author,
+          summary: summary || `Latest update from ${feed.name}.`,
+          htmlContent: rawContent || `<p>${summary}</p>`,
+          content: plainText,
+          isRead: false,
+          link: link
+        });
+      });
+      return items;
+    }
+
+    // Parse Atom <entry>
+    const atomEntries = xmlDoc.querySelectorAll('entry');
+    if (atomEntries && atomEntries.length > 0) {
+      atomEntries.forEach((node, index) => {
+        const titleNode = node.querySelector('title');
+        const linkNode = node.querySelector('link[rel="alternate"]') || node.querySelector('link');
+        const pubDateNode = node.querySelector('published') || node.querySelector('updated');
+        const authorNode = node.querySelector('author name') || node.querySelector('author');
+        const contentNode = node.querySelector('content') || node.querySelector('summary');
+
+        const title = titleNode ? titleNode.textContent.trim() : `${feed.name} Article #${index+1}`;
+        let link = linkNode ? (linkNode.getAttribute('href') || linkNode.textContent.trim()) : '';
+        if (!link) link = cleanWebUrl;
+
+        const pubDateStr = pubDateNode ? pubDateNode.textContent.trim() : new Date(Date.now() - index * 3600000).toISOString();
+        const author = authorNode ? authorNode.textContent.trim() : (feed.name + ' Team');
+
+        let rawContent = contentNode ? contentNode.textContent.trim() : '';
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = rawContent;
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        const summary = plainText.slice(0, 200).trim() + (plainText.length > 200 ? '...' : '');
+
+        items.push({
+          id: `live-${feed.id || 'f'}-${index}`,
+          feedTitle: feed.name,
+          title: title,
+          pubDate: pubDateStr,
+          author: author,
+          summary: summary || `Latest update from ${feed.name}.`,
+          htmlContent: rawContent || `<p>${summary}</p>`,
+          content: plainText,
+          isRead: false,
+          link: link
+        });
+      });
+      return items;
+    }
+  } catch (e) {
+    console.error('Error parsing RSS XML:', e);
+  }
+  return [];
+}
+
+// Get or fetch live RSS articles for a feed
+async function getArticlesForFeed(feed) {
+  const cacheKey = feed.url || feed.id || feed.name;
+  if (feedArticleCache[cacheKey]) {
+    return feedArticleCache[cacheKey];
+  }
+
+  if (feed.url) {
+    try {
+      const rawXml = await fetchWebPageHTML(feed.url);
+      if (rawXml) {
+        const parsedArticles = parseRssXml(rawXml, feed);
+        if (parsedArticles && parsedArticles.length > 0) {
+          feedArticleCache[cacheKey] = parsedArticles;
+          feed.unreadCount = parsedArticles.length;
+          return parsedArticles;
+        }
+      }
+    } catch (err) {
+      console.warn('Live RSS fetch failed for:', feed.name, err);
+    }
+  }
+
+  // Fallback 1: Pre-defined mock database
   if (articleDatabase[feed.name]) {
+    feedArticleCache[cacheKey] = articleDatabase[feed.name];
     return articleDatabase[feed.name];
   }
+
+  // Fallback 2: Clean mock article pointing to clean web URL
+  const cleanWebUrl = getCleanWebUrl(feed.url);
   const pubDate = new Date(Date.now() - Math.floor(Math.random() * 86400000 * 3)).toISOString();
-  return [
+  const fallbackArticles = [
     {
       id: `art-${feed.id || Date.now()}-1`,
       feedTitle: feed.name,
@@ -1118,11 +1263,13 @@ function getArticlesForFeed(feed) {
           <p style="font-size:14px; color:#1c1c1e; margin:0;"><strong>Highlighted Overview:</strong> Recent system optimizations have brought substantial improvements in performance and capabilities.</p>
         </div>
       </div>`,
-      content: `Welcome to the live RSS content stream for ${feed.name}. Recent optimizations have brought substantial improvements in performance and capabilities.`,
+      content: `Welcome to the live RSS content stream for ${feed.name}.`,
       isRead: false,
-      link: feed.url || 'https://news.ycombinator.com'
+      link: cleanWebUrl
     }
   ];
+  feedArticleCache[cacheKey] = fallbackArticles;
+  return fallbackArticles;
 }
 
 // Fetch & Display Articles for Filter, Folder, or Feed
@@ -1130,15 +1277,22 @@ async function fetchAndDisplayArticles(target) {
   const container = document.getElementById('article-list-container');
   container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Loading articles...</div>';
 
+  let targetFeeds = [];
+  if (typeof target === 'string') {
+    targetFeeds = getAllFeedsFromTree(treeData);
+  } else if (target && target.type === 'feed') {
+    targetFeeds = [target];
+  } else if (target && target.type === 'folder') {
+    targetFeeds = getAllFeedsFromTree(target.children || []);
+  } else {
+    targetFeeds = getAllFeedsFromTree(treeData);
+  }
+
+  // Fetch articles for target feeds in parallel
+  const articlesLists = await Promise.all(targetFeeds.map(f => getArticlesForFeed(f)));
+  let pool = articlesLists.flat();
+
   let items = [];
-  const allFeeds = getAllFeedsFromTree(treeData);
-
-  // Build full pool across all feeds
-  let pool = [];
-  allFeeds.forEach(f => {
-    pool = pool.concat(getArticlesForFeed(f));
-  });
-
   if (typeof target === 'string') {
     if (target === 'read') {
       items = pool.filter(a => a.isRead);
@@ -1147,14 +1301,8 @@ async function fetchAndDisplayArticles(target) {
     } else { // 'all' or default
       items = pool;
     }
-  } else if (target && target.type === 'feed') {
-    items = getArticlesForFeed(target);
-  } else if (target && target.type === 'folder') {
-    const folderFeeds = getAllFeedsFromTree(target.children || []);
-    items = [];
-    folderFeeds.forEach(f => {
-      items = items.concat(getArticlesForFeed(f));
-    });
+  } else {
+    items = pool;
   }
 
   loadedArticles = items;
@@ -1280,6 +1428,20 @@ function renderReaderBody() {
         .then(rawHtml => {
           const targetPane = document.getElementById(containerId);
           if (!targetPane) return;
+
+          const trimmed = rawHtml ? rawHtml.trim() : '';
+          if (trimmed.startsWith('<?xml') || trimmed.startsWith('<rss') || trimmed.startsWith('<feed') || (trimmed.includes('<rss') && !trimmed.includes('<html'))) {
+            targetPane.innerHTML = `
+              <div class="formatted-html-view">
+                <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
+                <h1 class="reader-title">${art.title}</h1>
+                <div class="reader-byline">Published ${art.pubDate ? new Date(art.pubDate).toLocaleDateString() : ''} ${art.author ? '• By ' + art.author : ''}</div>
+                <hr class="reader-divider" />
+                <div class="reader-html-body">${art.htmlContent || art.content || art.summary || ''}</div>
+              </div>
+            `;
+            return;
+          }
           
           let processedHtml = rawHtml;
           const baseTag = `<base href="${art.link}">`;

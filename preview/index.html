@@ -353,8 +353,7 @@
               <!-- OPML Status Message Box -->
               <div id="opml-status-message" class="opml-status-box hidden"></div>
             </div>
-            </div>
-            <div class="setting-row">
+            <div class="setting-row" style="margin-top:14px;">
               <label>iCloud Subscription Sync</label>
               <input type="checkbox" id="icloud-sync-toggle" checked>
             </div>
@@ -365,13 +364,13 @@
             <!-- OpenAI Authentication -->
             <div class="setting-block">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-weight:600; margin:0;">OpenAI Account</label>
+                <label style="font-weight:600; margin:0;">OpenAI (OAuth Login)</label>
                 <span id="openai-oauth-status" class="oauth-badge disconnected">Disconnected</span>
               </div>
               <p class="help-text">Sign in to your OpenAI account in browser, then paste your access token or key below.</p>
               <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
                 <button type="button" class="btn-secondary" id="openai-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 Open OpenAI Login Portal</span>
+                  <span>🌐 Login with OpenAI (OAuth)</span>
                 </button>
                 <button type="button" class="btn-secondary" id="openai-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>
@@ -381,13 +380,13 @@
             <!-- Claude / Anthropic Authentication -->
             <div class="setting-block" style="margin-top:14px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-weight:600; margin:0;">Claude / Anthropic Account</label>
+                <label style="font-weight:600; margin:0;">Claude / Anthropic (OAuth Login)</label>
                 <span id="claude-oauth-status" class="oauth-badge disconnected">Disconnected</span>
               </div>
               <p class="help-text">Sign in to your Claude account in browser, then paste your access token or key below.</p>
               <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
                 <button type="button" class="btn-secondary" id="claude-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 Open Claude Login Portal</span>
+                  <span>🌐 Login with Claude (OAuth)</span>
                 </button>
                 <button type="button" class="btn-secondary" id="claude-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>

@@ -3068,8 +3068,8 @@ function initAISettingsUI() {
   // OpenAI Portal & Login Handler
   if (openaiOAuthBtn) {
     openaiOAuthBtn.onclick = () => {
-      openInDefaultBrowser('https://platform.openai.com/account/api-keys');
-      showToast('Opened OpenAI Login Portal in browser', 'info');
+      openInDefaultBrowser('https://chatgpt.com');
+      showToast('Opened OpenAI Login in browser', 'info');
     };
   }
 
@@ -3086,8 +3086,8 @@ function initAISettingsUI() {
   // Claude Portal & Login Handler
   if (claudeOAuthBtn) {
     claudeOAuthBtn.onclick = () => {
-      openInDefaultBrowser('https://console.anthropic.com/settings/keys');
-      showToast('Opened Claude Login Portal in browser', 'info');
+      openInDefaultBrowser('https://claude.ai');
+      showToast('Opened Claude Login in browser', 'info');
     };
   }
 

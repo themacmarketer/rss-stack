@@ -3083,182 +3083,60 @@ function extractOAuthCode(rawInput) {
   return trimmed;
 }
 
-// Load AI keys & OAuth authentication into Settings UI
+// Load AI credentials & ChatGPT session token into Settings UI
 function initAISettingsUI() {
   const keys = getAIKeys();
+  const inputOpenAI = document.getElementById('ai-token-openai');
+  const inputClaude = document.getElementById('ai-token-claude');
   const inputOpenRouter = document.getElementById('ai-key-openrouter');
   const saveBtn = document.getElementById('save-ai-keys-btn');
   const modelSelect = document.getElementById('ai-model-select');
 
-  const openaiOAuthBtn = document.getElementById('openai-oauth-btn');
+  const openaiSessionBtn = document.getElementById('openai-session-btn');
   const openaiDiscBtn = document.getElementById('openai-disconnect-btn');
-  const openaiSubmitCodeBtn = document.getElementById('openai-submit-code-btn');
 
-  const claudeOAuthBtn = document.getElementById('claude-oauth-btn');
+  const claudeSessionBtn = document.getElementById('claude-session-btn');
   const claudeDiscBtn = document.getElementById('claude-disconnect-btn');
-  const claudeSubmitCodeBtn = document.getElementById('claude-submit-code-btn');
   const openrouterPortalBtn = document.getElementById('openrouter-portal-btn');
 
+  if (inputOpenAI) inputOpenAI.value = keys.openai || '';
+  if (inputClaude) inputClaude.value = keys.claude || '';
   if (inputOpenRouter) inputOpenRouter.value = keys.openrouter || '';
   if (modelSelect && keys.preferredModel) modelSelect.value = keys.preferredModel;
 
   updateOAuthStatusUI();
 
-  // OpenAI PKCE OAuth 2.0 Flow Trigger
-  if (openaiOAuthBtn) {
-    openaiOAuthBtn.onclick = async () => {
-      try {
-        const pkce = await generatePKCE();
-        const state = 'st_' + Date.now() + Math.random().toString(36).substring(2, 9);
-        localStorage.setItem('quickrss_openai_pkce_verifier', pkce.verifier);
-        localStorage.setItem('quickrss_openai_pkce_state', state);
-
-        const authUrl = `https://auth.openai.com/oauth/authorize?response_type=code&client_id=app_quickrss_desktop&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&scope=openid%20profile%20email%20model.request&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256`;
-        openInDefaultBrowser(authUrl);
-
-        const codeBox = document.getElementById('openai-code-box');
-        if (codeBox) codeBox.style.display = 'block';
-        showToast('🔑 Opened OpenAI PKCE Authorization in browser', 'info');
-      } catch (err) {
-        showToast('Error initializing PKCE: ' + err.message, 'error');
-      }
-    };
-  }
-
-  if (openaiSubmitCodeBtn) {
-    openaiSubmitCodeBtn.onclick = async () => {
-      const inputEl = document.getElementById('openai-auth-code-input');
-      const rawCode = inputEl ? inputEl.value : '';
-      const code = extractOAuthCode(rawCode);
-
-      if (!code) {
-        showToast('Please paste the authorization code or callback URL', 'error');
-        return;
-      }
-
-      const verifier = localStorage.getItem('quickrss_openai_pkce_verifier') || '';
-      try {
-        const bodyParams = new URLSearchParams();
-        bodyParams.append('grant_type', 'authorization_code');
-        bodyParams.append('client_id', 'app_quickrss_desktop');
-        bodyParams.append('code', code);
-        bodyParams.append('redirect_uri', 'http://localhost:1455/auth/callback');
-        if (verifier) bodyParams.append('code_verifier', verifier);
-
-        const res = await fetch('https://auth.openai.com/oauth/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: bodyParams
-        }).catch(() => null);
-
-        let tokenToSave = code;
-        if (res && res.ok) {
-          const json = await res.json();
-          tokenToSave = json.access_token || code;
-        }
-
-        localStorage.setItem('quickrss_openai_oauth_token', tokenToSave);
-        saveAIKeys({ openai: tokenToSave });
-        updateOAuthStatusUI();
-        const codeBox = document.getElementById('openai-code-box');
-        if (codeBox) codeBox.style.display = 'none';
-        showToast('✅ Authenticated with OpenAI via OAuth PKCE!', 'success');
-      } catch (err) {
-        localStorage.setItem('quickrss_openai_oauth_token', code);
-        saveAIKeys({ openai: code });
-        updateOAuthStatusUI();
-        showToast('✅ Saved OpenAI OAuth Credentials!', 'success');
-      }
+  // 1-Click ChatGPT Session Endpoint Handler
+  if (openaiSessionBtn) {
+    openaiSessionBtn.onclick = () => {
+      openInDefaultBrowser('https://chatgpt.com/api/auth/session');
+      showToast('Opened ChatGPT Session page! Copy the "accessToken" value and paste below.', 'info');
     };
   }
 
   if (openaiDiscBtn) {
     openaiDiscBtn.onclick = () => {
       localStorage.removeItem('quickrss_openai_oauth_token');
-      localStorage.removeItem('quickrss_openai_pkce_verifier');
       saveAIKeys({ openai: '' });
-      const codeBox = document.getElementById('openai-code-box');
-      if (codeBox) codeBox.style.display = 'none';
+      if (inputOpenAI) inputOpenAI.value = '';
       updateOAuthStatusUI();
       showToast('Disconnected OpenAI account', 'info');
     };
   }
 
-  // Claude PKCE OAuth 2.0 Flow Trigger
-  if (claudeOAuthBtn) {
-    claudeOAuthBtn.onclick = async () => {
-      try {
-        const pkce = await generatePKCE();
-        const state = 'st_' + Date.now() + Math.random().toString(36).substring(2, 9);
-        localStorage.setItem('quickrss_claude_pkce_verifier', pkce.verifier);
-        localStorage.setItem('quickrss_claude_pkce_state', state);
-
-        const authUrl = `https://claude.ai/oauth/authorize?response_type=code&client_id=app_quickrss_desktop&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&scope=user%3Ainference&state=${state}&code_challenge=${pkce.challenge}&code_challenge_method=S256`;
-        openInDefaultBrowser(authUrl);
-
-        const codeBox = document.getElementById('claude-code-box');
-        if (codeBox) codeBox.style.display = 'block';
-        showToast('🔑 Opened Claude PKCE Authorization in browser', 'info');
-      } catch (err) {
-        showToast('Error initializing PKCE: ' + err.message, 'error');
-      }
-    };
-  }
-
-  if (claudeSubmitCodeBtn) {
-    claudeSubmitCodeBtn.onclick = async () => {
-      const inputEl = document.getElementById('claude-auth-code-input');
-      const rawCode = inputEl ? inputEl.value : '';
-      const code = extractOAuthCode(rawCode);
-
-      if (!code) {
-        showToast('Please paste the authorization code or callback URL', 'error');
-        return;
-      }
-
-      const verifier = localStorage.getItem('quickrss_claude_pkce_verifier') || '';
-      try {
-        const bodyParams = new URLSearchParams();
-        bodyParams.append('grant_type', 'authorization_code');
-        bodyParams.append('client_id', 'app_quickrss_desktop');
-        bodyParams.append('code', code);
-        bodyParams.append('redirect_uri', 'http://localhost:1455/auth/callback');
-        if (verifier) bodyParams.append('code_verifier', verifier);
-
-        const res = await fetch('https://claude.ai/oauth/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: bodyParams
-        }).catch(() => null);
-
-        let tokenToSave = code;
-        if (res && res.ok) {
-          const json = await res.json();
-          tokenToSave = json.access_token || code;
-        }
-
-        localStorage.setItem('quickrss_claude_oauth_token', tokenToSave);
-        saveAIKeys({ claude: tokenToSave });
-        updateOAuthStatusUI();
-        const codeBox = document.getElementById('claude-code-box');
-        if (codeBox) codeBox.style.display = 'none';
-        showToast('✅ Authenticated with Claude via OAuth PKCE!', 'success');
-      } catch (err) {
-        localStorage.setItem('quickrss_claude_oauth_token', code);
-        saveAIKeys({ claude: code });
-        updateOAuthStatusUI();
-        showToast('✅ Saved Claude OAuth Credentials!', 'success');
-      }
+  // 1-Click Claude Session Handler
+  if (claudeSessionBtn) {
+    claudeSessionBtn.onclick = () => {
+      openInDefaultBrowser('https://claude.ai');
+      showToast('Opened Claude in browser! Copy your session key and paste below.', 'info');
     };
   }
 
   if (claudeDiscBtn) {
     claudeDiscBtn.onclick = () => {
       localStorage.removeItem('quickrss_claude_oauth_token');
-      localStorage.removeItem('quickrss_claude_pkce_verifier');
       saveAIKeys({ claude: '' });
-      const codeBox = document.getElementById('claude-code-box');
-      if (codeBox) codeBox.style.display = 'none';
+      if (inputClaude) inputClaude.value = '';
       updateOAuthStatusUI();
       showToast('Disconnected Claude account', 'info');
     };
@@ -3273,13 +3151,31 @@ function initAISettingsUI() {
 
   if (saveBtn) {
     saveBtn.onclick = () => {
+      const openaiVal = inputOpenAI ? inputOpenAI.value.trim() : '';
+      const claudeVal = inputClaude ? inputClaude.value.trim() : '';
       const openrouterVal = inputOpenRouter ? inputOpenRouter.value.trim() : '';
+
+      if (openaiVal) {
+        localStorage.setItem('quickrss_openai_oauth_token', openaiVal);
+      } else {
+        localStorage.removeItem('quickrss_openai_oauth_token');
+      }
+
+      if (claudeVal) {
+        localStorage.setItem('quickrss_claude_oauth_token', claudeVal);
+      } else {
+        localStorage.removeItem('quickrss_claude_oauth_token');
+      }
+
       saveAIKeys({
+        openai: openaiVal,
+        claude: claudeVal,
         openrouter: openrouterVal,
         preferredModel: modelSelect ? modelSelect.value : 'openai:gpt-4o'
       });
+
       updateOAuthStatusUI();
-      showToast('✅ Saved AI Preferences!', 'success');
+      showToast('✅ Saved AI Credentials & ChatGPT Session Token!', 'success');
     };
   }
 

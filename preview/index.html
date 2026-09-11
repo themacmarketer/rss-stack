@@ -112,11 +112,11 @@
     <div class="reader-column">
       <div class="reader-header">
         <div class="reader-view-mode-toggle">
-          <button id="toggle-view-html" class="view-mode-btn active" title="HTML Web View">
+          <button id="toggle-view-html" class="view-mode-btn active" title="Full HTML Web View (Default)">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
               <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 1.05-1.745A7.956 7.956 0 0 0 2.213 4H4.09zm.57 1.5H1.67A7.954 7.954 0 0 0 1 8c0 .882.143 1.73.404 2.5h3.257A18.89 18.89 0 0 1 4.5 8c0-.866.056-1.705.16-2.5zm1.34 0c-.1.802-.15 1.637-.15 2.5 0 .863.05 1.698.15 2.5h3.9c.1-.802.15-1.637.15-2.5 0-.863-.05-1.698-.15-2.5h-3.9zm5.34 0c.104.795.16 1.634.16 2.5s-.056 1.705-.16 2.5h3.087c.26-.77.404-1.618.404-2.5s-.144-1.73-.404-2.5H11.34z"/>
             </svg>
-            <span>HTML View</span>
+            <span>HTML Web View</span>
           </button>
           <button id="toggle-view-text" class="view-mode-btn" title="Clean Reader Text View">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -132,7 +132,7 @@
               <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25z"/>
             </svg>
           </button>
-          <button id="open-browser-btn" class="btn-icon" title="Open in Browser">
+          <button id="open-browser-btn" class="btn-icon" title="Open in Default Browser">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
               <path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/>
               <path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/>
@@ -145,7 +145,7 @@
         <div class="empty-state">
           <div class="empty-icon">📰</div>
           <h3>Select an Article</h3>
-          <p>Choose an article from the list to read its content.</p>
+          <p>Choose an article from the list to view its live HTML web page.</p>
         </div>
       </div>
     </div>
@@ -186,8 +186,8 @@
             <div class="setting-row">
               <label>Article Link Opening</label>
               <select id="setting-open-link">
-                <option value="app" selected>Open inside Quick RSS App</option>
-                <option value="browser">Open in Default Web Browser</option>
+                <option value="browser" selected>Open in Default Mac Browser</option>
+                <option value="app">Open inside Quick RSS App</option>
               </select>
             </div>
             <div class="setting-row">

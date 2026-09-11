@@ -65,8 +65,83 @@ let treeData = [
   ]}
 ];
 
+// Helper to open links natively in default browser (Safari/Chrome/Arc) via Swift message handler
+function openInDefaultBrowser(url) {
+  if (!url || url === '#' || url.startsWith('javascript:')) return;
+  if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.openExternal) {
+    window.webkit.messageHandlers.openExternal.postMessage(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
 // Per-Feed Article Database
 const articleDatabase = {
+  'OpenAI Blog': [
+    {
+      id: 'OAI-1',
+      feedTitle: 'OpenAI Blog',
+      title: 'GPT-5 Architecture & Frontier Capabilities Deep Dive',
+      pubDate: '2026-09-09T02:00:00Z',
+      author: 'OpenAI Research Team',
+      summary: 'Detailed research release on multimodal reasoning, extended context windows, and native tool invocation.',
+      htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
+        <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase; letter-spacing:0.5px;">OPENAI BLOG</div>
+        <h1 style="font-size:28px; font-weight:700; margin:10px 0 6px 0; color:#1c1c1e;">GPT-5 Architecture & Frontier Capabilities Deep Dive</h1>
+        <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published 9 Sep 2026 • By OpenAI Research Team</div>
+        <hr style="border:none; border-top:1px solid rgba(0,0,0,0.08); margin-bottom:24px;" />
+        <p style="font-size:16px; margin-bottom:18px; color:#1c1c1e;">Today we are sharing technical insights into our frontier model family, featuring enhanced reasoning capabilities and native tool invocation across complex workflows.</p>
+        <p style="font-size:15px; margin-bottom:16px; color:#3a3a3c;">The architecture builds upon dynamic mixture-of-experts with latent reasoning tokens that execute self-correction prior to output streaming. This significantly reduces hallucinations in long-form synthesis and code generation tasks.</p>
+        <div style="background:#f4f6f8; border-left:4px solid #10a37f; padding:16px 20px; border-radius:6px; margin:24px 0;">
+          <h4 style="margin-bottom:6px; font-size:15px; color:#1c1c1e;">Key Benchmarks Achieved:</h4>
+          <ul style="padding-left:20px; font-size:14px; color:#3a3a3c;">
+            <li>SWE-bench Verified: 88.4% autonomous issue resolution</li>
+            <li>MATH-500: 97.2% zero-shot accuracy</li>
+            <li>Multimodal Long-Video QA: 91.5% accuracy over 4-hour video inputs</li>
+          </ul>
+        </div>
+      </div>`,
+      content: 'Today we are sharing technical insights into our frontier model family, featuring enhanced reasoning capabilities and native tool invocation.',
+      isRead: false,
+      link: 'https://openai.com/news/'
+    },
+    {
+      id: 'OAI-2',
+      feedTitle: 'OpenAI Blog',
+      title: 'Introducing Operator: Autonomous Computer Use for Workflows',
+      pubDate: '2026-09-08T18:00:00Z',
+      author: 'OpenAI Product Team',
+      summary: 'Operator performs complex multi-step browser and GUI tasks to automate repetitive developer and operations tasks.',
+      htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
+        <div style="font-size:12px; font-weight:700; color:#10a37f; text-transform:uppercase;">OPENAI ANNOUNCEMENT</div>
+        <h1 style="font-size:28px; font-weight:700; margin:10px 0;">Introducing Operator: Autonomous Computer Use for Workflows</h1>
+        <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published 8 Sep 2026</div>
+        <p style="font-size:16px;">We are excited to announce early preview access to Operator, an agentic AI assistant capable of executing GUI browser actions, filling complex web forms, and handling enterprise system tasks autonomously.</p>
+      </div>`,
+      content: 'We are excited to announce early preview access to Operator, an agentic AI assistant capable of executing GUI browser actions.',
+      isRead: false,
+      link: 'https://openai.com/index/'
+    }
+  ],
+  'DeepMind Blog': [
+    {
+      id: 'DM-1',
+      feedTitle: 'DeepMind Blog',
+      title: 'AlphaFold 3.5: Predicting Complex Molecular Interactions and Drug Binding',
+      pubDate: '2026-09-09T10:00:00Z',
+      author: 'Demis Hassabis & DeepMind Science Team',
+      summary: 'AlphaFold 3.5 introduces atomic-accuracy modeling for RNA, DNA, small molecule ligands, and post-translational modifications.',
+      htmlContent: `<div style="font-family:-apple-system, sans-serif; padding:30px; line-height:1.6; max-width:800px; margin:0 auto;">
+        <div style="font-size:12px; font-weight:700; color:#4285f4; text-transform:uppercase;">DEEPMIND SCIENCE</div>
+        <h1 style="font-size:26px; font-weight:700; margin:8px 0;">AlphaFold 3.5: Predicting Complex Molecular Interactions</h1>
+        <div style="font-size:12px; color:#8e8e93; margin-bottom:20px;">Published 9 Sep 2026</div>
+        <p style="font-size:15px;">AlphaFold 3.5 expands structure prediction beyond proteins to full cellular machinery across nucleic acids, ions, and small molecules with unprecedented atomic resolution.</p>
+      </div>`,
+      content: 'AlphaFold 3.5 expands structure prediction beyond proteins to full cellular machinery across nucleic acids, ions, and small molecules.',
+      isRead: false,
+      link: 'https://deepmind.google/blog/'
+    }
+  ],
   'arXiv - Computer Vision': [
     {
       id: 'ARXIV-CV-1',
@@ -76,15 +151,13 @@ const articleDatabase = {
       author: 'cs.CV Research Team',
       summary: 'High-fidelity 60FPS rendering of complex dynamic scenes captured from sparse monocular video streams.',
       htmlContent: `<div style="font-family:system-ui; padding:30px; line-height:1.6; max-width:800px; margin:0 auto;">
-        <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase; letter-spacing:0.5px;">ARXIV - COMPUTER VISION</div>
+        <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">ARXIV - COMPUTER VISION</div>
         <h1 style="font-size:26px; font-weight:700; margin:8px 0;">cs.CV: 3D Gaussian Splatting for Real-Time Dynamic Scene Reconstruction</h1>
         <div style="font-size:12px; color:#8e8e93; margin-bottom:20px;">Published 10 Sep 2026 • By cs.CV Research Team</div>
         <hr style="border:none; border-top:1px solid #eee; margin-bottom:20px;" />
         <div style="background:#f4f6f8; border-left:4px solid #70b643; padding:16px; border-radius:4px; margin-bottom:20px; font-size:14px; color:#333;">
-          <strong>Abstract:</strong> We present <em>4D-Splat</em>, extending 3D Gaussian Splatting to dynamic temporal dimensions with neural deformation fields. Our method achieves real-time 60FPS view synthesis from monocular handheld camera footage while maintaining crisp geometric boundaries and specular reflections.
+          <strong>Abstract:</strong> We present <em>4D-Splat</em>, extending 3D Gaussian Splatting to dynamic temporal dimensions with neural deformation fields.
         </div>
-        <p style="font-size:15px; margin-bottom:16px;">3D Gaussian Splatting has rapidly transformed novel view synthesis by eliminating heavy neural implicit function queries. However, dynamic scenes with articulated motion present significant optimization challenges.</p>
-        <p style="font-size:15px; margin-bottom:16px;">In this work, we introduce a space-time Gaussian representation paired with a lightweight MLP deformation field that models temporal offsets without memory expansion.</p>
       </div>`,
       content: 'Abstract: We present 4D-Splat, extending 3D Gaussian Splatting to dynamic temporal dimensions with neural deformation fields.',
       isRead: false,
@@ -103,9 +176,6 @@ const articleDatabase = {
         <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">ARXIV - ARTIFICIAL INTELLIGENCE</div>
         <h1 style="font-size:26px; font-weight:700; margin:8px 0;">cs.AI: Neuro-Symbolic Integration in Frontier Reasoning Models</h1>
         <div style="font-size:12px; color:#8e8e93; margin-bottom:20px;">Published 10 Sep 2026</div>
-        <div style="background:#f4f6f8; border-left:4px solid #007aff; padding:16px; margin-bottom:20px; font-size:14px;">
-          Abstract: We introduce <strong>NeuroSymbolic-R1</strong>, combining formal automated theorem provers directly into transformer self-attention computations for verifiable reasoning.
-        </div>
       </div>`,
       content: 'Abstract: We introduce NeuroSymbolic-R1, combining formal automated theorem provers directly into transformer self-attention computations.',
       isRead: false,
@@ -124,8 +194,7 @@ const articleDatabase = {
         <div style="font-size:12px; font-weight:700; color:#70b643;">GOOGLE RESEARCH BLOG</div>
         <h1 style="font-size:26px; font-weight:700; margin:8px 0;">Scaling Multimodal Transformers for Long-Context Reasoning</h1>
         <div style="font-size:12px; color:#8e8e93; margin-bottom:20px;">Published 10 Sep 2026 • By Jeff Dean & Gemini Team</div>
-        <p style="font-size:15px; margin-bottom:16px;">Long-context multimodal transformers enable novel agentic workflows across video, audio, and large codebase inputs. In this research update, we detail architectural optimizations including FlashAttention-3 integration, KV cache compression, and token pruning methods that achieve 3.4x faster time-to-first-token.</p>
-        <p style="font-size:15px;">We also evaluate long-context retrieval accuracy on Needle In A Haystack benchmarks, demonstrating 99.8% recall up to 2M tokens.</p>
+        <p style="font-size:15px; margin-bottom:16px;">Long-context multimodal transformers enable novel agentic workflows across video, audio, and large codebase inputs.</p>
       </div>`,
       content: 'Long-context multimodal transformers enable novel agentic workflows across video, audio, and large codebase inputs.',
       isRead: false,
@@ -133,6 +202,7 @@ const articleDatabase = {
     }
   ]
 };
+
 
 // App State
 let loadedArticles = [];
@@ -524,15 +594,31 @@ function renderReaderBody() {
 
   if (activeArticleViewMode === 'html') {
     readerContainer.classList.remove('text-padding');
-    const htmlBody = art.htmlContent || `<div style="font-family:system-ui; padding:30px; line-height:1.6; max-width:800px; margin:0 auto;">
-      <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">${art.feedTitle || 'Quick RSS'}</div>
-      <h1 style="font-size:26px; font-weight:700; margin:8px 0;">${art.title}</h1>
-      <div style="font-size:12px; color:#8e8e93; margin-bottom:20px;">Published ${art.pubDate || ''} ${art.author ? '• By ' + art.author : ''}</div>
-      <hr style="border:none; border-top:1px solid #eee; margin-bottom:20px;" />
-      <div style="font-size:15px; line-height:1.7;">${art.content || art.summary || 'Full HTML article view.'}</div>
-    </div>`;
-
-    readerContainer.innerHTML = `<div class="html-view-container">${htmlBody}</div>`;
+    
+    const hasLiveUrl = art.link && art.link.startsWith('http');
+    
+    if (hasLiveUrl) {
+      readerContainer.innerHTML = `
+        <div class="html-view-container">
+          <div class="html-view-bar">
+            <span class="html-view-url-label">🌐 Web View: <a href="${art.link}" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link}</a></span>
+            <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
+          </div>
+          <iframe src="${art.link}" class="html-view-iframe" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" loading="lazy"></iframe>
+        </div>
+      `;
+    } else {
+      const htmlBody = art.htmlContent || `
+        <div class="formatted-html-view">
+          <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
+          <h1 class="reader-title">${art.title}</h1>
+          <div class="reader-byline">Published ${art.pubDate || ''} ${art.author ? '• By ' + art.author : ''}</div>
+          <hr class="reader-divider" />
+          <div class="reader-html-body">${art.content || art.summary || 'Full HTML article view.'}</div>
+        </div>
+      `;
+      readerContainer.innerHTML = `<div class="html-view-container">${htmlBody}</div>`;
+    }
   } else {
     readerContainer.classList.add('text-padding');
     const dateStr = art.pubDate ? new Date(art.pubDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -605,9 +691,10 @@ document.getElementById('star-btn').onclick = () => {
 // Open in Browser
 document.getElementById('open-browser-btn').onclick = () => {
   if (currentArticle && currentArticle.link) {
-    window.open(currentArticle.link, '_blank');
+    openInDefaultBrowser(currentArticle.link);
   }
 };
+
 
 // Settings Modal Navigation
 const settingsModal = document.getElementById('settings-modal');

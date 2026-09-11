@@ -1,7 +1,7 @@
 import AppKit
 import WebKit
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
 
@@ -19,14 +19,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 900, height: 600)
         
-        // Configure WebKit Preferences
+        // Configure WebKit Preferences and Message Handler
         let config = WKWebViewConfiguration()
         let prefs = WKWebpagePreferences()
         prefs.allowsContentJavaScript = true
         config.defaultWebpagePreferences = prefs
         
+        // Register Native Open External Message Handler
+        config.userContentController.add(self, name: "openExternal")
+        
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
+        webView.uiDelegate = self
+        webView.navigationDelegate = self
         
         window.contentView?.addSubview(webView)
         
@@ -40,6 +45,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // Handle JS postMessage calls (e.g. window.webkit.messageHandlers.openExternal.postMessage(url))
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // Handle window.open(...) in JavaScript to open in default Mac browser
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let url = navigationAction.request.url {
+            NSWorkspace.shared.open(url)
+        }
+        return nil
+    }
+
+    // Intercept link clicks targeting _blank or external URLs
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
+            // If link click, open in default browser
+            if url.scheme == "http" || url.scheme == "https" {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+        }
+        decisionHandler(.allow)
     }
 
     func setupMenuBar() {
@@ -94,3 +127,4 @@ let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
+

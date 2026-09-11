@@ -9,12 +9,12 @@ let defaultArticleViewMode = 'html'; // 'html' (Default) or 'text'
 let activeArticleViewMode = 'html';  // Current active view mode
 
 // Full Feed Tree Structure
-let treeData = [
+let defaultTreeData = [
   {
     "id": "f-0-6592",
     "type": "folder",
     "name": "01 \u2014 AI Industry & Strategy",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-5779",
@@ -27,42 +27,42 @@ let treeData = [
             "type": "feed",
             "name": "TechCrunch AI",
             "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
-            "unreadCount": 17
+            "unreadCount": 19
           },
           {
             "id": "feed-2-3997",
             "type": "feed",
             "name": "VentureBeat AI",
             "url": "https://venturebeat.com/category/ai/feed/",
-            "unreadCount": 18
+            "unreadCount": 7
           },
           {
             "id": "feed-2-5123",
             "type": "feed",
             "name": "MIT Technology Review",
             "url": "https://www.technologyreview.com/feed/",
-            "unreadCount": 79
+            "unreadCount": 10
           },
           {
             "id": "feed-2-4533",
             "type": "feed",
             "name": "Unite.AI",
             "url": "https://unite.ai/feed",
-            "unreadCount": 34
+            "unreadCount": 25
           },
           {
             "id": "feed-2-3581",
             "type": "feed",
             "name": "DailyAI",
             "url": "https://dailyai.com/feed",
-            "unreadCount": 38
+            "unreadCount": 10
           },
           {
             "id": "feed-2-5247",
             "type": "feed",
             "name": "Artificial Intelligence News",
             "url": "https://www.artificialintelligence-news.com/feed/rss/",
-            "unreadCount": 23
+            "unreadCount": 12
           }
         ]
       }
@@ -72,7 +72,7 @@ let treeData = [
     "id": "f-0-3336",
     "type": "folder",
     "name": "02 \u2014 AI Companies & Platforms",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-4395",
@@ -107,7 +107,7 @@ let treeData = [
             "type": "feed",
             "name": "DeepMind Blog",
             "url": "https://deepmind.com/blog/feed/basic",
-            "unreadCount": 41
+            "unreadCount": 100
           }
         ]
       },
@@ -177,7 +177,7 @@ let treeData = [
     "id": "f-0-3194",
     "type": "folder",
     "name": "03 \u2014 Models & Research",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-8353",
@@ -204,14 +204,14 @@ let treeData = [
             "type": "feed",
             "name": "Google Research Blog",
             "url": "https://research.google/blog/rss",
-            "unreadCount": 67
+            "unreadCount": 100
           },
           {
             "id": "feed-2-4485",
             "type": "feed",
             "name": "Microsoft Research Blog",
             "url": "https://www.microsoft.com/en-us/research/blog/feed/",
-            "unreadCount": 63
+            "unreadCount": 10
           }
         ]
       },
@@ -226,14 +226,14 @@ let treeData = [
             "type": "feed",
             "name": "Stanford AI Lab (SAIL)",
             "url": "https://ai.stanford.edu/blog/feed.xml",
-            "unreadCount": 25
+            "unreadCount": 15
           },
           {
             "id": "feed-2-6948",
             "type": "feed",
             "name": "MIT CSAIL News - AI",
             "url": "https://news.mit.edu/rss/topic/artificial-intelligence2",
-            "unreadCount": 31
+            "unreadCount": 50
           },
           {
             "id": "feed-2-9056",
@@ -262,21 +262,21 @@ let treeData = [
             "type": "feed",
             "name": "arXiv - Artificial Intelligence",
             "url": "https://rss.arxiv.org/rss/cs.ai",
-            "unreadCount": 62
+            "unreadCount": 273
           },
           {
             "id": "feed-2-5071",
             "type": "feed",
             "name": "arXiv - Machine Learning",
             "url": "https://rss.arxiv.org/rss/cs.LG",
-            "unreadCount": 36
+            "unreadCount": 268
           },
           {
             "id": "feed-2-7344",
             "type": "feed",
             "name": "arXiv - AI + ML + Stats",
             "url": "https://rss.arxiv.org/rss/cs.ai+cs.LG+stat.ML",
-            "unreadCount": 47
+            "unreadCount": 464
           }
         ]
       },
@@ -291,14 +291,14 @@ let treeData = [
             "type": "feed",
             "name": "arXiv - Computer Vision",
             "url": "https://rss.arxiv.org/rss/cs.CV",
-            "unreadCount": 57
+            "unreadCount": 158
           },
           {
             "id": "feed-2-7686",
             "type": "feed",
             "name": "arXiv - Natural Language Processing",
             "url": "https://rss.arxiv.org/rss/cs.CL",
-            "unreadCount": 6
+            "unreadCount": 155
           }
         ]
       },
@@ -330,7 +330,7 @@ let treeData = [
     "id": "f-0-1838",
     "type": "folder",
     "name": "05 \u2014 AI Engineering & Infrastructure",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-2889",
@@ -350,14 +350,14 @@ let treeData = [
             "type": "feed",
             "name": "Towards Data Science",
             "url": "https://towardsdatascience.com/feed",
-            "unreadCount": 6
+            "unreadCount": 20
           },
           {
             "id": "feed-2-3298",
             "type": "feed",
             "name": "KDnuggets",
             "url": "https://kdnuggets.com/feed",
-            "unreadCount": 15
+            "unreadCount": 10
           }
         ]
       },
@@ -372,7 +372,7 @@ let treeData = [
             "type": "feed",
             "name": "Hugging Face Blog",
             "url": "https://huggingface.co/blog/feed.xml",
-            "unreadCount": 63
+            "unreadCount": 861
           }
         ]
       },
@@ -387,14 +387,14 @@ let treeData = [
             "type": "feed",
             "name": "AWS Machine Learning Blog",
             "url": "https://aws.amazon.com/blogs/ai/feed/",
-            "unreadCount": 64
+            "unreadCount": 20
           },
           {
             "id": "feed-2-9533",
             "type": "feed",
             "name": "Google Cloud Blog",
             "url": "https://cloudblog.withgoogle.com/rss",
-            "unreadCount": 71
+            "unreadCount": 20
           },
           {
             "id": "feed-2-6287",
@@ -440,7 +440,7 @@ let treeData = [
     "id": "f-0-4809",
     "type": "folder",
     "name": "08 \u2014 AI Marketing & Growth",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-3398",
@@ -467,21 +467,21 @@ let treeData = [
             "type": "feed",
             "name": "MarTech Series",
             "url": "https://martechseries.com/feed",
-            "unreadCount": 60
+            "unreadCount": 10
           },
           {
             "id": "feed-2-1828",
             "type": "feed",
             "name": "Marketing Tech News",
             "url": "https://marketingtechnews.net/feed",
-            "unreadCount": 68
+            "unreadCount": 10
           },
           {
             "id": "feed-2-7669",
             "type": "feed",
             "name": "Chiefmartec (Scott Brinker)",
             "url": "https://chiefmartec.com/feed",
-            "unreadCount": 35
+            "unreadCount": 10
           },
           {
             "id": "feed-2-9737",
@@ -510,21 +510,21 @@ let treeData = [
             "type": "feed",
             "name": "StoryLab.ai Blog",
             "url": "https://storylab.ai/feed",
-            "unreadCount": 18
+            "unreadCount": 10
           },
           {
             "id": "feed-2-2451",
             "type": "feed",
             "name": "Rad AI Blog",
             "url": "https://blog.radintel.ai/rss.xml",
-            "unreadCount": 37
+            "unreadCount": 10
           },
           {
             "id": "feed-2-3115",
             "type": "feed",
             "name": "Marketing SoundBytes",
             "url": "https://rahulsandil.com/feed",
-            "unreadCount": 35
+            "unreadCount": 12
           }
         ]
       },
@@ -539,7 +539,7 @@ let treeData = [
             "type": "feed",
             "name": "WordLift Blog (AI/SEO)",
             "url": "https://wordlift.io/blog/en/feed",
-            "unreadCount": 5
+            "unreadCount": 10
           }
         ]
       },
@@ -578,7 +578,7 @@ let treeData = [
     "id": "f-0-1633",
     "type": "folder",
     "name": "11 \u2014 Analysis & Commentary",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-9793",
@@ -591,21 +591,21 @@ let treeData = [
             "type": "feed",
             "name": "AI Weekly",
             "url": "https://aiweekly.co/issues.rss",
-            "unreadCount": 16
+            "unreadCount": 20
           },
           {
             "id": "feed-2-2819",
             "type": "feed",
             "name": "Import AI (Jack Clark)",
             "url": "https://jack-clark.net/feed/",
-            "unreadCount": 22
+            "unreadCount": 10
           },
           {
             "id": "feed-2-1852",
             "type": "feed",
             "name": "AI Alignment Forum",
             "url": "https://www.alignmentforum.org/feed.xml",
-            "unreadCount": 29
+            "unreadCount": 10
           },
           {
             "id": "feed-2-8546",
@@ -627,7 +627,7 @@ let treeData = [
             "type": "feed",
             "name": "MarkTechPost",
             "url": "https://marktechpost.com/feed",
-            "unreadCount": 15
+            "unreadCount": 10
           }
         ]
       }
@@ -637,7 +637,7 @@ let treeData = [
     "id": "f-0-1007",
     "type": "folder",
     "name": "12 \u2014 General Technology",
-    "expanded": true,
+    "expanded": false,
     "children": [
       {
         "id": "f-1-9829",
@@ -650,18 +650,25 @@ let treeData = [
             "type": "feed",
             "name": "The Verge",
             "url": "https://www.theverge.com/rss/index.xml",
-            "unreadCount": 49
+            "unreadCount": 10
           },
           {
             "id": "feed-2-2565",
             "type": "feed",
             "name": "Wired",
             "url": "https://www.wired.com/feed/rss",
-            "unreadCount": 13
+            "unreadCount": 50
           }
         ]
       }
     ]
+  },
+  {
+    "id": "f-1789112190694",
+    "type": "folder",
+    "name": "13 \u2014 AI at Reddit",
+    "expanded": true,
+    "children": []
   },
   {
     "id": "f-0-9083",
@@ -678,6 +685,27 @@ let treeData = [
     "children": []
   }
 ];
+
+function loadSavedTreeData() {
+  try {
+    const saved = localStorage.getItem('quickrss_user_tree');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(defaultTreeData));
+}
+
+let treeData = loadSavedTreeData();
+
+function saveTreeData() {
+  try {
+    localStorage.setItem('quickrss_user_tree', JSON.stringify(treeData));
+  } catch(e) {}
+}
+
+
 
 // Helper to open links natively in default browser (Safari/Chrome/Arc) via Swift message handler
 function openInDefaultBrowser(url) {
@@ -1274,6 +1302,7 @@ function renderTree() {
 
   container.appendChild(rootUl);
   updateBadges();
+  saveTreeData();
 }
 
 function createNodeElement(node, depth) {

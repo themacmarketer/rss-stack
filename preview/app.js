@@ -3191,19 +3191,42 @@ function setupAIChatbotUI() {
   const panel = document.getElementById('ai-chatbot-panel');
   const triggerBtn = document.getElementById('ai-assistant-toggle-btn');
   const closeBtn = document.getElementById('ai-close-btn');
+  const pinBtn = document.getElementById('ai-pin-btn');
   const settingsBtn = document.getElementById('ai-settings-btn');
   const sendBtn = document.getElementById('ai-chat-send-btn');
   const clearBtn = document.getElementById('ai-chat-clear-btn');
   const chatInput = document.getElementById('ai-chat-input');
   const chatThread = document.getElementById('ai-chat-thread');
+  const resizer = document.getElementById('ai-popover-resizer');
 
   if (!panel) return;
+
+  let isAIPinned = false;
 
   // Toggle Trigger Button
   if (triggerBtn) {
     triggerBtn.onclick = (e) => {
       e.stopPropagation();
       panel.classList.toggle('hidden');
+    };
+  }
+
+  // Pin / Lock Window Button
+  if (pinBtn) {
+    pinBtn.onclick = (e) => {
+      e.stopPropagation();
+      isAIPinned = !isAIPinned;
+      if (isAIPinned) {
+        panel.classList.add('pinned');
+        pinBtn.classList.add('active');
+        pinBtn.title = "Unpin / Unlock AI Assistant Window";
+        showToast('📌 AI Assistant window pinned above articles!', 'success');
+      } else {
+        panel.classList.remove('pinned');
+        pinBtn.classList.remove('active');
+        pinBtn.title = "Pin / Lock AI Assistant Window in place";
+        showToast('Unpinned AI Assistant window', 'info');
+      }
     };
   }
 
@@ -3215,12 +3238,47 @@ function setupAIChatbotUI() {
     };
   }
 
-  // Close when clicking outside panel
+  // Close when clicking outside panel (unless pinned)
   document.addEventListener('click', (e) => {
-    if (!panel.classList.contains('hidden') && !panel.contains(e.target) && triggerBtn && !triggerBtn.contains(e.target)) {
+    if (!isAIPinned && !panel.classList.contains('hidden') && !panel.contains(e.target) && triggerBtn && !triggerBtn.contains(e.target)) {
       panel.classList.add('hidden');
     }
   });
+
+  // Draggable Mouse Resizer for Chatbot Popover
+  if (resizer && panel) {
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+
+    resizer.onmousedown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = panel.offsetWidth;
+      startHeight = panel.offsetHeight;
+
+      document.documentElement.addEventListener('mousemove', onMouseMove);
+      document.documentElement.addEventListener('mouseup', onMouseUp);
+    };
+
+    function onMouseMove(e) {
+      if (!isResizing) return;
+      const newWidth = Math.max(300, Math.min(650, startWidth + (e.clientX - startX)));
+      const newHeight = Math.max(260, Math.min(window.innerHeight * 0.85, startHeight + (e.clientY - startY)));
+      panel.style.width = `${newWidth}px`;
+      panel.style.height = `${newHeight}px`;
+    }
+
+    function onMouseUp() {
+      if (isResizing) {
+        isResizing = false;
+        document.documentElement.removeEventListener('mousemove', onMouseMove);
+        document.documentElement.removeEventListener('mouseup', onMouseUp);
+      }
+    }
+  }
 
   // Settings Icon click -> Open Settings Modal to AI tab
   if (settingsBtn) {

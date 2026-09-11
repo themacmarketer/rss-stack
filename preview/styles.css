@@ -1245,14 +1245,25 @@ body {
   top: 74px;
   left: 8px;
   z-index: 1200;
-  width: 360px;
+  width: 380px;
+  height: 420px;
+  min-width: 320px;
+  max-width: 650px;
+  min-height: 260px;
+  max-height: 82vh;
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 12px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.05);
   overflow: hidden;
+  resize: both;
   animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-app-region: no-drag;
+}
+
+.ai-chatbot-popover.pinned {
+  border-color: #70b643;
+  box-shadow: 0 12px 36px rgba(112, 182, 67, 0.22), 0 0 0 2px rgba(112, 182, 67, 0.4);
 }
 
 .ai-chatbot-popover.hidden {
@@ -1271,6 +1282,8 @@ body {
   padding: 8px 12px;
   background: rgba(245, 247, 250, 0.95);
   border-bottom: 1px solid rgba(0,0,0,0.08);
+  height: 38px;
+  box-sizing: border-box;
 }
 
 .ai-chat-title {
@@ -1312,9 +1325,14 @@ body {
   padding: 2px 5px;
   border-radius: 4px;
   color: #666;
+  transition: all 0.15s ease;
 }
 .ai-btn-icon:hover {
   background: rgba(0,0,0,0.08);
+}
+.ai-btn-icon.active {
+  background: rgba(112, 182, 67, 0.2);
+  color: #70b643;
 }
 
 .ai-chat-body {
@@ -1322,7 +1340,9 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 10px;
-  max-height: 380px;
+  height: calc(100% - 38px);
+  box-sizing: border-box;
+  justify-content: space-between;
 }
 
 .ai-quick-prompts {
@@ -1330,6 +1350,7 @@ body {
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .quick-prompt-btn {
@@ -1354,9 +1375,27 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  height: 220px;
+  flex: 1;
+  min-height: 120px;
+  height: auto;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.ai-popover-resizer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 100;
+  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.25) 50%);
+  border-bottom-right-radius: 12px;
+  transition: background 0.15s ease;
+}
+.ai-popover-resizer:hover {
+  background: linear-gradient(135deg, transparent 40%, rgba(112, 182, 67, 0.85) 40%);
 }
 
 .ai-message {

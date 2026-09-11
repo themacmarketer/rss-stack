@@ -1155,71 +1155,54 @@ window.executeMCPTool = async function(name, args = {}) {
 
     if (name === 'mark_read') {
       const id = args.id;
-      loadedArticles.forEach(a => { if (a.id === id) a.isRead = true; });
-      updateBadges();
+      const target = loadedArticles.find(a => a.id === id || a.link === id);
+      if (target) {
+        setArticleRead(target);
+      } else {
+        const readSet = getReadArticleIdsFromStorage();
+        readSet.add(id);
+        saveReadArticleIdsToStorage(readSet);
+        updateBadges();
+      }
       return { success: true, id: id };
     }
 
     if (name === 'star') {
       const id = args.id;
-      let target = loadedArticles.find(a => a.id === id);
+      let target = loadedArticles.find(a => a.id === id || a.link === id);
       if (target) {
-        target.isFavorite = true;
+        setArticleStarred(target, true);
+        renderArticleList(loadedArticles);
       }
-      updateBadges();
-      renderArticleList(loadedArticles);
       return { success: true, id: id };
     }
 
     if (name === 'unstar') {
       const id = args.id;
-      let target = loadedArticles.find(a => a.id === id);
+      let target = loadedArticles.find(a => a.id === id || a.link === id);
       if (target) {
-        target.isFavorite = false;
+        setArticleStarred(target, false);
+        renderArticleList(loadedArticles);
       }
-      updateBadges();
-      renderArticleList(loadedArticles);
       return { success: true, id: id };
     }
 
     if (name === 'star_all') {
-      loadedArticles.forEach(a => { a.isFavorite = true; });
-      updateBadges();
+      loadedArticles.forEach(a => setArticleStarred(a, true));
       renderArticleList(loadedArticles);
       return { success: true, count: loadedArticles.length };
     }
 
     if (name === 'unstar_all') {
-      loadedArticles.forEach(a => { a.isFavorite = false; });
-      updateBadges();
+      loadedArticles.forEach(a => setArticleStarred(a, false));
       renderArticleList(loadedArticles);
       return { success: true, count: loadedArticles.length };
     }
 
     if (name === 'get_starred_articles') {
-      const allFeeds = getAllFeedsFromTree(treeData);
-      const starred = [];
-      const seen = new Set();
-      allFeeds.forEach(feed => {
-        const cacheKey = feed.url || feed.id || feed.name;
-        const arts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
-        arts.forEach(art => {
-          if (art.isFavorite && !seen.has(art.id)) {
-            seen.add(art.id);
-            starred.push({
-              id: art.id,
-              title: art.title,
-              feedTitle: art.feedTitle,
-              pubDate: art.pubDate,
-              author: art.author,
-              summary: art.summary,
-              link: art.link
-            });
-          }
-        });
-      });
-      return starred;
+      return getStarredArticlesFromStorage();
     }
+
 
     if (name === 'chat_with_news') {
       const query = args.query || args.prompt || '';
@@ -1506,6 +1489,120 @@ function moveNodeInTree(sourceId, targetId, position) {
   }
 }
 
+// ==========================================
+// PERSISTENCE ENGINE: Starred & Read Articles
+// ==========================================
+const STARRED_ARTICLES_KEY = 'quickrss_starred_articles';
+const READ_ARTICLES_KEY = 'quickrss_read_article_ids';
+
+function getArticleKey(art) {
+  if (!art) return '';
+  return art.id || art.link || (art.title + '---' + (art.feedTitle || ''));
+}
+
+function getStarredArticlesFromStorage() {
+  try {
+    const raw = localStorage.getItem(STARRED_ARTICLES_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveStarredArticlesToStorage(starredArray) {
+  try {
+    localStorage.setItem(STARRED_ARTICLES_KEY, JSON.stringify(starredArray));
+  } catch (e) {}
+}
+
+function setArticleStarred(art, forceState) {
+  if (!art) return;
+  const isStarred = forceState !== undefined ? Boolean(forceState) : !art.isFavorite;
+  art.isFavorite = isStarred;
+
+  const key = getArticleKey(art);
+  let starredList = getStarredArticlesFromStorage();
+
+  if (isStarred) {
+    const existingIndex = starredList.findIndex(a => getArticleKey(a) === key);
+    const cleanObj = {
+      id: art.id || `starred-${Date.now()}`,
+      feedTitle: art.feedTitle || 'Feed',
+      title: art.title || 'Untitled',
+      pubDate: art.pubDate || new Date().toISOString(),
+      author: art.author || '',
+      summary: art.summary || '',
+      htmlContent: art.htmlContent || '',
+      content: art.content || '',
+      isRead: Boolean(art.isRead),
+      isFavorite: true,
+      link: art.link || ''
+    };
+    if (existingIndex >= 0) {
+      starredList[existingIndex] = cleanObj;
+    } else {
+      starredList.unshift(cleanObj);
+    }
+  } else {
+    starredList = starredList.filter(a => getArticleKey(a) !== key);
+  }
+
+  saveStarredArticlesToStorage(starredList);
+  updateBadges();
+}
+
+function getReadArticleIdsFromStorage() {
+  try {
+    const raw = localStorage.getItem(READ_ARTICLES_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch (e) {}
+  return new Set();
+}
+
+function saveReadArticleIdsToStorage(readSet) {
+  try {
+    localStorage.setItem(READ_ARTICLES_KEY, JSON.stringify(Array.from(readSet)));
+  } catch (e) {}
+}
+
+function setArticleRead(art) {
+  if (!art) return;
+  art.isRead = true;
+  const key = getArticleKey(art);
+  if (key) {
+    const readSet = getReadArticleIdsFromStorage();
+    if (!readSet.has(key)) {
+      readSet.add(key);
+      saveReadArticleIdsToStorage(readSet);
+      updateBadges();
+    }
+  }
+}
+
+function applyPersistedArticleStates(articles) {
+  if (!articles || !Array.isArray(articles)) return articles;
+  const readSet = getReadArticleIdsFromStorage();
+  const starredList = getStarredArticlesFromStorage();
+  const starredKeys = new Set(starredList.map(a => getArticleKey(a)));
+
+  articles.forEach(art => {
+    const key = getArticleKey(art);
+    if (readSet.has(key)) {
+      art.isRead = true;
+    }
+    if (starredKeys.has(key)) {
+      art.isFavorite = true;
+    }
+  });
+
+  return articles;
+}
+
 function updateBadges() {
   const total = getTotalUnreadCount();
   const badgeAll = document.getElementById('badge-all');
@@ -1513,15 +1610,13 @@ function updateBadges() {
   const badgeLatest = document.getElementById('badge-latest');
   if (badgeLatest) badgeLatest.textContent = Math.round(total * 0.6);
 
-  const allFeeds = getAllFeedsFromTree(treeData);
-  let starredCount = 0;
-  allFeeds.forEach(feed => {
-    const cacheKey = feed.url || feed.id || feed.name;
-    const arts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
-    starredCount += arts.filter(a => a.isFavorite).length;
-  });
+  const starredList = getStarredArticlesFromStorage();
   const badgeStarred = document.getElementById('badge-starred');
-  if (badgeStarred) badgeStarred.textContent = starredCount;
+  if (badgeStarred) badgeStarred.textContent = starredList.length;
+
+  const readSet = getReadArticleIdsFromStorage();
+  const badgeRead = document.getElementById('badge-read');
+  if (badgeRead) badgeRead.textContent = readSet.size;
 }
 
 // Helper to collect all feeds from tree recursively
@@ -1659,11 +1754,11 @@ function parseRssXml(xmlText, feed) {
 // Get or fetch live RSS articles for a feed
 async function getArticlesForFeed(feed) {
   const cacheKey = feed.url || feed.id || feed.name;
-  if (feedArticleCache[cacheKey]) {
-    return feedArticleCache[cacheKey];
-  }
+  let articles = null;
 
-  if (feed.url) {
+  if (feedArticleCache[cacheKey]) {
+    articles = feedArticleCache[cacheKey];
+  } else if (feed.url) {
     // 1. Direct Native Fetch
     try {
       const rawXml = await fetchWebPageHTML(feed.url);
@@ -1672,85 +1767,89 @@ async function getArticlesForFeed(feed) {
         if (parsedArticles && parsedArticles.length > 0) {
           feedArticleCache[cacheKey] = parsedArticles;
           feed.unreadCount = parsedArticles.length;
-          return parsedArticles;
+          articles = parsedArticles;
         }
       }
     } catch (err) {
       console.warn('Live RSS direct fetch failed for:', feed.name, err);
     }
 
-    // 2. RSS2JSON API Fallback for Reddit or Cloudflare-protected feeds
-    try {
-      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
-      const res = await fetch(apiUrl);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.status === 'ok' && json.items && json.items.length > 0) {
-          const items = json.items.map((item, idx) => {
-            const rawContent = item.content || item.description || '';
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = rawContent;
-            const plainText = tempDiv.textContent || tempDiv.innerText || '';
-            const summary = plainText.slice(0, 220).trim() + (plainText.length > 220 ? '...' : '');
+    if (!articles) {
+      // 2. RSS2JSON API Fallback for Reddit or Cloudflare-protected feeds
+      try {
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
+        const res = await fetch(apiUrl);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.status === 'ok' && json.items && json.items.length > 0) {
+            const items = json.items.map((item, idx) => {
+              const rawContent = item.content || item.description || '';
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = rawContent;
+              const plainText = tempDiv.textContent || tempDiv.innerText || '';
+              const summary = plainText.slice(0, 220).trim() + (plainText.length > 220 ? '...' : '');
 
-            return {
-              id: `live-rss2json-${feed.id || 'f'}-${idx}`,
-              feedTitle: feed.name,
-              title: item.title || `${feed.name} Post #${idx + 1}`,
-              pubDate: item.pubDate || new Date().toISOString(),
-              author: item.author || (feed.name + ' Author'),
-              summary: summary || item.title,
-              htmlContent: rawContent || `<p>${summary}</p>`,
-              content: plainText,
-              isRead: false,
-              link: item.link || feed.url
-            };
-          });
+              return {
+                id: `live-rss2json-${feed.id || 'f'}-${idx}`,
+                feedTitle: feed.name,
+                title: item.title || `${feed.name} Post #${idx + 1}`,
+                pubDate: item.pubDate || new Date().toISOString(),
+                author: item.author || (feed.name + ' Author'),
+                summary: summary || item.title,
+                htmlContent: rawContent || `<p>${summary}</p>`,
+                content: plainText,
+                isRead: false,
+                link: item.link || feed.url
+              };
+            });
 
-          feedArticleCache[cacheKey] = items;
-          feed.unreadCount = items.length;
-          return items;
+            feedArticleCache[cacheKey] = items;
+            feed.unreadCount = items.length;
+            articles = items;
+          }
         }
+      } catch (err) {
+        console.warn('RSS2JSON API fetch failed for:', feed.name, err);
       }
-    } catch (err) {
-      console.warn('RSS2JSON API fetch failed for:', feed.name, err);
     }
   }
 
-  // Fallback 1: Pre-defined mock database
-  if (articleDatabase[feed.name]) {
-    feedArticleCache[cacheKey] = articleDatabase[feed.name];
-    return articleDatabase[feed.name];
+  if (!articles) {
+    if (articleDatabase[feed.name]) {
+      feedArticleCache[cacheKey] = articleDatabase[feed.name];
+      articles = articleDatabase[feed.name];
+    } else {
+      const cleanWebUrl = getCleanWebUrl(feed.url);
+      const pubDate = new Date(Date.now() - Math.floor(Math.random() * 86400000 * 3)).toISOString();
+      const fallbackArticles = [
+        {
+          id: `art-${feed.id || Date.now()}-1`,
+          feedTitle: feed.name,
+          title: `${feed.name}: Frontier Research & Technology Update`,
+          pubDate: pubDate,
+          author: `${feed.name} Team`,
+          summary: `Latest technical insights, software releases, and research updates from ${feed.name}.`,
+          htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
+            <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase; letter-spacing:0.5px;">${feed.name.toUpperCase()}</div>
+            <h1 style="font-size:28px; font-weight:700; margin:10px 0 6px 0; color:#1c1c1e;">${feed.name}: Frontier Research & Technology Update</h1>
+            <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published ${new Date(pubDate).toLocaleDateString()} • By ${feed.name} Team</div>
+            <hr style="border:none; border-top:1px solid rgba(0,0,0,0.08); margin-bottom:24px;" />
+            <p style="font-size:16px; margin-bottom:18px; color:#1c1c1e;">Welcome to the live RSS content stream for <strong>${feed.name}</strong>. Here we share technical articles, architectural insights, and release notes.</p>
+            <div style="background:#f4f6f8; border-left:4px solid #007aff; padding:16px 20px; border-radius:6px; margin:24px 0;">
+              <p style="font-size:14px; color:#1c1c1e; margin:0;"><strong>Highlighted Overview:</strong> Recent system optimizations have brought substantial improvements in performance and capabilities.</p>
+            </div>
+          </div>`,
+          content: `Welcome to the live RSS content stream for ${feed.name}.`,
+          isRead: false,
+          link: cleanWebUrl
+        }
+      ];
+      feedArticleCache[cacheKey] = fallbackArticles;
+      articles = fallbackArticles;
+    }
   }
 
-  // Fallback 2: Clean mock article pointing to clean web URL
-  const cleanWebUrl = getCleanWebUrl(feed.url);
-  const pubDate = new Date(Date.now() - Math.floor(Math.random() * 86400000 * 3)).toISOString();
-  const fallbackArticles = [
-    {
-      id: `art-${feed.id || Date.now()}-1`,
-      feedTitle: feed.name,
-      title: `${feed.name}: Frontier Research & Technology Update`,
-      pubDate: pubDate,
-      author: `${feed.name} Team`,
-      summary: `Latest technical insights, software releases, and research updates from ${feed.name}.`,
-      htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
-        <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase; letter-spacing:0.5px;">${feed.name.toUpperCase()}</div>
-        <h1 style="font-size:28px; font-weight:700; margin:10px 0 6px 0; color:#1c1c1e;">${feed.name}: Frontier Research & Technology Update</h1>
-        <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published ${new Date(pubDate).toLocaleDateString()} • By ${feed.name} Team</div>
-        <hr style="border:none; border-top:1px solid rgba(0,0,0,0.08); margin-bottom:24px;" />
-        <p style="font-size:16px; margin-bottom:18px; color:#1c1c1e;">Welcome to the live RSS content stream for <strong>${feed.name}</strong>. Here we share technical articles, architectural insights, and release notes.</p>
-        <div style="background:#f4f6f8; border-left:4px solid #007aff; padding:16px 20px; border-radius:6px; margin:24px 0;">
-          <p style="font-size:14px; color:#1c1c1e; margin:0;"><strong>Highlighted Overview:</strong> Recent system optimizations have brought substantial improvements in performance and capabilities.</p>
-        </div>
-      </div>`,
-      content: `Welcome to the live RSS content stream for ${feed.name}.`,
-      isRead: false,
-      link: cleanWebUrl
-    }
-  ];
-  feedArticleCache[cacheKey] = fallbackArticles;
-  return fallbackArticles;
+  return applyPersistedArticleStates(articles);
 }
 
 // Fetch & Display Articles for Filter, Folder, or Feed
@@ -1771,14 +1870,16 @@ async function fetchAndDisplayArticles(target) {
 
   // Fetch articles for target feeds in parallel
   const articlesLists = await Promise.all(targetFeeds.map(f => getArticlesForFeed(f)));
-  let pool = articlesLists.flat();
+  let pool = applyPersistedArticleStates(articlesLists.flat());
 
   let items = [];
   if (typeof target === 'string') {
     if (target === 'read') {
-      items = pool.filter(a => a.isRead);
+      const readSet = getReadArticleIdsFromStorage();
+      items = pool.filter(a => a.isRead || readSet.has(getArticleKey(a)));
     } else if (target === 'starred') {
-      items = pool.filter(a => a.isFavorite);
+      items = getStarredArticlesFromStorage();
+      items.forEach(a => a.isFavorite = true);
     } else if (target === 'latest') {
       items = [...pool].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     } else { // 'all' or default
@@ -1791,6 +1892,7 @@ async function fetchAndDisplayArticles(target) {
   loadedArticles = items;
   renderArticleList(loadedArticles, typeof target === 'string' && target === 'starred' ? 'No starred articles yet.' : 'No articles in this feed.');
 }
+
 
 function formatArticleTimestamp(pubDateRaw) {
   if (!pubDateRaw) return '';
@@ -1879,18 +1981,17 @@ function renderArticleList(articles, emptyMessage = 'No articles in this feed.')
     if (starIcon) {
       starIcon.addEventListener('click', (e) => {
         e.stopPropagation();
-        art.isFavorite = !art.isFavorite;
+        setArticleStarred(art);
         starIcon.className = `card-star-btn ${art.isFavorite ? 'starred' : ''}`;
         starIcon.textContent = art.isFavorite ? '★' : '☆';
         starIcon.title = art.isFavorite ? 'Unstar article' : 'Star article';
-        if (currentArticle && currentArticle.id === art.id) {
+        if (currentArticle && getArticleKey(currentArticle) === getArticleKey(art)) {
           const starBtn = document.getElementById('star-btn');
           if (starBtn) {
             if (art.isFavorite) starBtn.classList.add('starred');
             else starBtn.classList.remove('starred');
           }
         }
-        updateBadges();
       });
     }
 
@@ -1909,7 +2010,7 @@ function selectArticle(art, cardEl) {
   if (cardEl) cardEl.classList.add('selected');
 
   if (!art.isRead) {
-    art.isRead = true;
+    setArticleRead(art);
     const dot = document.getElementById(`dot-${art.id}`);
     if (dot) dot.remove();
     callMCP('mark_read', { id: art.id });
@@ -2115,7 +2216,7 @@ if (descLinesSelect) {
 // Star Button Click Handler (Single Article)
 document.getElementById('star-btn').onclick = () => {
   if (!currentArticle) return;
-  currentArticle.isFavorite = !currentArticle.isFavorite;
+  setArticleStarred(currentArticle);
   const starBtn = document.getElementById('star-btn');
   if (currentArticle.isFavorite) {
     starBtn.classList.add('starred');
@@ -2125,7 +2226,6 @@ document.getElementById('star-btn').onclick = () => {
     showToast(`Unstarred "${currentArticle.title.slice(0, 30)}..."`, 'info');
   }
   renderArticleList(loadedArticles);
-  updateBadges();
 };
 
 // Bulk Star / Unstar Handlers
@@ -2135,13 +2235,12 @@ const bulkUnstarBtn = document.getElementById('bulk-unstar-btn');
 if (bulkStarBtn) {
   bulkStarBtn.onclick = () => {
     if (!loadedArticles || loadedArticles.length === 0) return;
-    loadedArticles.forEach(a => { a.isFavorite = true; });
+    loadedArticles.forEach(a => setArticleStarred(a, true));
     if (currentArticle) {
       const starBtn = document.getElementById('star-btn');
       if (starBtn) starBtn.classList.add('starred');
     }
     renderArticleList(loadedArticles);
-    updateBadges();
     showToast(`Starred all ${loadedArticles.length} displayed articles!`, 'success');
   };
 }
@@ -2149,13 +2248,12 @@ if (bulkStarBtn) {
 if (bulkUnstarBtn) {
   bulkUnstarBtn.onclick = () => {
     if (!loadedArticles || loadedArticles.length === 0) return;
-    loadedArticles.forEach(a => { a.isFavorite = false; });
+    loadedArticles.forEach(a => setArticleStarred(a, false));
     if (currentArticle) {
       const starBtn = document.getElementById('star-btn');
       if (starBtn) starBtn.classList.remove('starred');
     }
     renderArticleList(loadedArticles);
-    updateBadges();
     showToast(`Unstarred all ${loadedArticles.length} displayed articles!`, 'info');
   };
 }
@@ -3652,6 +3750,7 @@ async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
 // Initial Render & Load
 renderTree();
 fetchAndDisplayArticles('latest');
+updateBadges();
 initGeneralSettingsUI();
 initAISettingsUI();
 setupAIChatbotUI();

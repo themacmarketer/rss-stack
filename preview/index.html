@@ -360,24 +360,46 @@
             </div>
           </div>
 
-          <!-- Tab 4: AI Assistant Keys -->
+          <!-- Tab 4: AI Assistant Authentication & Keys -->
           <div class="tab-pane" id="pane-ai">
+            <!-- OpenAI OAuth Login -->
             <div class="setting-block">
-              <label>OpenAI (API Key / OAuth Token)</label>
-              <input type="password" id="ai-key-openai" placeholder="sk-proj-..." />
-              <p class="help-text">Direct integration for GPT-4o & GPT-4o-mini.</p>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-weight:600; margin:0;">OpenAI (OAuth Login)</label>
+                <span id="openai-oauth-status" class="oauth-badge disconnected">Disconnected</span>
+              </div>
+              <p class="help-text">Sign in to your OpenAI account via browser OAuth. No API key required.</p>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button type="button" class="btn-secondary" id="openai-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                  <span>🌐 Login with OpenAI (OAuth)</span>
+                </button>
+                <button type="button" class="btn-secondary" id="openai-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
+              </div>
             </div>
-            <div class="setting-block" style="margin-top:10px;">
-              <label>Claude / Anthropic (API Key / OAuth Token)</label>
-              <input type="password" id="ai-key-claude" placeholder="sk-ant-..." />
-              <p class="help-text">Direct integration for Claude 3.5 Sonnet & Haiku.</p>
+
+            <!-- Claude / Anthropic OAuth Login -->
+            <div class="setting-block" style="margin-top:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-weight:600; margin:0;">Claude / Anthropic (OAuth Login)</label>
+                <span id="claude-oauth-status" class="oauth-badge disconnected">Disconnected</span>
+              </div>
+              <p class="help-text">Sign in to your Claude account via browser OAuth. No API key required.</p>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <button type="button" class="btn-secondary" id="claude-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                  <span>🌐 Login with Claude (OAuth)</span>
+                </button>
+                <button type="button" class="btn-secondary" id="claude-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
+              </div>
             </div>
-            <div class="setting-block" style="margin-top:10px;">
-              <label>OpenRouter (API Key)</label>
+
+            <!-- OpenRouter API Key -->
+            <div class="setting-block" style="margin-top:14px;">
+              <label style="font-weight:600;">OpenRouter (API Key)</label>
               <input type="password" id="ai-key-openrouter" placeholder="sk-or-v1-..." />
               <p class="help-text">Access DeepSeek, Llama, GPT-4o, Claude 3.5 via single OpenRouter API key.</p>
             </div>
-            <button class="btn-primary" id="save-ai-keys-btn" style="margin-top:14px; width:100%;">Save AI Configuration</button>
+
+            <button class="btn-primary" id="save-ai-keys-btn" style="margin-top:16px; width:100%;">Save AI Preferences</button>
           </div>
         </div>
       </div>

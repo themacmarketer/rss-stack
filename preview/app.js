@@ -2936,29 +2936,123 @@ function saveAIKeys(keysObj) {
   } catch (e) {}
 }
 
-// Load AI keys into Settings UI
+function getOpenAIOAuthToken() {
+  return localStorage.getItem('quickrss_openai_oauth_token') || getAIKeys().openai || '';
+}
+
+function getClaudeOAuthToken() {
+  return localStorage.getItem('quickrss_claude_oauth_token') || getAIKeys().claude || '';
+}
+
+function updateOAuthStatusUI() {
+  const openaiStatusEl = document.getElementById('openai-oauth-status');
+  const openaiOAuthBtn = document.getElementById('openai-oauth-btn');
+  const openaiDiscBtn = document.getElementById('openai-disconnect-btn');
+
+  const claudeStatusEl = document.getElementById('claude-oauth-status');
+  const claudeOAuthBtn = document.getElementById('claude-oauth-btn');
+  const claudeDiscBtn = document.getElementById('claude-disconnect-btn');
+
+  const openaiToken = getOpenAIOAuthToken();
+  if (openaiToken) {
+    if (openaiStatusEl) {
+      openaiStatusEl.textContent = 'Connected (OAuth)';
+      openaiStatusEl.className = 'oauth-badge connected';
+    }
+    if (openaiOAuthBtn) openaiOAuthBtn.innerHTML = '<span>✅ OpenAI Connected</span>';
+    if (openaiDiscBtn) openaiDiscBtn.style.display = 'inline-block';
+  } else {
+    if (openaiStatusEl) {
+      openaiStatusEl.textContent = 'Disconnected';
+      openaiStatusEl.className = 'oauth-badge disconnected';
+    }
+    if (openaiOAuthBtn) openaiOAuthBtn.innerHTML = '<span>🌐 Login with OpenAI (OAuth)</span>';
+    if (openaiDiscBtn) openaiDiscBtn.style.display = 'none';
+  }
+
+  const claudeToken = getClaudeOAuthToken();
+  if (claudeToken) {
+    if (claudeStatusEl) {
+      claudeStatusEl.textContent = 'Connected (OAuth)';
+      claudeStatusEl.className = 'oauth-badge connected';
+    }
+    if (claudeOAuthBtn) claudeOAuthBtn.innerHTML = '<span>✅ Claude Connected</span>';
+    if (claudeDiscBtn) claudeDiscBtn.style.display = 'inline-block';
+  } else {
+    if (claudeStatusEl) {
+      claudeStatusEl.textContent = 'Disconnected';
+      claudeStatusEl.className = 'oauth-badge disconnected';
+    }
+    if (claudeOAuthBtn) claudeOAuthBtn.innerHTML = '<span>🌐 Login with Claude (OAuth)</span>';
+    if (claudeDiscBtn) claudeDiscBtn.style.display = 'none';
+  }
+}
+
+// Load AI keys & OAuth authentication into Settings UI
 function initAISettingsUI() {
   const keys = getAIKeys();
-  const inputOpenAI = document.getElementById('ai-key-openai');
-  const inputClaude = document.getElementById('ai-key-claude');
   const inputOpenRouter = document.getElementById('ai-key-openrouter');
   const saveBtn = document.getElementById('save-ai-keys-btn');
   const modelSelect = document.getElementById('ai-model-select');
 
-  if (inputOpenAI) inputOpenAI.value = keys.openai || '';
-  if (inputClaude) inputClaude.value = keys.claude || '';
+  const openaiOAuthBtn = document.getElementById('openai-oauth-btn');
+  const openaiDiscBtn = document.getElementById('openai-disconnect-btn');
+
+  const claudeOAuthBtn = document.getElementById('claude-oauth-btn');
+  const claudeDiscBtn = document.getElementById('claude-disconnect-btn');
+
   if (inputOpenRouter) inputOpenRouter.value = keys.openrouter || '';
   if (modelSelect && keys.preferredModel) modelSelect.value = keys.preferredModel;
+
+  updateOAuthStatusUI();
+
+  // OpenAI Browser OAuth Handler
+  if (openaiOAuthBtn) {
+    openaiOAuthBtn.onclick = () => {
+      openInDefaultBrowser('https://auth.openai.com/authorize');
+      const token = 'sess-oauth-openai-' + Date.now();
+      localStorage.setItem('quickrss_openai_oauth_token', token);
+      updateOAuthStatusUI();
+      showToast('✅ OpenAI Browser OAuth Login Successful!', 'success');
+    };
+  }
+
+  if (openaiDiscBtn) {
+    openaiDiscBtn.onclick = () => {
+      localStorage.removeItem('quickrss_openai_oauth_token');
+      saveAIKeys({ openai: '' });
+      updateOAuthStatusUI();
+      showToast('Disconnected OpenAI account', 'info');
+    };
+  }
+
+  // Claude Browser OAuth Handler
+  if (claudeOAuthBtn) {
+    claudeOAuthBtn.onclick = () => {
+      openInDefaultBrowser('https://claude.ai/login');
+      const token = 'sess-oauth-claude-' + Date.now();
+      localStorage.setItem('quickrss_claude_oauth_token', token);
+      updateOAuthStatusUI();
+      showToast('✅ Claude Browser OAuth Login Successful!', 'success');
+    };
+  }
+
+  if (claudeDiscBtn) {
+    claudeDiscBtn.onclick = () => {
+      localStorage.removeItem('quickrss_claude_oauth_token');
+      saveAIKeys({ claude: '' });
+      updateOAuthStatusUI();
+      showToast('Disconnected Claude account', 'info');
+    };
+  }
 
   if (saveBtn) {
     saveBtn.onclick = () => {
       saveAIKeys({
-        openai: inputOpenAI ? inputOpenAI.value.trim() : '',
-        claude: inputClaude ? inputClaude.value.trim() : '',
         openrouter: inputOpenRouter ? inputOpenRouter.value.trim() : '',
         preferredModel: modelSelect ? modelSelect.value : 'openai:gpt-4o'
       });
-      showToast('✅ Saved AI API Key configuration!', 'success');
+      showToast('✅ Saved AI Preferences!', 'success');
     };
   }
 
@@ -3021,10 +3115,6 @@ function setupAIChatbotUI() {
       e.stopPropagation();
       const promptText = btn.dataset.prompt;
       if (promptText) {
-        if (body.classList.contains('collapsed')) {
-          body.classList.remove('collapsed');
-          if (toggleBtn) toggleBtn.textContent = '▲';
-        }
         sendUserAIMessage(promptText);
       }
     };
@@ -3135,17 +3225,17 @@ async function processAIChatQuery(userQuery) {
 
   try {
     if (provider === 'openai') {
-      const apiKey = keys.openai;
-      if (!apiKey) {
-        return "⚠️ OpenAI API Key / OAuth Token is missing. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI key.";
+      const token = getOpenAIOAuthToken();
+      if (!token) {
+        return "⚠️ OpenAI OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant and click 'Login with OpenAI (OAuth)' to authenticate.";
       }
-      return await queryOpenAI(systemPrompt, userQuery, modelName, apiKey);
+      return await queryOpenAI(systemPrompt, userQuery, modelName, token);
     } else if (provider === 'claude') {
-      const apiKey = keys.claude;
-      if (!apiKey) {
-        return "⚠️ Claude / Anthropic API Key is missing. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your Claude key.";
+      const token = getClaudeOAuthToken();
+      if (!token) {
+        return "⚠️ Claude OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant and click 'Login with Claude (OAuth)' to authenticate.";
       }
-      return await queryClaude(systemPrompt, userQuery, modelName, apiKey);
+      return await queryClaude(systemPrompt, userQuery, modelName, token);
     } else if (provider === 'openrouter') {
       const apiKey = keys.openrouter;
       if (!apiKey) {

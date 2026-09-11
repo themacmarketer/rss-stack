@@ -1410,3 +1410,23 @@ body {
   background: rgba(255, 59, 48, 0.1);
 }
 
+/* OAuth Status Badges */
+.oauth-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.oauth-badge.connected {
+  background: rgba(52, 199, 89, 0.15);
+  color: #248a3d;
+  border: 1px solid rgba(52, 199, 89, 0.3);
+}
+.oauth-badge.disconnected {
+  background: rgba(142, 142, 147, 0.15);
+  color: #636366;
+  border: 1px solid rgba(142, 142, 147, 0.3);
+}
+
+

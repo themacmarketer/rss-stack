@@ -15,6 +15,7 @@ echo "📦 Compiling Swift native app..."
 swiftc -O -target arm64-apple-macosx14.0 \
   -framework AppKit \
   -framework WebKit \
+  -framework Network \
   src/main.swift \
   -o "${MACOS_DIR}/${APP_NAME}"
 

@@ -366,15 +366,93 @@ class MCPServer {
                     ]
                 ],
                 [
+                    "name": "get_feed_tree",
+                    "description": "Get complete folder and feed tree structure",
+                    "inputSchema": ["type": "object", "properties": [:]]
+                ],
+                [
+                    "name": "add_folder",
+                    "description": "Create a new folder or subfolder",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "name": ["type": "string", "description": "Folder name"],
+                            "parent_id": ["type": "string", "description": "Parent folder ID or 'root'"]
+                        ],
+                        "required": ["name"]
+                    ]
+                ],
+                [
+                    "name": "edit_folder",
+                    "description": "Rename or move a folder",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "id": ["type": "string", "description": "Folder ID"],
+                            "name": ["type": "string", "description": "New folder name"],
+                            "parent_id": ["type": "string", "description": "New parent folder ID or 'root'"]
+                        ],
+                        "required": ["id"]
+                    ]
+                ],
+                [
+                    "name": "delete_folder",
+                    "description": "Delete a folder and all its contents",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "id": ["type": "string", "description": "Folder ID"]
+                        ],
+                        "required": ["id"]
+                    ]
+                ],
+                [
                     "name": "add_feed",
                     "description": "Subscribe to a new RSS feed",
                     "inputSchema": [
                         "type": "object",
                         "properties": [
                             "url": ["type": "string", "description": "RSS Feed URL"],
-                            "title": ["type": "string", "description": "Feed Title"]
+                            "title": ["type": "string", "description": "Feed Title"],
+                            "folder_id": ["type": "string", "description": "Target folder ID or 'root'"]
                         ],
                         "required": ["url"]
+                    ]
+                ],
+                [
+                    "name": "edit_feed",
+                    "description": "Edit title, URL, or parent folder of an RSS feed",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "id": ["type": "string", "description": "Feed ID"],
+                            "title": ["type": "string", "description": "New feed title"],
+                            "url": ["type": "string", "description": "New feed RSS URL"],
+                            "folder_id": ["type": "string", "description": "New parent folder ID or 'root'"]
+                        ],
+                        "required": ["id"]
+                    ]
+                ],
+                [
+                    "name": "delete_feed",
+                    "description": "Unsubscribe and delete an RSS feed",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "id": ["type": "string", "description": "Feed ID"]
+                        ],
+                        "required": ["id"]
+                    ]
+                ],
+                [
+                    "name": "get_folder_articles",
+                    "description": "Fetch articles for feeds inside a specific folder",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "folder_id": ["type": "string", "description": "Folder ID"]
+                        ],
+                        "required": ["folder_id"]
                     ]
                 ],
                 [

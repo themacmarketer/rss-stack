@@ -915,10 +915,94 @@ window.executeMCPTool = async function(name, args = {}) {
       return matches;
     }
 
+    if (name === 'get_feed_tree') {
+      return treeData;
+    }
+
+    if (name === 'add_folder') {
+      const folderName = args.name;
+      if (!folderName) return { error: 'Missing folder name' };
+      const parentId = args.parent_id || 'root';
+      const newFolder = {
+        id: `f-mcp-${Date.now()}`,
+        type: 'folder',
+        name: folderName,
+        expanded: true,
+        children: []
+      };
+
+      if (parentId === 'root') {
+        treeData.unshift(newFolder);
+      } else {
+        const parentPos = findNodePosition(treeData, parentId);
+        if (parentPos && parentPos.node.type === 'folder') {
+          parentPos.node.children = parentPos.node.children || [];
+          parentPos.node.children.unshift(newFolder);
+          parentPos.node.expanded = true;
+        } else {
+          treeData.unshift(newFolder);
+        }
+      }
+      renderTree();
+      showToast(`Created folder "${folderName}" via MCP`, 'success');
+      return { success: true, folder: newFolder };
+    }
+
+    if (name === 'edit_folder') {
+      const folderId = args.id;
+      if (!folderId) return { error: 'Missing folder ID' };
+      const pos = findNodePosition(treeData, folderId);
+      if (!pos || pos.node.type !== 'folder') return { error: `Folder '${folderId}' not found` };
+
+      if (args.name) pos.node.name = args.name;
+
+      if (args.parent_id !== undefined) {
+        const newParentId = args.parent_id;
+        const parentInfo = findParentOfNode(treeData, folderId);
+        const currentParentId = parentInfo && parentInfo.parentNode ? parentInfo.parentNode.id : 'root';
+
+        if (newParentId !== currentParentId) {
+          const removed = removeNodeById(treeData, folderId);
+          if (removed) {
+            if (newParentId === 'root') {
+              treeData.unshift(removed);
+            } else {
+              const targetPos = findNodePosition(treeData, newParentId);
+              if (targetPos && targetPos.node.type === 'folder') {
+                targetPos.node.children = targetPos.node.children || [];
+                targetPos.node.children.unshift(removed);
+                targetPos.node.expanded = true;
+              } else {
+                treeData.unshift(removed);
+              }
+            }
+          }
+        }
+      }
+
+      renderTree();
+      showToast(`Updated folder "${pos.node.name}" via MCP`, 'success');
+      return { success: true, folder: pos.node };
+    }
+
+    if (name === 'delete_folder') {
+      const folderId = args.id;
+      if (!folderId) return { error: 'Missing folder ID' };
+      const pos = findNodePosition(treeData, folderId);
+      if (!pos) return { error: `Folder '${folderId}' not found` };
+
+      removeNodeById(treeData, folderId);
+      renderTree();
+      showToast(`Deleted folder via MCP`, 'info');
+      return { success: true, id: folderId };
+    }
+
     if (name === 'add_feed') {
       const url = args.url;
       const title = args.title || url;
+      const folderId = args.folder_id || args.folderId || 'root';
       if (!url) return { error: 'Missing feed URL' };
+
       const newFeed = {
         id: `feed-mcp-${Date.now()}`,
         type: 'feed',
@@ -926,10 +1010,98 @@ window.executeMCPTool = async function(name, args = {}) {
         url: url,
         unreadCount: 0
       };
-      treeData.push(newFeed);
+
+      if (folderId === 'root') {
+        treeData.unshift(newFeed);
+      } else {
+        const targetPos = findNodePosition(treeData, folderId);
+        if (targetPos && targetPos.node.type === 'folder') {
+          targetPos.node.children = targetPos.node.children || [];
+          targetPos.node.children.unshift(newFeed);
+          targetPos.node.expanded = true;
+        } else {
+          treeData.unshift(newFeed);
+        }
+      }
+
       renderTree();
       fetchAndDisplayArticles(newFeed);
+      showToast(`Added feed "${title}" via MCP`, 'success');
       return { success: true, message: `Added feed ${title}`, feed: newFeed };
+    }
+
+    if (name === 'edit_feed') {
+      const feedId = args.id;
+      if (!feedId) return { error: 'Missing feed ID or URL' };
+      const pos = findNodePosition(treeData, feedId);
+      if (!pos || pos.node.type !== 'feed') return { error: `Feed '${feedId}' not found` };
+
+      if (args.title) pos.node.name = args.title;
+      if (args.url && args.url !== pos.node.url) {
+        delete feedArticleCache[pos.node.url];
+        pos.node.url = args.url;
+      }
+
+      if (args.folder_id !== undefined) {
+        const newFolderId = args.folder_id;
+        const parentInfo = findParentOfNode(treeData, pos.node.id);
+        const currentParentId = parentInfo && parentInfo.parentNode ? parentInfo.parentNode.id : 'root';
+
+        if (newFolderId !== currentParentId) {
+          const removed = removeNodeById(treeData, pos.node.id);
+          if (removed) {
+            if (newFolderId === 'root') {
+              treeData.unshift(removed);
+            } else {
+              const targetPos = findNodePosition(treeData, newFolderId);
+              if (targetPos && targetPos.node.type === 'folder') {
+                targetPos.node.children = targetPos.node.children || [];
+                targetPos.node.children.unshift(removed);
+                targetPos.node.expanded = true;
+              } else {
+                treeData.unshift(removed);
+              }
+            }
+          }
+        }
+      }
+
+      renderTree();
+      fetchAndDisplayArticles(pos.node);
+      showToast(`Updated feed "${pos.node.name}" via MCP`, 'success');
+      return { success: true, feed: pos.node };
+    }
+
+    if (name === 'delete_feed') {
+      const feedId = args.id;
+      if (!feedId) return { error: 'Missing feed ID' };
+      const pos = findNodePosition(treeData, feedId);
+      if (!pos) return { error: `Feed '${feedId}' not found` };
+
+      removeNodeById(treeData, feedId);
+      renderTree();
+      showToast(`Deleted feed via MCP`, 'info');
+      return { success: true, id: feedId };
+    }
+
+    if (name === 'get_folder_articles') {
+      const folderId = args.folder_id;
+      if (!folderId) return { error: 'Missing folder_id' };
+      const pos = findNodePosition(treeData, folderId);
+      if (!pos || pos.node.type !== 'folder') return { error: `Folder '${folderId}' not found` };
+
+      const folderFeeds = getAllFeedsFromTree(pos.node.children || []);
+      const articlesLists = await Promise.all(folderFeeds.map(f => getArticlesForFeed(f)));
+      const pool = articlesLists.flat();
+      return pool.map(a => ({
+        id: a.id,
+        title: a.title,
+        feedTitle: a.feedTitle,
+        pubDate: a.pubDate,
+        author: a.author,
+        summary: a.summary,
+        link: a.link
+      }));
     }
 
     if (name === 'mark_read') {

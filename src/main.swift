@@ -25,8 +25,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         prefs.allowsContentJavaScript = true
         config.defaultWebpagePreferences = prefs
         
-        // Register Native Open External Message Handler
+        // Register Native Message Handlers
         config.userContentController.add(self, name: "openExternal")
+        config.userContentController.add(self, name: "fetchURL")
         
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
@@ -47,12 +48,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // Handle JS postMessage calls (e.g. window.webkit.messageHandlers.openExternal.postMessage(url))
+    // Handle JS postMessage calls (e.g. openExternal and fetchURL)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
+        } else if message.name == "fetchURL", let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let requestId = dict["requestId"] as? String, let url = URL(string: urlString) {
+            
+            var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10.0)
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, Gecko) Chrome/122.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+            request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+            
+            let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+                guard let self = self else { return }
+                
+                var jsCode = ""
+                if let error = error {
+                    let errEscaped = error.localizedDescription.replacingOccurrences(of: "'", with: "\\'")
+                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', null, '\(errEscaped)'); }"
+                } else if let data = data, let htmlString = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) {
+                    if let jsonData = try? JSONSerialization.data(withJSONObject: [htmlString], options: []),
+                       let jsonStr = String(data: jsonData, encoding: .utf8) {
+                        let innerJson = String(jsonStr.dropFirst().dropLast()) // JSON escaped string payload
+                        jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', \(innerJson), null); }"
+                    }
+                }
+                
+                if !jsCode.isEmpty {
+                    DispatchQueue.main.async {
+                        self.webView.evaluateJavaScript(jsCode, completionHandler: nil)
+                    }
+                }
+            }
+            task.resume()
         }
     }
+
 
     // Handle window.open(...) in JavaScript to open in default Mac browser
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {

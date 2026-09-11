@@ -606,6 +606,35 @@ function selectArticle(art, cardEl) {
   renderReaderBody();
 }
 
+// Native Swift URLSession Fetch Callback Bridge
+const nativeFetchCallbacks = {};
+
+window.onNativeURLFetched = (requestId, htmlContent, error) => {
+  if (nativeFetchCallbacks[requestId]) {
+    nativeFetchCallbacks[requestId](htmlContent, error);
+    delete nativeFetchCallbacks[requestId];
+  }
+};
+
+function fetchWebPageHTML(url) {
+  return new Promise((resolve, reject) => {
+    const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    nativeFetchCallbacks[requestId] = (html, err) => {
+      if (html) resolve(html);
+      else reject(err || 'Failed to fetch');
+    };
+
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.fetchURL) {
+      window.webkit.messageHandlers.fetchURL.postMessage({ url, requestId });
+    } else {
+      fetch(url)
+        .then(res => res.text())
+        .then(html => resolve(html))
+        .catch(err => reject(err));
+    }
+  });
+}
+
 function renderReaderBody() {
   if (!currentArticle) return;
   const readerContainer = document.getElementById('reader-container');
@@ -614,30 +643,74 @@ function renderReaderBody() {
   if (activeArticleViewMode === 'html') {
     readerContainer.classList.remove('text-padding');
     
-    const htmlBody = art.htmlContent || `
-      <div class="formatted-html-view">
-        <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
-        <h1 class="reader-title">${art.title}</h1>
-        <div class="reader-byline">Published ${art.pubDate ? new Date(art.pubDate).toLocaleDateString() : ''} ${art.author ? '• By ' + art.author : ''}</div>
-        <hr class="reader-divider" />
-        <div class="reader-html-body">
-          <p>${art.content || art.summary || 'Full HTML article view.'}</p>
+    const hasLiveUrl = art.link && art.link.startsWith('http');
+    
+    if (hasLiveUrl) {
+      const containerId = `html-pane-${Date.now()}`;
+      readerContainer.innerHTML = `
+        <div class="html-view-container">
+          <div class="html-view-bar">
+            <span class="html-view-url-label">🌐 Web View: <a href="#" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link}</a></span>
+            <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
+          </div>
+          <div id="${containerId}" class="html-view-scroll-pane">
+            <div style="padding:50px; text-align:center; color:#8e8e93; font-size:14px;">
+              <div style="margin-bottom:10px; font-weight:600; color:#1c1c1e; font-size:15px;">🌐 Fetching full original webpage...</div>
+              <div style="font-size:12px; color:#007aff;">${art.link}</div>
+            </div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    readerContainer.innerHTML = `
-      <div class="html-view-container">
-        <div class="html-view-bar">
-          <span class="html-view-url-label">🌐 Web Link: <a href="#" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link || '#'}</a></span>
-          <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
+      fetchWebPageHTML(art.link)
+        .then(rawHtml => {
+          const targetPane = document.getElementById(containerId);
+          if (!targetPane) return;
+          
+          let processedHtml = rawHtml;
+          const baseTag = `<base href="${art.link}">`;
+          if (processedHtml.includes('<head>')) {
+            processedHtml = processedHtml.replace('<head>', `<head>${baseTag}`);
+          } else if (processedHtml.includes('<html>')) {
+            processedHtml = processedHtml.replace('<html>', `<html><head>${baseTag}</head>`);
+          } else {
+            processedHtml = `<head>${baseTag}</head>` + processedHtml;
+          }
+
+          const iframe = document.createElement('iframe');
+          iframe.className = 'html-view-iframe';
+          iframe.setAttribute('allow', 'autoplay; encrypted-media');
+          targetPane.innerHTML = '';
+          targetPane.appendChild(iframe);
+          iframe.srcdoc = processedHtml;
+        })
+        .catch(err => {
+          const targetPane = document.getElementById(containerId);
+          if (!targetPane) return;
+          targetPane.innerHTML = `
+            <div class="formatted-html-view">
+              <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
+              <h1 class="reader-title">${art.title}</h1>
+              <div class="reader-byline">Published ${art.pubDate ? new Date(art.pubDate).toLocaleDateString() : ''} ${art.author ? '• By ' + art.author : ''}</div>
+              <hr class="reader-divider" />
+              <div class="reader-html-body">${art.htmlContent || art.content || art.summary || ''}</div>
+            </div>
+          `;
+        });
+    } else {
+      const htmlBody = art.htmlContent || `
+        <div class="formatted-html-view">
+          <div class="reader-feed-badge">${art.feedTitle || 'Quick RSS'}</div>
+          <h1 class="reader-title">${art.title}</h1>
+          <div class="reader-byline">Published ${art.pubDate ? new Date(art.pubDate).toLocaleDateString() : ''} ${art.author ? '• By ' + art.author : ''}</div>
+          <hr class="reader-divider" />
+          <div class="reader-html-body">${art.content || art.summary || 'Full HTML article view.'}</div>
         </div>
-        <div class="html-view-scroll-pane">
-          ${htmlBody}
-        </div>
-      </div>
-    `;
+      `;
+      readerContainer.innerHTML = `<div class="html-view-container"><div class="html-view-scroll-pane">${htmlBody}</div></div>`;
+    }
   } else {
+
     readerContainer.classList.add('text-padding');
     const dateStr = art.pubDate ? new Date(art.pubDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '';
     const textContent = art.content || art.summary || 'Clean reader text content.';

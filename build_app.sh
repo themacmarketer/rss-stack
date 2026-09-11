@@ -22,6 +22,9 @@ echo "🎨 Copying UI resources..."
 cp preview/index.html "${RESOURCES_DIR}/"
 cp preview/styles.css "${RESOURCES_DIR}/"
 cp preview/app.js "${RESOURCES_DIR}/"
+if [ -f "assets/AppIcon.icns" ]; then
+  cp assets/AppIcon.icns "${RESOURCES_DIR}/"
+fi
 
 echo "📄 Creating Info.plist..."
 cat <<EOF > "${CONTENTS_DIR}/Info.plist"
@@ -33,6 +36,8 @@ cat <<EOF > "${CONTENTS_DIR}/Info.plist"
     <string>en</string>
     <key>CFBundleExecutable</key>
     <string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.wangchujiang.quickrss.folders</string>
     <key>CFBundleInfoDictionaryVersion</key>

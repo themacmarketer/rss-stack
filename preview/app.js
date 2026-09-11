@@ -871,19 +871,35 @@ document.getElementById('search-input').oninput = (e) => {
   renderArticleList(filtered);
 };
 
-// Add Folder Toolbar Button
-document.getElementById('add-folder-btn').onclick = () => {
-  const name = prompt('New folder name:', 'New Folder');
-  if (name) {
-    treeData.unshift({ id: `f-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
-    renderTree();
-  }
-};
-
-// Context Menu & Folder Modal Dialogs Setup
-const contextMenu = document.getElementById('context-menu');
+// Add New Folder Modal & Setup
+const addFolderModal = document.getElementById('add-folder-modal');
+const deleteFolderModal = document.getElementById('delete-folder-modal');
 const renameFolderModal = document.getElementById('rename-folder-modal');
 const subfolderModal = document.getElementById('subfolder-modal');
+
+document.getElementById('add-folder-btn').onclick = () => {
+  document.getElementById('new-folder-name-input').value = 'New Folder';
+  addFolderModal.classList.remove('hidden');
+};
+
+const closeAddFolderBtn = document.getElementById('close-add-folder-btn');
+const cancelAddFolderBtn = document.getElementById('cancel-add-folder-btn');
+const confirmAddFolderBtn = document.getElementById('confirm-add-folder-btn');
+
+if (closeAddFolderBtn) closeAddFolderBtn.onclick = () => addFolderModal.classList.add('hidden');
+if (cancelAddFolderBtn) cancelAddFolderBtn.onclick = () => addFolderModal.classList.add('hidden');
+
+if (confirmAddFolderBtn) {
+  confirmAddFolderBtn.onclick = () => {
+    const name = document.getElementById('new-folder-name-input').value.trim() || 'New Folder';
+    treeData.unshift({ id: `f-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
+    renderTree();
+    addFolderModal.classList.add('hidden');
+  };
+}
+
+// Context Menu Setup
+const contextMenu = document.getElementById('context-menu');
 
 function showContextMenu(x, y, isFolder) {
   contextMenu.style.left = `${x}px`;
@@ -963,19 +979,89 @@ if (confirmRenameFolderBtn) {
   };
 }
 
-// Context Menu Action 3: Delete Folder
+// Context Menu Action 3: Delete Folder Modal
 document.getElementById('ctx-delete').onclick = (e) => {
   e.stopPropagation();
   contextMenu.classList.add('hidden');
   if (!contextNodeId) return;
   const pos = findNodePosition(treeData, contextNodeId);
   if (pos) {
-    if (confirm(`Delete "${pos.node.name}" and all its contents?`)) {
-      removeNodeById(treeData, contextNodeId);
-      renderTree();
-    }
+    document.getElementById('delete-folder-message').textContent = `Are you sure you want to delete folder "${pos.node.name}" and all its contents?`;
+    deleteFolderModal.classList.remove('hidden');
   }
 };
+
+const closeDeleteFolderBtn = document.getElementById('close-delete-folder-btn');
+const cancelDeleteFolderBtn = document.getElementById('cancel-delete-folder-btn');
+const confirmDeleteFolderBtn = document.getElementById('confirm-delete-folder-btn');
+
+if (closeDeleteFolderBtn) closeDeleteFolderBtn.onclick = () => deleteFolderModal.classList.add('hidden');
+if (cancelDeleteFolderBtn) cancelDeleteFolderBtn.onclick = () => deleteFolderModal.classList.add('hidden');
+
+if (confirmDeleteFolderBtn) {
+  confirmDeleteFolderBtn.onclick = () => {
+    if (contextNodeId) {
+      removeNodeById(treeData, contextNodeId);
+      renderTree();
+      fetchAndDisplayArticles('latest');
+    }
+    deleteFolderModal.classList.add('hidden');
+  };
+}
+
+// Column Resizing Engine
+function setupColumnResizers() {
+  const sidebar = document.querySelector('.sidebar');
+  const articleColumn = document.querySelector('.article-list-column');
+  const resizer1 = document.getElementById('resizer-1');
+  const resizer2 = document.getElementById('resizer-2');
+
+  if (!resizer1 || !resizer2) return;
+
+  let isResizing1 = false;
+  let isResizing2 = false;
+
+  // Resizer 1: Sidebar Width
+  resizer1.addEventListener('mousedown', (e) => {
+    isResizing1 = true;
+    resizer1.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  // Resizer 2: Article List Column Width
+  resizer2.addEventListener('mousedown', (e) => {
+    isResizing2 = true;
+    resizer2.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (isResizing1) {
+      const newWidth = Math.max(180, Math.min(480, e.clientX));
+      sidebar.style.width = `${newWidth}px`;
+    } else if (isResizing2) {
+      const sidebarWidth = sidebar.getBoundingClientRect().width;
+      const newWidth = Math.max(220, Math.min(650, e.clientX - sidebarWidth));
+      articleColumn.style.width = `${newWidth}px`;
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing1 || isResizing2) {
+      isResizing1 = false;
+      isResizing2 = false;
+      resizer1.classList.remove('dragging');
+      resizer2.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  });
+}
+
+setupColumnResizers();
+
 
 // OPML Import & Export Engine with Replace Option
 const importOpmlBtn = document.getElementById('import-opml-btn');

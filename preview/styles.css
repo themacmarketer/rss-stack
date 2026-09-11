@@ -518,6 +518,27 @@ body {
   overflow: hidden;
 }
 
+.card-star-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  font-size: 14px;
+  color: #c7c7cc;
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+  user-select: none;
+}
+.card-star-btn:hover {
+  color: #ffcc00;
+  transform: scale(1.2);
+}
+.card-star-btn.starred {
+  color: #ffcc00;
+}
+
 .unread-dot {
   width: 7px;
   height: 7px;

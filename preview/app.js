@@ -1134,8 +1134,63 @@ window.executeMCPTool = async function(name, args = {}) {
 
     if (name === 'star') {
       const id = args.id;
-      loadedArticles.forEach(a => { if (a.id === id) a.isFavorite = true; });
+      let target = loadedArticles.find(a => a.id === id);
+      if (target) {
+        target.isFavorite = true;
+      }
+      updateBadges();
+      renderArticleList(loadedArticles);
       return { success: true, id: id };
+    }
+
+    if (name === 'unstar') {
+      const id = args.id;
+      let target = loadedArticles.find(a => a.id === id);
+      if (target) {
+        target.isFavorite = false;
+      }
+      updateBadges();
+      renderArticleList(loadedArticles);
+      return { success: true, id: id };
+    }
+
+    if (name === 'star_all') {
+      loadedArticles.forEach(a => { a.isFavorite = true; });
+      updateBadges();
+      renderArticleList(loadedArticles);
+      return { success: true, count: loadedArticles.length };
+    }
+
+    if (name === 'unstar_all') {
+      loadedArticles.forEach(a => { a.isFavorite = false; });
+      updateBadges();
+      renderArticleList(loadedArticles);
+      return { success: true, count: loadedArticles.length };
+    }
+
+    if (name === 'get_starred_articles') {
+      const allFeeds = getAllFeedsFromTree(treeData);
+      const starred = [];
+      const seen = new Set();
+      allFeeds.forEach(feed => {
+        const cacheKey = feed.url || feed.id || feed.name;
+        const arts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
+        arts.forEach(art => {
+          if (art.isFavorite && !seen.has(art.id)) {
+            seen.add(art.id);
+            starred.push({
+              id: art.id,
+              title: art.title,
+              feedTitle: art.feedTitle,
+              pubDate: art.pubDate,
+              author: art.author,
+              summary: art.summary,
+              link: art.link
+            });
+          }
+        });
+      });
+      return starred;
     }
   } catch (err) {
     return { error: err.toString() };
@@ -1417,8 +1472,20 @@ function moveNodeInTree(sourceId, targetId, position) {
 
 function updateBadges() {
   const total = getTotalUnreadCount();
-  document.getElementById('badge-all').textContent = total;
-  document.getElementById('badge-latest').textContent = Math.round(total * 0.6);
+  const badgeAll = document.getElementById('badge-all');
+  if (badgeAll) badgeAll.textContent = total;
+  const badgeLatest = document.getElementById('badge-latest');
+  if (badgeLatest) badgeLatest.textContent = Math.round(total * 0.6);
+
+  const allFeeds = getAllFeedsFromTree(treeData);
+  let starredCount = 0;
+  allFeeds.forEach(feed => {
+    const cacheKey = feed.url || feed.id || feed.name;
+    const arts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
+    starredCount += arts.filter(a => a.isFavorite).length;
+  });
+  const badgeStarred = document.getElementById('badge-starred');
+  if (badgeStarred) badgeStarred.textContent = starredCount;
 }
 
 // Helper to collect all feeds from tree recursively
@@ -1636,6 +1703,8 @@ async function fetchAndDisplayArticles(target) {
   if (typeof target === 'string') {
     if (target === 'read') {
       items = pool.filter(a => a.isRead);
+    } else if (target === 'starred') {
+      items = pool.filter(a => a.isFavorite);
     } else if (target === 'latest') {
       items = [...pool].sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
     } else { // 'all' or default
@@ -1646,7 +1715,7 @@ async function fetchAndDisplayArticles(target) {
   }
 
   loadedArticles = items;
-  renderArticleList(loadedArticles);
+  renderArticleList(loadedArticles, typeof target === 'string' && target === 'starred' ? 'No starred articles yet.' : 'No articles in this feed.');
 }
 
 function renderArticleList(articles, emptyMessage = 'No articles in this feed.') {
@@ -1674,10 +1743,31 @@ function renderArticleList(articles, emptyMessage = 'No articles in this feed.')
       <div class="article-meta">
         <span class="article-feed-title">${art.feedTitle || 'Feed'}</span>
         <span class="article-date">${dateStr}</span>
+        <span class="card-star-btn ${art.isFavorite ? 'starred' : ''}" title="${art.isFavorite ? 'Unstar article' : 'Star article'}">${art.isFavorite ? '★' : '☆'}</span>
       </div>
       <div class="article-headline">${art.title}</div>
       <div class="article-snippet-text">${art.summary || ''}</div>
     `;
+
+    const starIcon = card.querySelector('.card-star-btn');
+    if (starIcon) {
+      starIcon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        art.isFavorite = !art.isFavorite;
+        starIcon.className = `card-star-btn ${art.isFavorite ? 'starred' : ''}`;
+        starIcon.textContent = art.isFavorite ? '★' : '☆';
+        starIcon.title = art.isFavorite ? 'Unstar article' : 'Star article';
+        if (currentArticle && currentArticle.id === art.id) {
+          const starBtn = document.getElementById('star-btn');
+          if (starBtn) {
+            if (art.isFavorite) starBtn.classList.add('starred');
+            else starBtn.classList.remove('starred');
+          }
+        }
+        updateBadges();
+      });
+    }
+
     container.appendChild(card);
 
     if (idx === 0) {
@@ -1896,19 +1986,63 @@ if (descLinesSelect) {
   };
 }
 
-// Star Button Click Handler
+// Star Button Click Handler (Single Article)
 document.getElementById('star-btn').onclick = () => {
   if (!currentArticle) return;
   currentArticle.isFavorite = !currentArticle.isFavorite;
   const starBtn = document.getElementById('star-btn');
   if (currentArticle.isFavorite) {
     starBtn.classList.add('starred');
-    callMCP('star', { id: currentArticle.id });
+    showToast(`Starred "${currentArticle.title.slice(0, 30)}..."`, 'success');
   } else {
     starBtn.classList.remove('starred');
-    callMCP('unstar', { id: currentArticle.id });
+    showToast(`Unstarred "${currentArticle.title.slice(0, 30)}..."`, 'info');
   }
+  renderArticleList(loadedArticles);
+  updateBadges();
 };
+
+// Bulk Star / Unstar Handlers
+const bulkStarBtn = document.getElementById('bulk-star-btn');
+const bulkUnstarBtn = document.getElementById('bulk-unstar-btn');
+
+if (bulkStarBtn) {
+  bulkStarBtn.onclick = () => {
+    if (!loadedArticles || loadedArticles.length === 0) return;
+    loadedArticles.forEach(a => { a.isFavorite = true; });
+    if (currentArticle) {
+      const starBtn = document.getElementById('star-btn');
+      if (starBtn) starBtn.classList.add('starred');
+    }
+    renderArticleList(loadedArticles);
+    updateBadges();
+    showToast(`Starred all ${loadedArticles.length} displayed articles!`, 'success');
+  };
+}
+
+if (bulkUnstarBtn) {
+  bulkUnstarBtn.onclick = () => {
+    if (!loadedArticles || loadedArticles.length === 0) return;
+    loadedArticles.forEach(a => { a.isFavorite = false; });
+    if (currentArticle) {
+      const starBtn = document.getElementById('star-btn');
+      if (starBtn) starBtn.classList.remove('starred');
+    }
+    renderArticleList(loadedArticles);
+    updateBadges();
+    showToast(`Unstarred all ${loadedArticles.length} displayed articles!`, 'info');
+  };
+}
+
+// Keyboard Shortcut 'S' to Star/Unstar Selected Article
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 's' || e.key === 'S') {
+    if (currentArticle) {
+      document.getElementById('star-btn').click();
+    }
+  }
+});
 
 // Open in Browser
 document.getElementById('open-browser-btn').onclick = () => {

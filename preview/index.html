@@ -59,6 +59,17 @@
             </div>
             <span class="item-badge" id="badge-all">0</span>
           </li>
+          <li class="nav-item filter-item" data-filter="starred" id="filter-starred">
+            <div class="item-left">
+              <span class="icon-box gold-icon" style="color: #ffcc00;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25z"/>
+                </svg>
+              </span>
+              <span class="item-label">Starred Articles</span>
+            </div>
+            <span class="item-badge" id="badge-starred">0</span>
+          </li>
           <li class="nav-item filter-item" data-filter="read" id="filter-read">
             <div class="item-left">
               <span class="icon-box green-icon">
@@ -104,6 +115,14 @@
             <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM12 12l3 3"/>
           </svg>
           <input type="text" id="search-input" placeholder="Search articles...">
+        </div>
+        <div class="bulk-star-actions" style="display:flex; gap:6px; margin-top:8px;">
+          <button id="bulk-star-btn" class="bulk-action-btn" title="Star all articles currently displayed in list" style="flex:1; padding:4px 8px; font-size:11px; font-weight:600; border-radius:6px; border:1px solid rgba(0,0,0,0.12); background:#ffffff; color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+            <span style="color:#ffcc00;">★</span> Star All
+          </button>
+          <button id="bulk-unstar-btn" class="bulk-action-btn" title="Unstar all articles currently displayed in list" style="flex:1; padding:4px 8px; font-size:11px; font-weight:600; border-radius:6px; border:1px solid rgba(0,0,0,0.12); background:#ffffff; color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+            <span style="color:#8e8e93;">☆</span> Unstar All
+          </button>
         </div>
       </div>
       <div class="article-list-content" id="article-list-container">

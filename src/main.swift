@@ -473,6 +473,30 @@ class MCPServer {
                         "properties": ["id": ["type": "string"]],
                         "required": ["id"]
                     ]
+                ],
+                [
+                    "name": "unstar",
+                    "description": "Unstar an article",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": ["id": ["type": "string"]],
+                        "required": ["id"]
+                    ]
+                ],
+                [
+                    "name": "star_all",
+                    "description": "Star all currently loaded/displayed articles in view",
+                    "inputSchema": ["type": "object", "properties": [:]]
+                ],
+                [
+                    "name": "unstar_all",
+                    "description": "Unstar all currently loaded/displayed articles in view",
+                    "inputSchema": ["type": "object", "properties": [:]]
+                ],
+                [
+                    "name": "get_starred_articles",
+                    "description": "Fetch all starred/favorite RSS articles",
+                    "inputSchema": ["type": "object", "properties": [:]]
                 ]
             ]
             let result: [String: Any] = ["tools": tools]

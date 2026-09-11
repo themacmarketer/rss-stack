@@ -110,12 +110,36 @@
     <!-- COLUMN 2: Article List -->
     <div class="article-list-column">
       <div class="article-list-header">
-        <!-- AI Assistant Chatbot Bar -->
-        <div id="ai-chatbot-panel" class="ai-chatbot-panel">
-          <div class="ai-chat-header" id="ai-chat-header-toggle">
+        <!-- Row 1: Search Bar -->
+        <div class="search-bar-wrapper">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM12 12l3 3"/>
+          </svg>
+          <input type="text" id="search-input" placeholder="Search articles...">
+        </div>
+
+        <!-- Row 2: Action Bar (AI Assistant & Bulk Star/Unstar) -->
+        <div class="header-top-row">
+          <button id="ai-assistant-toggle-btn" class="ai-assistant-trigger-btn">
+            <span class="ai-sparkle-icon">🤖</span>
+            <span>AI Assistant</span>
+          </button>
+          <div class="bulk-star-actions">
+            <button id="bulk-star-btn" class="bulk-action-btn" title="Star all articles currently displayed in list">
+              <span style="color:#ffcc00;">★</span> Star All
+            </button>
+            <button id="bulk-unstar-btn" class="bulk-action-btn" title="Unstar all articles currently displayed in list">
+              <span style="color:#8e8e93;">☆</span> Unstar All
+            </button>
+          </div>
+        </div>
+
+        <!-- Floating Popover AI Chatbot Panel -->
+        <div id="ai-chatbot-panel" class="ai-chatbot-popover hidden">
+          <div class="ai-chat-header">
             <div class="ai-chat-title">
               <span class="ai-sparkle-icon">🤖</span>
-              <span>AI News Assistant</span>
+              <span>AI Assistant</span>
             </div>
             <div class="ai-chat-header-actions" onclick="event.stopPropagation();">
               <select id="ai-model-select" class="ai-model-select">
@@ -135,10 +159,10 @@
                 </optgroup>
               </select>
               <button id="ai-settings-btn" class="ai-btn-icon" title="Configure AI API Keys & Auth">⚙️</button>
-              <button id="ai-toggle-btn" class="ai-btn-icon" title="Expand / Collapse AI Chatbot">▼</button>
+              <button id="ai-close-btn" class="ai-btn-icon" title="Close AI Assistant">✕</button>
             </div>
           </div>
-          <div id="ai-chat-body" class="ai-chat-body collapsed">
+          <div id="ai-chat-body" class="ai-chat-body">
             <div class="ai-quick-prompts">
               <button class="quick-prompt-btn" data-prompt="Summarize the top news headlines right now">📰 Summarize Top News</button>
               <button class="quick-prompt-btn" data-prompt="What are the latest AI model releases and research breakthroughs?">🚀 AI Model Releases</button>
@@ -153,26 +177,11 @@
               </div>
             </div>
             <div class="ai-chat-input-bar">
-              <input type="text" id="ai-chat-input" placeholder="Ask AI about news content (e.g. 'Summarize tech news')..." />
+              <input type="text" id="ai-chat-input" placeholder="Ask AI about news content..." />
               <button id="ai-chat-send-btn" class="ai-send-btn">Send ➔</button>
               <button id="ai-chat-clear-btn" class="ai-clear-btn" title="Clear chat history">🗑️</button>
             </div>
           </div>
-        </div>
-
-        <div class="search-bar-wrapper">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM12 12l3 3"/>
-          </svg>
-          <input type="text" id="search-input" placeholder="Search articles...">
-        </div>
-        <div class="bulk-star-actions" style="display:flex; gap:6px; margin-top:8px;">
-          <button id="bulk-star-btn" class="bulk-action-btn" title="Star all articles currently displayed in list" style="flex:1; padding:4px 8px; font-size:11px; font-weight:600; border-radius:6px; border:1px solid rgba(0,0,0,0.12); background:#ffffff; color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
-            <span style="color:#ffcc00;">★</span> Star All
-          </button>
-          <button id="bulk-unstar-btn" class="bulk-action-btn" title="Unstar all articles currently displayed in list" style="flex:1; padding:4px 8px; font-size:11px; font-weight:600; border-radius:6px; border:1px solid rgba(0,0,0,0.12); background:#ffffff; color:#333; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
-            <span style="color:#8e8e93;">☆</span> Unstar All
-          </button>
         </div>
       </div>
       <div class="article-list-content" id="article-list-container">

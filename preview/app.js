@@ -2972,28 +2972,38 @@ function initAISettingsUI() {
 // AI Chatbot UI Interactivity
 function setupAIChatbotUI() {
   const panel = document.getElementById('ai-chatbot-panel');
-  const headerToggle = document.getElementById('ai-chat-header-toggle');
-  const body = document.getElementById('ai-chat-body');
-  const toggleBtn = document.getElementById('ai-toggle-btn');
+  const triggerBtn = document.getElementById('ai-assistant-toggle-btn');
+  const closeBtn = document.getElementById('ai-close-btn');
   const settingsBtn = document.getElementById('ai-settings-btn');
   const sendBtn = document.getElementById('ai-chat-send-btn');
   const clearBtn = document.getElementById('ai-chat-clear-btn');
   const chatInput = document.getElementById('ai-chat-input');
   const chatThread = document.getElementById('ai-chat-thread');
 
-  if (!panel || !headerToggle || !body) return;
+  if (!panel) return;
 
-  // Header Toggle (Expand / Collapse)
-  headerToggle.onclick = () => {
-    const isCollapsed = body.classList.contains('collapsed');
-    if (isCollapsed) {
-      body.classList.remove('collapsed');
-      if (toggleBtn) toggleBtn.textContent = '▲';
-    } else {
-      body.classList.add('collapsed');
-      if (toggleBtn) toggleBtn.textContent = '▼';
+  // Toggle Trigger Button
+  if (triggerBtn) {
+    triggerBtn.onclick = (e) => {
+      e.stopPropagation();
+      panel.classList.toggle('hidden');
+    };
+  }
+
+  // Close Button
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      panel.classList.add('hidden');
+    };
+  }
+
+  // Close when clicking outside panel
+  document.addEventListener('click', (e) => {
+    if (!panel.classList.contains('hidden') && !panel.contains(e.target) && triggerBtn && !triggerBtn.contains(e.target)) {
+      panel.classList.add('hidden');
     }
-  };
+  });
 
   // Settings Icon click -> Open Settings Modal to AI tab
   if (settingsBtn) {

@@ -229,10 +229,19 @@
             <div class="setting-block">
               <label>Import / Export OPML Subscriptions</label>
               <p class="help-text">Import or export your RSS feeds and nested folder structure in standard OPML format.</p>
+              
+              <div style="display: flex; align-items: center; gap: 8px; margin: 10px 0 14px 0;">
+                <input type="checkbox" id="opml-replace-checkbox" style="width: auto; cursor: pointer;">
+                <label for="opml-replace-checkbox" style="font-weight: 400; font-size: 12.5px; margin: 0; cursor: pointer; color: var(--text-primary);">
+                  Replace all existing subscriptions on import
+                </label>
+              </div>
+
               <div class="btn-group">
                 <button class="btn-secondary" id="import-opml-btn">Import OPML...</button>
                 <button class="btn-secondary" id="export-opml-btn">Export OPML...</button>
               </div>
+              <input type="file" id="opml-file-input" accept=".opml,.xml" style="display: none;">
             </div>
             <div class="setting-row">
               <label>iCloud Subscription Sync</label>
@@ -263,6 +272,43 @@
       </div>
     </div>
   </div>
+
+  <!-- Rename Folder Modal -->
+  <div id="rename-folder-modal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <div class="modal-header">
+        <h3>Rename Folder</h3>
+        <button class="close-modal-btn" id="close-rename-folder-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label>Folder Name</label>
+        <input type="text" id="rename-folder-input" placeholder="e.g. Tech News">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancel-rename-folder-btn">Cancel</button>
+        <button class="btn-primary" id="confirm-rename-folder-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Subfolder Modal -->
+  <div id="subfolder-modal" class="modal-overlay hidden">
+    <div class="modal-card dialog-card">
+      <div class="modal-header">
+        <h3>Create Subfolder</h3>
+        <button class="close-modal-btn" id="close-subfolder-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label>Subfolder Name</label>
+        <input type="text" id="subfolder-name-input" placeholder="e.g. Machine Learning">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="cancel-subfolder-btn">Cancel</button>
+        <button class="btn-primary" id="confirm-subfolder-btn">Create</button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Context Menu -->
   <div id="context-menu" class="context-menu hidden">

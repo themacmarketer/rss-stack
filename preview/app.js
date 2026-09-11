@@ -875,49 +875,233 @@ document.getElementById('search-input').oninput = (e) => {
 document.getElementById('add-folder-btn').onclick = () => {
   const name = prompt('New folder name:', 'New Folder');
   if (name) {
-    treeData.unshift({ id: `f-${Date.now()}`, type: 'folder', name, expanded: false, children: [] });
+    treeData.unshift({ id: `f-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
     renderTree();
   }
 };
 
-// Context Menu Setup
+// Context Menu & Folder Modal Dialogs Setup
 const contextMenu = document.getElementById('context-menu');
+const renameFolderModal = document.getElementById('rename-folder-modal');
+const subfolderModal = document.getElementById('subfolder-modal');
+
 function showContextMenu(x, y, isFolder) {
   contextMenu.style.left = `${x}px`;
   contextMenu.style.top = `${y}px`;
   contextMenu.classList.remove('hidden');
   document.getElementById('ctx-new-subfolder').style.display = isFolder ? 'flex' : 'none';
 }
-document.addEventListener('click', () => contextMenu.classList.add('hidden'));
 
-document.getElementById('ctx-new-subfolder').onclick = () => {
+document.addEventListener('click', (e) => {
+  if (!contextMenu.contains(e.target)) {
+    contextMenu.classList.add('hidden');
+  }
+});
+
+// Context Menu Action 1: New Subfolder Modal
+document.getElementById('ctx-new-subfolder').onclick = (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add('hidden');
   if (!contextNodeId) return;
-  const name = prompt('New subfolder name:', 'New Subfolder');
-  if (name) {
-    const pos = findNodePosition(treeData, contextNodeId);
-    if (pos && pos.node.type === 'folder') {
-      pos.node.children = pos.node.children || [];
-      pos.node.children.unshift({ id: `subf-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
-      pos.node.expanded = true;
+  document.getElementById('subfolder-name-input').value = 'New Subfolder';
+  subfolderModal.classList.remove('hidden');
+};
+
+const closeSubfolderBtn = document.getElementById('close-subfolder-btn');
+const cancelSubfolderBtn = document.getElementById('cancel-subfolder-btn');
+const confirmSubfolderBtn = document.getElementById('confirm-subfolder-btn');
+
+if (closeSubfolderBtn) closeSubfolderBtn.onclick = () => subfolderModal.classList.add('hidden');
+if (cancelSubfolderBtn) cancelSubfolderBtn.onclick = () => subfolderModal.classList.add('hidden');
+
+if (confirmSubfolderBtn) {
+  confirmSubfolderBtn.onclick = () => {
+    const name = document.getElementById('subfolder-name-input').value.trim();
+    if (name && contextNodeId) {
+      const pos = findNodePosition(treeData, contextNodeId);
+      if (pos && pos.node.type === 'folder') {
+        pos.node.children = pos.node.children || [];
+        pos.node.children.unshift({ id: `subf-${Date.now()}`, type: 'folder', name, expanded: true, children: [] });
+        pos.node.expanded = true;
+        renderTree();
+      }
+    }
+    subfolderModal.classList.add('hidden');
+  };
+}
+
+// Context Menu Action 2: Rename Folder Modal
+document.getElementById('ctx-rename').onclick = (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add('hidden');
+  if (!contextNodeId) return;
+  const pos = findNodePosition(treeData, contextNodeId);
+  if (pos) {
+    document.getElementById('rename-folder-input').value = pos.node.name;
+    renameFolderModal.classList.remove('hidden');
+  }
+};
+
+const closeRenameFolderBtn = document.getElementById('close-rename-folder-btn');
+const cancelRenameFolderBtn = document.getElementById('cancel-rename-folder-btn');
+const confirmRenameFolderBtn = document.getElementById('confirm-rename-folder-btn');
+
+if (closeRenameFolderBtn) closeRenameFolderBtn.onclick = () => renameFolderModal.classList.add('hidden');
+if (cancelRenameFolderBtn) cancelRenameFolderBtn.onclick = () => renameFolderModal.classList.add('hidden');
+
+if (confirmRenameFolderBtn) {
+  confirmRenameFolderBtn.onclick = () => {
+    const newName = document.getElementById('rename-folder-input').value.trim();
+    if (newName && contextNodeId) {
+      const pos = findNodePosition(treeData, contextNodeId);
+      if (pos) {
+        pos.node.name = newName;
+        renderTree();
+      }
+    }
+    renameFolderModal.classList.add('hidden');
+  };
+}
+
+// Context Menu Action 3: Delete Folder
+document.getElementById('ctx-delete').onclick = (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add('hidden');
+  if (!contextNodeId) return;
+  const pos = findNodePosition(treeData, contextNodeId);
+  if (pos) {
+    if (confirm(`Delete "${pos.node.name}" and all its contents?`)) {
+      removeNodeById(treeData, contextNodeId);
       renderTree();
     }
   }
 };
 
-document.getElementById('ctx-rename').onclick = () => {
-  if (!contextNodeId) return;
-  const pos = findNodePosition(treeData, contextNodeId);
-  if (pos) {
-    const newName = prompt('Rename folder:', pos.node.name);
-    if (newName) { pos.node.name = newName; renderTree(); }
-  }
-};
+// OPML Import & Export Engine with Replace Option
+const importOpmlBtn = document.getElementById('import-opml-btn');
+const exportOpmlBtn = document.getElementById('export-opml-btn');
+const opmlFileInput = document.getElementById('opml-file-input');
+const opmlReplaceCheckbox = document.getElementById('opml-replace-checkbox');
 
-document.getElementById('ctx-delete').onclick = () => {
-  if (!contextNodeId) return;
-  if (confirm('Delete this folder?')) { removeNodeById(treeData, contextNodeId); renderTree(); }
-};
+if (importOpmlBtn && opmlFileInput) {
+  importOpmlBtn.onclick = () => {
+    opmlFileInput.click();
+  };
+
+  opmlFileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const xmlText = event.target.result;
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        const bodyNode = xmlDoc.querySelector('body');
+        if (!bodyNode) {
+          alert('Invalid OPML file structure.');
+          return;
+        }
+
+        function parseOutlineNodes(element) {
+          const result = [];
+          const children = element.children;
+          for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            if (child.tagName.toLowerCase() === 'outline') {
+              const text = child.getAttribute('text') || child.getAttribute('title') || 'Untitled';
+              const xmlUrl = child.getAttribute('xmlUrl');
+
+              if (xmlUrl) {
+                result.push({
+                  id: `feed-opml-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                  type: 'feed',
+                  name: text,
+                  url: xmlUrl,
+                  unreadCount: Math.floor(Math.random() * 25) + 1
+                });
+              } else {
+                const subChildren = parseOutlineNodes(child);
+                result.push({
+                  id: `f-opml-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                  type: 'folder',
+                  name: text,
+                  expanded: true,
+                  children: subChildren
+                });
+              }
+            }
+          }
+          return result;
+        }
+
+        const importedTree = parseOutlineNodes(bodyNode);
+
+        if (importedTree.length === 0) {
+          alert('No feeds or folders found in the OPML file.');
+          return;
+        }
+
+        const replaceExisting = opmlReplaceCheckbox ? opmlReplaceCheckbox.checked : false;
+
+        if (replaceExisting) {
+          treeData = importedTree;
+          alert(`Successfully replaced all subscriptions with ${importedTree.length} imported items!`);
+        } else {
+          treeData = treeData.concat(importedTree);
+          alert(`Successfully imported and merged ${importedTree.length} items!`);
+        }
+
+        renderTree();
+        fetchAndDisplayArticles('latest');
+        opmlFileInput.value = '';
+      } catch (err) {
+        alert('Failed to parse OPML file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+}
+
+if (exportOpmlBtn) {
+  exportOpmlBtn.onclick = () => {
+    function treeToOpmlOutlines(nodes, depth = 3) {
+      const indent = ' '.repeat(depth * 2);
+      let xml = '';
+      nodes.forEach(node => {
+        const titleEscaped = (node.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        if (node.type === 'folder') {
+          xml += `${indent}<outline text="${titleEscaped}" title="${titleEscaped}">\n`;
+          if (node.children && node.children.length > 0) {
+            xml += treeToOpmlOutlines(node.children, depth + 1);
+          }
+          xml += `${indent}</outline>\n`;
+        } else {
+          const urlEscaped = (node.url || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+          xml += `${indent}<outline type="rss" text="${titleEscaped}" title="${titleEscaped}" xmlUrl="${urlEscaped}"/>\n`;
+        }
+      });
+      return xml;
+    }
+
+    let opmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head>\n    <title>Quick RSS Subscriptions</title>\n  </head>\n  <body>\n`;
+    opmlContent += treeToOpmlOutlines(treeData, 2);
+    opmlContent += `  </body>\n</opml>`;
+
+    const blob = new Blob([opmlContent], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'quickrss_subscriptions.opml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+}
 
 // Initial Render & Load
 renderTree();
 fetchAndDisplayArticles('latest');
+

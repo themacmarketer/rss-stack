@@ -1175,15 +1175,19 @@ if (exportOpmlBtn) {
     opmlContent += treeToOpmlOutlines(treeData, 2);
     opmlContent += `  </body>\n</opml>`;
 
-    const blob = new Blob([opmlContent], { type: 'text/xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'quickrss_subscriptions.opml';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.saveOPML) {
+      window.webkit.messageHandlers.saveOPML.postMessage(opmlContent);
+    } else {
+      const blob = new Blob([opmlContent], { type: 'text/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'quickrss_subscriptions.opml';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 }
 

@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import UniformTypeIdentifiers
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: NSWindow!
@@ -28,6 +29,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         // Register Native Message Handlers
         config.userContentController.add(self, name: "openExternal")
         config.userContentController.add(self, name: "fetchURL")
+        config.userContentController.add(self, name: "saveOPML")
         
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
@@ -48,10 +50,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // Handle JS postMessage calls (e.g. openExternal and fetchURL)
+    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
+        } else if message.name == "saveOPML", let xmlContent = message.body as? String {
+            let savePanel = NSSavePanel()
+            savePanel.title = "Export OPML Subscriptions"
+            savePanel.nameFieldStringValue = "quickrss_subscriptions.opml"
+            savePanel.allowedContentTypes = [UTType.xml, UTType(filenameExtension: "opml")].compactMap { $0 }
+            
+            savePanel.begin { result in
+                if result == .OK, let url = savePanel.url {
+                    try? xmlContent.write(to: url, atomically: true, encoding: .utf8)
+                }
+            }
         } else if message.name == "fetchURL", let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let requestId = dict["requestId"] as? String, let url = URL(string: urlString) {
             
             var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10.0)
@@ -80,6 +93,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 }
             }
             task.resume()
+        }
+    }
+
+    // Native macOS File Picker Dialog (<input type="file">) for WKWebView
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        let openPanel = NSOpenPanel()
+        openPanel.canChooseFiles = true
+        openPanel.canChooseDirectories = false
+        openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        openPanel.allowedContentTypes = [UTType.xml, UTType(filenameExtension: "opml")].compactMap { $0 }
+        
+        openPanel.begin { result in
+            if result == .OK {
+                completionHandler(openPanel.urls)
+            } else {
+                completionHandler(nil)
+            }
         }
     }
 

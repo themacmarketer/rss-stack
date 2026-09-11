@@ -2131,18 +2131,72 @@ const settingsModal = document.getElementById('settings-modal');
 const settingsBtn = document.getElementById('settings-btn');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 
-function openSettings() { settingsModal.classList.remove('hidden'); }
-function closeSettings() { settingsModal.classList.add('hidden'); }
+function openSettings() { if (settingsModal) settingsModal.classList.remove('hidden'); }
+function closeSettings() { if (settingsModal) settingsModal.classList.add('hidden'); }
 
 if (settingsBtn) settingsBtn.onclick = openSettings;
 if (closeSettingsBtn) closeSettingsBtn.onclick = closeSettings;
 
+// Close Preferences on Backdrop Click
+if (settingsModal) {
+  settingsModal.onclick = (e) => {
+    if (e.target === settingsModal) {
+      closeSettings();
+    }
+  };
+}
+
+// Global Keyboard Shortcuts: Cmd+, (Preferences) & ESC (Close Preferences & Modals)
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === ',') {
     e.preventDefault();
     openSettings();
   }
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    closeSettings();
+    document.querySelectorAll('.modal-overlay').forEach(modal => modal.classList.add('hidden'));
+    const aiPanel = document.getElementById('ai-chatbot-panel');
+    if (aiPanel) aiPanel.classList.add('hidden');
+  }
 });
+
+// Draggable Resizable Preferences Window Controller
+const settingsCard = document.querySelector('.settings-card');
+const resizeHandle = document.querySelector('.modal-resize-handle');
+
+if (settingsCard && resizeHandle) {
+  let isResizing = false;
+  let startX, startY, startWidth, startHeight;
+
+  resizeHandle.onmousedown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startWidth = settingsCard.offsetWidth;
+    startHeight = settingsCard.offsetHeight;
+
+    document.documentElement.addEventListener('mousemove', onMouseMove);
+    document.documentElement.addEventListener('mouseup', onMouseUp);
+  };
+
+  function onMouseMove(e) {
+    if (!isResizing) return;
+    const newWidth = Math.max(480, Math.min(window.innerWidth * 0.95, startWidth + (e.clientX - startX)));
+    const newHeight = Math.max(360, Math.min(window.innerHeight * 0.95, startHeight + (e.clientY - startY)));
+    settingsCard.style.width = `${newWidth}px`;
+    settingsCard.style.height = `${newHeight}px`;
+  }
+
+  function onMouseUp() {
+    if (isResizing) {
+      isResizing = false;
+      document.documentElement.removeEventListener('mousemove', onMouseMove);
+      document.documentElement.removeEventListener('mouseup', onMouseUp);
+    }
+  }
+}
 
 document.querySelectorAll('.settings-tab').forEach(tab => {
   tab.onclick = () => {

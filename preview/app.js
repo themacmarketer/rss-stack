@@ -1792,6 +1792,58 @@ async function fetchAndDisplayArticles(target) {
   renderArticleList(loadedArticles, typeof target === 'string' && target === 'starred' ? 'No starred articles yet.' : 'No articles in this feed.');
 }
 
+function formatArticleTimestamp(pubDateRaw) {
+  if (!pubDateRaw) return '';
+  const d = new Date(pubDateRaw);
+  if (isNaN(d.getTime())) return '';
+
+  const format = localStorage.getItem('quickrss_date_format') || 'relative';
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+
+  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthName = monthsShort[d.getMonth()];
+
+  if (format === 'time_only') {
+    return `${hours}:${minutes}`;
+  }
+  if (format === 'short_datetime') {
+    return `${monthName} ${d.getDate()}, ${hours}:${minutes}`;
+  }
+  if (format === 'iso_datetime') {
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  }
+  if (format === 'eu_datetime') {
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  }
+  if (format === 'us_datetime') {
+    return `${month}/${day}/${year} ${hours}:${minutes}`;
+  }
+
+  // Default: Relative / Auto Date & Time
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const articleDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  if (articleDay.getTime() === today.getTime()) {
+    return `Today ${hours}:${minutes}`;
+  } else if (articleDay.getTime() === yesterday.getTime()) {
+    return `Yesterday ${hours}:${minutes}`;
+  } else if (d.getFullYear() === now.getFullYear()) {
+    return `${monthName} ${d.getDate()}, ${hours}:${minutes}`;
+  } else {
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  }
+}
+
 function renderArticleList(articles, emptyMessage = 'No articles in this feed.') {
   const container = document.getElementById('article-list-container');
   container.innerHTML = '';
@@ -1810,7 +1862,7 @@ function renderArticleList(articles, emptyMessage = 'No articles in this feed.')
       selectArticle(art, card);
     });
 
-    const dateStr = art.pubDate ? new Date(art.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const dateStr = formatArticleTimestamp(art.pubDate);
 
     card.innerHTML = `
       ${!art.isRead ? '<div class="unread-dot" id="dot-' + art.id + '"></div>' : ''}
@@ -3198,6 +3250,20 @@ function initGeneralSettingsUI() {
       const val = e.target.value;
       localStorage.setItem('quickrss_desc_lines', val);
       document.documentElement.setAttribute('data-desc-lines', val);
+    };
+  }
+
+  // 1b. Timestamp & Date Format Setting
+  const dateFormatSelect = document.getElementById('setting-date-format');
+  if (dateFormatSelect) {
+    const savedFormat = localStorage.getItem('quickrss_date_format') || 'relative';
+    dateFormatSelect.value = savedFormat;
+    dateFormatSelect.onchange = (e) => {
+      const val = e.target.value;
+      localStorage.setItem('quickrss_date_format', val);
+      if (loadedArticles && loadedArticles.length > 0) {
+        renderArticleList(loadedArticles);
+      }
     };
   }
 

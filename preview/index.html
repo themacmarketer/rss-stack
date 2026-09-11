@@ -272,6 +272,17 @@
               </select>
             </div>
             <div class="setting-row">
+              <label>Timestamp & Date Format</label>
+              <select id="setting-date-format">
+                <option value="relative" selected>Auto Date & Time (e.g. Today 19:07 / Sep 11, 19:07)</option>
+                <option value="short_datetime">Short Date & Time (e.g. Sep 11, 19:07)</option>
+                <option value="iso_datetime">ISO Format (e.g. 2026-09-11 19:07)</option>
+                <option value="eu_datetime">Day/Month/Year Time (e.g. 11/09/2026 19:07)</option>
+                <option value="us_datetime">Month/Day/Year Time (e.g. 09/11/2026 19:07)</option>
+                <option value="time_only">Time Only (e.g. 19:07)</option>
+              </select>
+            </div>
+            <div class="setting-row">
               <label>Auto Refresh Feeds</label>
               <select id="setting-refresh-interval">
                 <option value="15">Every 15 minutes</option>

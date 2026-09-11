@@ -133,58 +133,58 @@
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- Floating Popover AI Chatbot Panel -->
-        <div id="ai-chatbot-panel" class="ai-chatbot-popover hidden">
-          <div class="ai-chat-header">
-            <div class="ai-chat-title">
-              <span class="ai-sparkle-icon">🤖</span>
-              <span>AI Assistant</span>
-            </div>
-            <div class="ai-chat-header-actions" onclick="event.stopPropagation();">
-              <select id="ai-model-select" class="ai-model-select">
-                <optgroup label="OpenAI">
-                  <option value="openai:gpt-4o" selected>OpenAI — GPT-4o</option>
-                  <option value="openai:gpt-4o-mini">OpenAI — GPT-4o mini</option>
-                </optgroup>
-                <optgroup label="Claude (Anthropic)">
-                  <option value="claude:claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                  <option value="claude:claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                </optgroup>
-                <optgroup label="OpenRouter (API Key)">
-                  <option value="openrouter:auto">OpenRouter — Auto</option>
-                  <option value="openrouter:anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet</option>
-                  <option value="openrouter:openai/gpt-4o">OpenRouter — GPT-4o</option>
-                  <option value="openrouter:deepseek/deepseek-chat">OpenRouter — DeepSeek Chat</option>
-                </optgroup>
-              </select>
-              <button id="ai-pin-btn" class="ai-btn-icon" title="Pin / Lock AI Assistant Window in place">📌</button>
-              <button id="ai-settings-btn" class="ai-btn-icon" title="Configure AI API Keys & Auth">⚙️</button>
-              <button id="ai-close-btn" class="ai-btn-icon" title="Close AI Assistant">✕</button>
-            </div>
+      <!-- Floating Popover / Pinned AI Chatbot Panel -->
+      <div id="ai-chatbot-panel" class="ai-chatbot-popover hidden">
+        <div class="ai-chat-header">
+          <div class="ai-chat-title">
+            <span class="ai-sparkle-icon">🤖</span>
+            <span>AI Assistant</span>
           </div>
-          <div id="ai-chat-body" class="ai-chat-body">
-            <div class="ai-quick-prompts">
-              <button class="quick-prompt-btn" data-prompt="Summarize the top news headlines right now">📰 Summarize Top News</button>
-              <button class="quick-prompt-btn" data-prompt="What are the latest AI model releases and research breakthroughs?">🚀 AI Model Releases</button>
-              <button class="quick-prompt-btn" data-prompt="Which companies have the most updates in the current articles?">🏢 Key Companies</button>
-            </div>
-            <div id="ai-chat-thread" class="ai-chat-thread">
-              <div class="ai-message assistant">
-                <div class="ai-avatar">🤖</div>
-                <div class="ai-msg-content">
-                  Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
-                </div>
+          <div class="ai-chat-header-actions" onclick="event.stopPropagation();">
+            <select id="ai-model-select" class="ai-model-select">
+              <optgroup label="OpenAI">
+                <option value="openai:gpt-4o" selected>OpenAI — GPT-4o</option>
+                <option value="openai:gpt-4o-mini">OpenAI — GPT-4o mini</option>
+              </optgroup>
+              <optgroup label="Claude (Anthropic)">
+                <option value="claude:claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                <option value="claude:claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+              </optgroup>
+              <optgroup label="OpenRouter (API Key)">
+                <option value="openrouter:auto">OpenRouter — Auto</option>
+                <option value="openrouter:anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet</option>
+                <option value="openrouter:openai/gpt-4o">OpenRouter — GPT-4o</option>
+                <option value="openrouter:deepseek/deepseek-chat">OpenRouter — DeepSeek Chat</option>
+              </optgroup>
+            </select>
+            <button id="ai-pin-btn" class="ai-btn-icon" title="Pin / Lock AI Assistant Window in place">📌</button>
+            <button id="ai-settings-btn" class="ai-btn-icon" title="Configure AI API Keys & Auth">⚙️</button>
+            <button id="ai-close-btn" class="ai-btn-icon" title="Close AI Assistant">✕</button>
+          </div>
+        </div>
+        <div id="ai-chat-body" class="ai-chat-body">
+          <div class="ai-quick-prompts">
+            <button class="quick-prompt-btn" data-prompt="Summarize the top news headlines right now">📰 Summarize Top News</button>
+            <button class="quick-prompt-btn" data-prompt="What are the latest AI model releases and research breakthroughs?">🚀 AI Model Releases</button>
+            <button class="quick-prompt-btn" data-prompt="Which companies have the most updates in the current articles?">🏢 Key Companies</button>
+          </div>
+          <div id="ai-chat-thread" class="ai-chat-thread">
+            <div class="ai-message assistant">
+              <div class="ai-avatar">🤖</div>
+              <div class="ai-msg-content">
+                Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
               </div>
             </div>
-            <div class="ai-chat-input-bar">
-              <input type="text" id="ai-chat-input" placeholder="Ask AI about news content..." />
-              <button id="ai-chat-send-btn" class="ai-send-btn">Send ➔</button>
-              <button id="ai-chat-clear-btn" class="ai-clear-btn" title="Clear chat history">🗑️</button>
-            </div>
           </div>
-          <div id="ai-popover-resizer" class="ai-popover-resizer" title="Drag to resize chatbot window"></div>
+          <div class="ai-chat-input-bar">
+            <input type="text" id="ai-chat-input" placeholder="Ask AI about news content..." />
+            <button id="ai-chat-send-btn" class="ai-send-btn">Send ➔</button>
+            <button id="ai-chat-clear-btn" class="ai-clear-btn" title="Clear chat history">🗑️</button>
+          </div>
         </div>
+        <div id="ai-popover-resizer" class="ai-popover-resizer" title="Drag to resize chatbot window"></div>
       </div>
       <div class="article-list-content" id="article-list-container">
         <!-- Articles List Items -->

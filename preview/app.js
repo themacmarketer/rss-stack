@@ -3453,11 +3453,17 @@ function setupAIChatbotUI() {
       e.stopPropagation();
       isAIPinned = !isAIPinned;
       if (isAIPinned) {
+        panel.style.top = '';
+        panel.style.left = '';
+        panel.style.right = '';
+        panel.style.width = '';
         panel.classList.add('pinned');
         pinBtn.classList.add('active');
         pinBtn.title = "Unpin / Unlock AI Assistant Window";
-        showToast('📌 AI Assistant window pinned above articles!', 'success');
+        showToast('📌 AI Assistant pinned inside column below search bar', 'success');
       } else {
+        panel.style.height = '';
+        panel.style.width = '';
         panel.classList.remove('pinned');
         pinBtn.classList.remove('active');
         pinBtn.title = "Pin / Lock AI Assistant Window in place";
@@ -3501,10 +3507,15 @@ function setupAIChatbotUI() {
 
     function onMouseMove(e) {
       if (!isResizing) return;
-      const newWidth = Math.max(300, Math.min(650, startWidth + (e.clientX - startX)));
-      const newHeight = Math.max(260, Math.min(window.innerHeight * 0.85, startHeight + (e.clientY - startY)));
-      panel.style.width = `${newWidth}px`;
-      panel.style.height = `${newHeight}px`;
+      if (panel.classList.contains('pinned')) {
+        const newHeight = Math.max(180, Math.min(window.innerHeight * 0.75, startHeight + (e.clientY - startY)));
+        panel.style.height = `${newHeight}px`;
+      } else {
+        const newWidth = Math.max(280, Math.min(650, startWidth + (e.clientX - startX)));
+        const newHeight = Math.max(220, Math.min(window.innerHeight * 0.85, startHeight + (e.clientY - startY)));
+        panel.style.width = `${newWidth}px`;
+        panel.style.height = `${newHeight}px`;
+      }
     }
 
     function onMouseUp() {
@@ -3574,6 +3585,38 @@ function setupAIChatbotUI() {
   }
 }
 
+// Global Article Selection by Link or Title for Citation Links
+function selectArticleByLink(urlOrTitle) {
+  if (!urlOrTitle) return;
+  const articlesToSearch = (loadedArticles && loadedArticles.length > 0)
+    ? loadedArticles
+    : (typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData) : []);
+  if (!articlesToSearch || articlesToSearch.length === 0) return;
+
+  const cleanQuery = urlOrTitle.trim().toLowerCase();
+  const target = articlesToSearch.find(a => 
+    (a.link && a.link.trim() === urlOrTitle.trim()) ||
+    (a.title && a.title.trim().toLowerCase().includes(cleanQuery)) ||
+    (a.title && cleanQuery.includes(a.title.trim().toLowerCase()))
+  );
+  if (target) {
+    const card = document.getElementById(`art-card-${target.id}`);
+    selectArticle(target, card);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+}
+
+function handleAICitationClick(url, title) {
+  if (url && url.startsWith('http')) {
+    openInDefaultBrowser(url);
+  }
+  selectArticleByLink(url || title);
+}
+
+let currentRAGArticles = [];
+
 // Send User Message & Query Selected LLM Provider
 async function sendUserAIMessage(userQuery) {
   const thread = document.getElementById('ai-chat-thread');
@@ -3601,7 +3644,7 @@ async function sendUserAIMessage(userQuery) {
   thread.scrollTop = thread.scrollHeight;
 
   const responseText = await processAIChatQuery(userQuery);
-  assistantMsgDiv.querySelector('.ai-msg-content').innerHTML = formatAIMarkdown(responseText);
+  assistantMsgDiv.querySelector('.ai-msg-content').innerHTML = formatAIMarkdown(responseText, currentRAGArticles);
   thread.scrollTop = thread.scrollHeight;
 }
 
@@ -3609,12 +3652,41 @@ function escapeHTML(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function formatAIMarkdown(text) {
+function formatAIMarkdown(text, articles = []) {
   if (!text) return 'No response generated.';
   let html = escapeHTML(text);
+
+  // 1. Convert markdown links [Article N: Title](URL) or [Title](URL) into clickable citation tags
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, linkText, url) => {
+    const cleanTitle = escapeHTML(linkText);
+    const cleanUrl = escapeHTML(url);
+    const safeTitle = cleanTitle.replace(/'/g, "\\'");
+    const safeUrl = cleanUrl.replace(/'/g, "\\'");
+    return `<a href="#" onclick="handleAICitationClick('${safeUrl}', '${safeTitle}'); return false;" class="ai-citation-tag" title="Open & highlight article">🔗 ${cleanTitle} ↗</a>`;
+  });
+
+  // 2. Convert [Article N] citations into clickable tags
+  html = html.replace(/\[Article\s*(\d+)\]/gi, (match, numStr) => {
+    const idx = parseInt(numStr, 10) - 1;
+    if (articles && articles[idx]) {
+      const art = articles[idx];
+      const safeTitle = escapeHTML(art.title || '').replace(/'/g, "\\'");
+      const safeUrl = escapeHTML(art.link || '').replace(/'/g, "\\'");
+      const shortTitle = (art.title || '').length > 30 ? (art.title.slice(0, 30) + '...') : art.title;
+      return `<a href="#" onclick="handleAICitationClick('${safeUrl}', '${safeTitle}'); return false;" class="ai-citation-tag" title="${escapeHTML(art.title || '')}">🔗 Article ${numStr}: ${escapeHTML(shortTitle)} ↗</a>`;
+    }
+    return match;
+  });
+
+  // 3. Bold text
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // 4. Bullet points
   html = html.replace(/^[•\*]\s+(.*)$/gm, '• $1');
+
+  // 5. Line breaks
   html = html.replace(/\n/g, '<br/>');
+
   return html;
 }
 
@@ -3631,14 +3703,15 @@ async function processAIChatQuery(userQuery) {
   // Gather current loaded/filtered RSS articles for RAG
   const articlesToUse = (loadedArticles && loadedArticles.length > 0)
     ? loadedArticles.slice(0, 30)
-    : getAllFeedsFromTree(treeData).slice(0, 30);
+    : (typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData).slice(0, 30) : []);
+  currentRAGArticles = articlesToUse;
 
   let contextSnippet = 'Here are the latest news articles currently loaded in Quick RSS:\n';
   articlesToUse.forEach((art, idx) => {
     contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
   });
 
-  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context provided below. Be concise, informative, and cite specific article numbers or titles when relevant.\n\n${contextSnippet}`;
+  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context provided below. Be concise, informative, and ALWAYS cite relevant source articles using markdown links in the format [Article N: Title](URL) or [Article N](URL).\n\n${contextSnippet}`;
 
   try {
     if (provider === 'openai') {

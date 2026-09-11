@@ -2991,6 +2991,8 @@ function updateOAuthStatusUI() {
 // Load AI keys & OAuth authentication into Settings UI
 function initAISettingsUI() {
   const keys = getAIKeys();
+  const inputOpenAI = document.getElementById('ai-token-openai');
+  const inputClaude = document.getElementById('ai-token-claude');
   const inputOpenRouter = document.getElementById('ai-key-openrouter');
   const saveBtn = document.getElementById('save-ai-keys-btn');
   const modelSelect = document.getElementById('ai-model-select');
@@ -3000,20 +3002,20 @@ function initAISettingsUI() {
 
   const claudeOAuthBtn = document.getElementById('claude-oauth-btn');
   const claudeDiscBtn = document.getElementById('claude-disconnect-btn');
+  const openrouterPortalBtn = document.getElementById('openrouter-portal-btn');
 
+  if (inputOpenAI) inputOpenAI.value = keys.openai || '';
+  if (inputClaude) inputClaude.value = keys.claude || '';
   if (inputOpenRouter) inputOpenRouter.value = keys.openrouter || '';
   if (modelSelect && keys.preferredModel) modelSelect.value = keys.preferredModel;
 
   updateOAuthStatusUI();
 
-  // OpenAI Browser OAuth Handler
+  // OpenAI Portal & Login Handler
   if (openaiOAuthBtn) {
     openaiOAuthBtn.onclick = () => {
-      openInDefaultBrowser('https://auth.openai.com/authorize');
-      const token = 'sess-oauth-openai-' + Date.now();
-      localStorage.setItem('quickrss_openai_oauth_token', token);
-      updateOAuthStatusUI();
-      showToast('✅ OpenAI Browser OAuth Login Successful!', 'success');
+      openInDefaultBrowser('https://platform.openai.com/account/api-keys');
+      showToast('Opened OpenAI Login Portal in browser', 'info');
     };
   }
 
@@ -3021,19 +3023,17 @@ function initAISettingsUI() {
     openaiDiscBtn.onclick = () => {
       localStorage.removeItem('quickrss_openai_oauth_token');
       saveAIKeys({ openai: '' });
+      if (inputOpenAI) inputOpenAI.value = '';
       updateOAuthStatusUI();
       showToast('Disconnected OpenAI account', 'info');
     };
   }
 
-  // Claude Browser OAuth Handler
+  // Claude Portal & Login Handler
   if (claudeOAuthBtn) {
     claudeOAuthBtn.onclick = () => {
-      openInDefaultBrowser('https://claude.ai/login');
-      const token = 'sess-oauth-claude-' + Date.now();
-      localStorage.setItem('quickrss_claude_oauth_token', token);
-      updateOAuthStatusUI();
-      showToast('✅ Claude Browser OAuth Login Successful!', 'success');
+      openInDefaultBrowser('https://console.anthropic.com/settings/keys');
+      showToast('Opened Claude Login Portal in browser', 'info');
     };
   }
 
@@ -3041,18 +3041,41 @@ function initAISettingsUI() {
     claudeDiscBtn.onclick = () => {
       localStorage.removeItem('quickrss_claude_oauth_token');
       saveAIKeys({ claude: '' });
+      if (inputClaude) inputClaude.value = '';
       updateOAuthStatusUI();
       showToast('Disconnected Claude account', 'info');
     };
   }
 
+  // OpenRouter Portal Handler
+  if (openrouterPortalBtn) {
+    openrouterPortalBtn.onclick = () => {
+      openInDefaultBrowser('https://openrouter.ai/keys');
+    };
+  }
+
   if (saveBtn) {
     saveBtn.onclick = () => {
+      const openaiVal = inputOpenAI ? inputOpenAI.value.trim() : '';
+      const claudeVal = inputClaude ? inputClaude.value.trim() : '';
+      const openrouterVal = inputOpenRouter ? inputOpenRouter.value.trim() : '';
+
+      if (openaiVal) {
+        localStorage.setItem('quickrss_openai_oauth_token', openaiVal);
+      }
+      if (claudeVal) {
+        localStorage.setItem('quickrss_claude_oauth_token', claudeVal);
+      }
+
       saveAIKeys({
-        openrouter: inputOpenRouter ? inputOpenRouter.value.trim() : '',
+        openai: openaiVal,
+        claude: claudeVal,
+        openrouter: openrouterVal,
         preferredModel: modelSelect ? modelSelect.value : 'openai:gpt-4o'
       });
-      showToast('✅ Saved AI Preferences!', 'success');
+
+      updateOAuthStatusUI();
+      showToast('✅ Saved AI Preferences & Credentials!', 'success');
     };
   }
 

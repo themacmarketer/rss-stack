@@ -360,41 +360,46 @@
             </div>
           </div>
 
-          <!-- Tab 4: AI Assistant Authentication & Keys -->
+          <!-- Tab 4: AI Assistant Authentication -->
           <div class="tab-pane" id="pane-ai">
-            <!-- OpenAI OAuth Login -->
+            <!-- OpenAI Authentication -->
             <div class="setting-block">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-weight:600; margin:0;">OpenAI (OAuth Login)</label>
+                <label style="font-weight:600; margin:0;">OpenAI Account</label>
                 <span id="openai-oauth-status" class="oauth-badge disconnected">Disconnected</span>
               </div>
-              <p class="help-text">Sign in to your OpenAI account via browser OAuth. No API key required.</p>
-              <div style="display:flex; gap:8px; margin-top:8px;">
+              <p class="help-text">Sign in to your OpenAI account in browser, then paste your access token or key below.</p>
+              <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
                 <button type="button" class="btn-secondary" id="openai-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 Login with OpenAI (OAuth)</span>
+                  <span>🌐 Open OpenAI Login Portal</span>
                 </button>
                 <button type="button" class="btn-secondary" id="openai-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>
+              <input type="password" id="ai-token-openai" placeholder="Paste OpenAI Session Token / Key..." />
             </div>
 
-            <!-- Claude / Anthropic OAuth Login -->
+            <!-- Claude / Anthropic Authentication -->
             <div class="setting-block" style="margin-top:14px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-weight:600; margin:0;">Claude / Anthropic (OAuth Login)</label>
+                <label style="font-weight:600; margin:0;">Claude / Anthropic Account</label>
                 <span id="claude-oauth-status" class="oauth-badge disconnected">Disconnected</span>
               </div>
-              <p class="help-text">Sign in to your Claude account via browser OAuth. No API key required.</p>
-              <div style="display:flex; gap:8px; margin-top:8px;">
+              <p class="help-text">Sign in to your Claude account in browser, then paste your access token or key below.</p>
+              <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
                 <button type="button" class="btn-secondary" id="claude-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 Login with Claude (OAuth)</span>
+                  <span>🌐 Open Claude Login Portal</span>
                 </button>
                 <button type="button" class="btn-secondary" id="claude-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>
+              <input type="password" id="ai-token-claude" placeholder="Paste Claude Session Token / Key..." />
             </div>
 
             <!-- OpenRouter API Key -->
             <div class="setting-block" style="margin-top:14px;">
-              <label style="font-weight:600;">OpenRouter (API Key)</label>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-weight:600; margin:0;">OpenRouter (API Key)</label>
+                <button type="button" class="btn-sm" id="openrouter-portal-btn" style="font-size:11px;">🌐 Open Keys Portal</button>
+              </div>
               <input type="password" id="ai-key-openrouter" placeholder="sk-or-v1-..." />
               <p class="help-text">Access DeepSeek, Llama, GPT-4o, Claude 3.5 via single OpenRouter API key.</p>
             </div>

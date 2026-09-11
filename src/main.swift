@@ -90,16 +90,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         } else if message.name == "fetchURL", let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let requestId = dict["requestId"] as? String, let url = URL(string: urlString) {
             
             var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10.0)
-            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, Gecko) Chrome/122.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+            if urlString.contains("reddit.com") {
+                let timeToken = Int(Date().timeIntervalSince1970)
+                request.setValue("desktop:com.quickrss.app:v1.0.0 (by /u/quickrss_\(timeToken))", forHTTPHeaderField: "User-Agent")
+            } else {
+                request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, Gecko) Chrome/122.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+            }
             request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
             
             let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 guard let self = self else { return }
                 
                 var jsCode = ""
+                let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
                 if let error = error {
                     let errEscaped = error.localizedDescription.replacingOccurrences(of: "'", with: "\\'")
                     jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', null, '\(errEscaped)'); }"
+                } else if httpStatus >= 400 {
+                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', null, 'HTTP \(httpStatus)'); }"
                 } else if let data = data, let htmlString = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) {
                     if let jsonData = try? JSONSerialization.data(withJSONObject: [htmlString], options: []),
                        let jsonStr = String(data: jsonData, encoding: .utf8) {

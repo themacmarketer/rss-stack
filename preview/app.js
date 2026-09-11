@@ -1657,6 +1657,7 @@ async function getArticlesForFeed(feed) {
   }
 
   if (feed.url) {
+    // 1. Direct Native Fetch
     try {
       const rawXml = await fetchWebPageHTML(feed.url);
       if (rawXml) {
@@ -1668,7 +1669,44 @@ async function getArticlesForFeed(feed) {
         }
       }
     } catch (err) {
-      console.warn('Live RSS fetch failed for:', feed.name, err);
+      console.warn('Live RSS direct fetch failed for:', feed.name, err);
+    }
+
+    // 2. RSS2JSON API Fallback for Reddit or Cloudflare-protected feeds
+    try {
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
+      const res = await fetch(apiUrl);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.status === 'ok' && json.items && json.items.length > 0) {
+          const items = json.items.map((item, idx) => {
+            const rawContent = item.content || item.description || '';
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = rawContent;
+            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+            const summary = plainText.slice(0, 220).trim() + (plainText.length > 220 ? '...' : '');
+
+            return {
+              id: `live-rss2json-${feed.id || 'f'}-${idx}`,
+              feedTitle: feed.name,
+              title: item.title || `${feed.name} Post #${idx + 1}`,
+              pubDate: item.pubDate || new Date().toISOString(),
+              author: item.author || (feed.name + ' Author'),
+              summary: summary || item.title,
+              htmlContent: rawContent || `<p>${summary}</p>`,
+              content: plainText,
+              isRead: false,
+              link: item.link || feed.url
+            };
+          });
+
+          feedArticleCache[cacheKey] = items;
+          feed.unreadCount = items.length;
+          return items;
+        }
+      }
+    } catch (err) {
+      console.warn('RSS2JSON API fetch failed for:', feed.name, err);
     }
   }
 

@@ -942,6 +942,8 @@ function createNodeElement(node, depth) {
 
   // Row Selection & Drag Events
   row.onclick = () => {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
     selectedNodeId = node.id;
     document.querySelectorAll('.node-row, .filter-item').forEach(el => el.classList.remove('selected', 'active'));
     row.classList.add('selected');
@@ -1309,12 +1311,12 @@ async function fetchAndDisplayArticles(target) {
   renderArticleList(loadedArticles);
 }
 
-function renderArticleList(articles) {
+function renderArticleList(articles, emptyMessage = 'No articles in this feed.') {
   const container = document.getElementById('article-list-container');
   container.innerHTML = '';
 
   if (!articles || articles.length === 0) {
-    container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">No articles in this feed.</div>';
+    container.innerHTML = `<div style="padding:20px; text-align:center; color:#8e8e93;">${emptyMessage}</div>`;
     return;
   }
 
@@ -1631,6 +1633,8 @@ if (confirmAddFeedBtn) {
 // Filter Navigation Clicks
 document.querySelectorAll('.filter-item').forEach(item => {
   item.onclick = () => {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
     document.querySelectorAll('.nav-item, .node-row').forEach(el => el.classList.remove('active', 'selected'));
     item.classList.add('active');
     selectedNodeId = null;
@@ -1638,14 +1642,75 @@ document.querySelectorAll('.filter-item').forEach(item => {
   };
 });
 
-// Search Bar Input Filtering
-document.getElementById('search-input').oninput = (e) => {
-  const query = e.target.value.toLowerCase();
-  const filtered = loadedArticles.filter(a =>
-    a.title.toLowerCase().includes(query) || (a.summary && a.summary.toLowerCase().includes(query))
-  );
-  renderArticleList(filtered);
-};
+// Search Bar Input Filtering Across All Feeds & Articles
+const searchInput = document.getElementById('search-input');
+if (searchInput) {
+  let searchDebounceTimeout = null;
+
+  searchInput.oninput = (e) => {
+    clearTimeout(searchDebounceTimeout);
+    const rawQuery = e.target.value;
+    const query = rawQuery.trim().toLowerCase();
+
+    if (!query) {
+      const activeFilterEl = document.querySelector('.filter-item.active');
+      if (activeFilterEl) {
+        fetchAndDisplayArticles(activeFilterEl.dataset.filter);
+      } else if (selectedNodeId) {
+        const nodePos = findNodePosition(treeData, selectedNodeId);
+        fetchAndDisplayArticles(nodePos ? nodePos.node : 'all');
+      } else {
+        fetchAndDisplayArticles('all');
+      }
+      return;
+    }
+
+    searchDebounceTimeout = setTimeout(async () => {
+      const container = document.getElementById('article-list-container');
+      if (container) {
+        container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Searching articles...</div>';
+      }
+
+      // Collect all feeds from the tree
+      const allFeeds = getAllFeedsFromTree(treeData);
+      const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f)));
+      const allArticlesPool = articlesLists.flat();
+
+      // Deduplicate pool by article ID or title+feed
+      const seenKeys = new Set();
+      const uniquePool = [];
+      allArticlesPool.forEach(art => {
+        const key = art.id || (art.title + '---' + art.feedTitle);
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniquePool.push(art);
+        }
+      });
+
+      const terms = query.split(/\s+/).filter(Boolean);
+
+      const filtered = uniquePool.filter(art => {
+        const titleStr = (art.title || '').toLowerCase();
+        const summaryStr = (art.summary || '').toLowerCase();
+        const contentStr = (art.content || '').toLowerCase();
+        const htmlStr = (art.htmlContent || '').toLowerCase();
+        const authorStr = (art.author || '').toLowerCase();
+        const feedStr = (art.feedTitle || '').toLowerCase();
+
+        return terms.every(term =>
+          titleStr.includes(term) ||
+          summaryStr.includes(term) ||
+          contentStr.includes(term) ||
+          htmlStr.includes(term) ||
+          authorStr.includes(term) ||
+          feedStr.includes(term)
+        );
+      });
+
+      renderArticleList(filtered, `No articles found matching "${rawQuery}"`);
+    }, 150);
+  };
+}
 
 // Add New Folder Modal & Setup
 const addFolderModal = document.getElementById('add-folder-modal');

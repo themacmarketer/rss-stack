@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>AI News Feeds — Reorganized Taxonomy</title>
+    <dateCreated>Mon, 20 Oct 2025 12:21:00 +0800</dateCreated>
+    <dateModified>Thu, 10 Sep 2026 14:09:00 +0800</dateModified>
+  </head>
+  <body>
+    <outline text="01 — AI Industry &amp; Strategy" title="01 — AI Industry &amp; Strategy">
+      <outline text="AI Market &amp; Industry News" title="AI Market &amp; Industry News">
+        <outline type="rss" text="TechCrunch AI" title="TechCrunch AI" xmlUrl="https://techcrunch.com/category/artificial-intelligence/feed/" htmlUrl="https://techcrunch.com/category/artificial-intelligence/"/>
+        
+        
+        <outline type="rss" text="VentureBeat AI" title="VentureBeat AI" xmlUrl="https://venturebeat.com/category/ai/feed/" htmlUrl="https://venturebeat.com/category/ai/"/>
+        
+        
+        <outline type="rss" text="MIT Technology Review" title="MIT Technology Review" xmlUrl="https://www.technologyreview.com/feed/" htmlUrl="https://www.technologyreview.com"/>
+        
+      
+        <outline type="rss" text="Unite.AI" title="Unite.AI" xmlUrl="https://unite.ai/feed" htmlUrl="https://unite.ai"/>
+        
+        
+        <outline type="rss" text="DailyAI" title="DailyAI" xmlUrl="https://dailyai.com/feed" htmlUrl="https://dailyai.com"/>
+        
+        
+        <outline type="rss" text="Artificial Intelligence News" title="Artificial Intelligence News" xmlUrl="https://www.artificialintelligence-news.com/feed/rss/" htmlUrl="https://www.artificialintelligence-news.com"/>
+        
+      
+      </outline>
+    </outline>
+    <outline text="02 — AI Companies &amp; Platforms" title="02 — AI Companies &amp; Platforms">
+      <outline text="OpenAI" title="OpenAI">
+        <outline type="rss" text="OpenAI Blog" title="OpenAI Blog" xmlUrl="https://openai.com/blog/rss/" htmlUrl="https://openai.com/blog"/>
+        
+        
+      </outline>
+      <outline text="Google / DeepMind" title="Google / DeepMind">
+        <outline type="rss" text="Google AI Research Blog" title="Google AI Research Blog" xmlUrl="https://ai.googleblog.com/feeds/posts/default" htmlUrl="https://ai.googleblog.com"/>
+        
+        
+        <outline type="rss" text="DeepMind Blog" title="DeepMind Blog" xmlUrl="https://deepmind.com/blog/feed/basic" htmlUrl="https://deepmind.google/discover/blog/"/>
+        
+        
+      </outline>
+      <outline text="Microsoft" title="Microsoft">
+        <outline type="rss" text="Microsoft AI Blog" title="Microsoft AI Blog" xmlUrl="https://blogs.microsoft.com/ai/feed/" htmlUrl="https://blogs.microsoft.com/ai"/>
+        
+        
+      </outline>
+      <outline text="Meta" title="Meta">
+        <outline type="rss" text="Meta AI Blog" title="Meta AI Blog" xmlUrl="https://ai.meta.com/blog/rss/" htmlUrl="https://ai.meta.com/blog/"/>
+        
+      
+      </outline>
+      <outline text="Cohere" title="Cohere">
+        <outline type="rss" text="Cohere AI Blog" title="Cohere AI Blog" xmlUrl="https://cohere.com/blog/rss.xml" htmlUrl="https://cohere.com/blog"/>
+        
+      
+      </outline>
+      <outline text="Stability AI" title="Stability AI">
+        <outline type="rss" text="Stability AI Blog" title="Stability AI Blog" xmlUrl="https://stability.ai/blog/rss" htmlUrl="https://stability.ai/blog"/>
+        
+    
+      </outline>
+    </outline>
+    <outline text="03 — Models &amp; Research" title="03 — Models &amp; Research">
+      <outline text="Company Research" title="Company Research">
+        <outline type="rss" text="OpenAI Research Index" title="OpenAI Research Index" xmlUrl="https://openai.com/research/feed.xml" htmlUrl="https://openai.com/research"/>
+        
+      
+        <outline type="rss" text="Anthropic Research" title="Anthropic Research" xmlUrl="https://www.anthropic.com/research/rss" htmlUrl="https://www.anthropic.com/research"/>
+        
+      
+        <outline type="rss" text="Google Research Blog" title="Google Research Blog" xmlUrl="https://research.google/blog/rss" htmlUrl="https://research.google/blog"/>
+        
+        
+        <outline type="rss" text="Microsoft Research Blog" title="Microsoft Research Blog" xmlUrl="https://www.microsoft.com/en-us/research/blog/feed/" htmlUrl="https://www.microsoft.com/en-us/research/blog"/>
+        
+      
+      </outline>
+      <outline text="Research Institutions" title="Research Institutions">
+        <outline type="rss" text="Stanford AI Lab (SAIL)" title="Stanford AI Lab (SAIL)" xmlUrl="https://ai.stanford.edu/blog/feed.xml" htmlUrl="https://ai.stanford.edu/blog"/>
+        
+        
+        <outline type="rss" text="MIT CSAIL News - AI" title="MIT CSAIL News - AI" xmlUrl="https://news.mit.edu/rss/topic/artificial-intelligence2" htmlUrl="https://news.mit.edu/topic/computer-science-and-artificial-intelligence-laboratory-csail"/>
+        
+        
+        <outline type="rss" text="Berkeley AI Research (BAIR)" title="Berkeley AI Research (BAIR)" xmlUrl="http://bair.berkeley.edu/blog/feed.xml" htmlUrl="http://bair.berkeley.edu/blog/"/>
+        
+        
+        <outline type="rss" text="Allen Institute for AI" title="Allen Institute for AI" xmlUrl="http://feeds.feedburner.com/AIInTheNews" htmlUrl="https://allenai.org"/>
+        
+      
+      </outline>
+      <outline text="arXiv — AI &amp; ML" title="arXiv — AI &amp; ML">
+        <outline type="rss" text="arXiv - Artificial Intelligence" title="arXiv - Artificial Intelligence" xmlUrl="https://rss.arxiv.org/rss/cs.ai" htmlUrl="https://arxiv.org/list/cs.AI/recent"/>
+        
+        
+        <outline type="rss" text="arXiv - Machine Learning" title="arXiv - Machine Learning" xmlUrl="https://rss.arxiv.org/rss/cs.LG" htmlUrl="https://arxiv.org/list/cs.LG/recent"/>
+        
+        
+        <outline type="rss" text="arXiv - AI + ML + Stats" title="arXiv - AI + ML + Stats" xmlUrl="https://rss.arxiv.org/rss/cs.ai+cs.LG+stat.ML" htmlUrl="https://arxiv.org/list/cs.AI/recent"/>
+        
+        
+      </outline>
+      <outline text="arXiv — Vision &amp; Language" title="arXiv — Vision &amp; Language">
+        <outline type="rss" text="arXiv - Computer Vision" title="arXiv - Computer Vision" xmlUrl="https://rss.arxiv.org/rss/cs.CV" htmlUrl="https://arxiv.org/list/cs.CV/recent"/>
+        
+        
+        <outline type="rss" text="arXiv - Natural Language Processing" title="arXiv - Natural Language Processing" xmlUrl="https://rss.arxiv.org/rss/cs.CL" htmlUrl="https://arxiv.org/list/cs.CL/recent"/>
+        
+      
+      </outline>
+      <outline text="Research Discovery" title="Research Discovery">
+        <outline type="rss" text="Hugging Face Papers (Community)" title="Hugging Face Papers (Community)" xmlUrl="https://jamesg.blog/hf-papers.xml" htmlUrl="https://jamesg.blog/2024/05/23/hf-papers-rss/"/>
+        
+      
+      </outline>
+    </outline>
+    <outline text="04 — Agents &amp; Agentic AI" title="04 — Agents &amp; Agentic AI"/>
+    <outline text="05 — AI Engineering &amp; Infrastructure" title="05 — AI Engineering &amp; Infrastructure">
+      <outline text="LLM / ML Engineering" title="LLM / ML Engineering">
+        <outline type="rss" text="Machine Learning Mastery" title="Machine Learning Mastery" xmlUrl="http://feeds.feedburner.com/MachineLearningMastery" htmlUrl="https://machinelearningmastery.com"/>
+        
+        
+        <outline type="rss" text="Towards Data Science" title="Towards Data Science" xmlUrl="https://towardsdatascience.com/feed" htmlUrl="https://towardsdatascience.com"/>
+        
+        
+        <outline type="rss" text="KDnuggets" title="KDnuggets" xmlUrl="https://kdnuggets.com/feed" htmlUrl="https://kdnuggets.com"/>
+        
+        
+      </outline>
+      <outline text="Hugging Face" title="Hugging Face">
+        <outline type="rss" text="Hugging Face Blog" title="Hugging Face Blog" xmlUrl="https://huggingface.co/blog/feed.xml" htmlUrl="https://huggingface.co/blog"/>
+        
+        
+      </outline>
+      <outline text="Cloud AI Platforms" title="Cloud AI Platforms">
+        <outline type="rss" text="AWS Machine Learning Blog" title="AWS Machine Learning Blog" xmlUrl="https://aws.amazon.com/blogs/ai/feed/" htmlUrl="https://aws.amazon.com/blogs/ai/"/>
+        
+      
+        <outline type="rss" text="Google Cloud Blog" title="Google Cloud Blog" xmlUrl="https://cloudblog.withgoogle.com/rss" htmlUrl="https://cloudblog.withgoogle.com"/>
+        
+      
+        <outline type="rss" text="Azure AI Blog" title="Azure AI Blog" xmlUrl="https://azure.microsoft.com/en-us/blog/topics/ai-machine-learning/feed/" htmlUrl="https://azure.microsoft.com/en-us/blog/topics/ai-machine-learning/"/>
+        
+    
+      </outline>
+      <outline text="AI Hardware &amp; Compute" title="AI Hardware &amp; Compute">
+        <outline type="rss" text="NVIDIA AI Blog" title="NVIDIA AI Blog" xmlUrl="https://blogs.nvidia.com/blog/category/ai/feed/" htmlUrl="https://blogs.nvidia.com/blog/category/ai/"/>
+        
+      
+      </outline>
+    </outline>
+    <outline text="06 — AI Automation &amp; Workflows" title="06 — AI Automation &amp; Workflows"/>
+    <outline text="07 — AI for Business" title="07 — AI for Business"/>
+    <outline text="08 — AI Marketing &amp; Growth" title="08 — AI Marketing &amp; Growth">
+      <outline text="MarTech" title="MarTech">
+        <outline type="rss" text="MarTech" title="MarTech" xmlUrl="https://martech.org/feed" htmlUrl="https://martech.org"/>
+        
+        
+        <outline type="rss" text="Martech Zone" title="Martech Zone" xmlUrl="https://feed.martech.zone" htmlUrl="https://martech.zone"/>
+        
+        
+        <outline type="rss" text="MarTech Series" title="MarTech Series" xmlUrl="https://martechseries.com/feed" htmlUrl="https://martechseries.com"/>
+        
+        
+        <outline type="rss" text="Marketing Tech News" title="Marketing Tech News" xmlUrl="https://marketingtechnews.net/feed" htmlUrl="https://marketingtechnews.net"/>
+        
+        
+        <outline type="rss" text="Chiefmartec (Scott Brinker)" title="Chiefmartec (Scott Brinker)" xmlUrl="https://chiefmartec.com/feed" htmlUrl="https://chiefmartec.com"/>
+        
+        
+        <outline type="rss" text="VentureBeat Marketing" title="VentureBeat Marketing" xmlUrl="https://venturebeat.com/category/marketing/feed/" htmlUrl="https://venturebeat.com/category/marketing/"/>
+        
+      
+      </outline>
+      <outline text="Marketing AI" title="Marketing AI">
+        <outline type="rss" text="Marketing AI Institute" title="Marketing AI Institute" xmlUrl="http://www.marketingaiinstitute.com/blog/rss.xml" htmlUrl="https://www.marketingaiinstitute.com"/>
+        
+        
+        <outline type="rss" text="StoryLab.ai Blog" title="StoryLab.ai Blog" xmlUrl="https://storylab.ai/feed" htmlUrl="https://storylab.ai/blog"/>
+        
+        
+        <outline type="rss" text="Rad AI Blog" title="Rad AI Blog" xmlUrl="https://blog.radintel.ai/rss.xml" htmlUrl="https://blog.radintel.ai"/>
+        
+        
+        <outline type="rss" text="Marketing SoundBytes" title="Marketing SoundBytes" xmlUrl="https://rahulsandil.com/feed" htmlUrl="https://rahulsandil.com"/>
+        
+      
+      </outline>
+      <outline text="SEO / GEO / AEO" title="SEO / GEO / AEO">
+        <outline type="rss" text="WordLift Blog (AI/SEO)" title="WordLift Blog (AI/SEO)" xmlUrl="https://wordlift.io/blog/en/feed" htmlUrl="https://wordlift.io/blog"/>
+        
+        
+      </outline>
+      <outline text="Content Marketing" title="Content Marketing">
+        <outline type="rss" text="Content Marketing Institute" title="Content Marketing Institute" xmlUrl="https://contentmarketinginstitute.com/feed/" htmlUrl="https://contentmarketinginstitute.com"/>
+        
+      
+      </outline>
+    </outline>
+    <outline text="09 — AI Learning &amp; Education" title="09 — AI Learning &amp; Education"/>
+    <outline text="10 — AI Applications" title="10 — AI Applications"/>
+    <outline text="11 — Analysis &amp; Commentary" title="11 — Analysis &amp; Commentary">
+      <outline text="AI Newsletters &amp; Analysis" title="AI Newsletters &amp; Analysis">
+        <outline type="rss" text="AI Weekly" title="AI Weekly" xmlUrl="https://aiweekly.co/issues.rss" htmlUrl="https://aiweekly.co"/>
+        
+        
+        <outline type="rss" text="Import AI (Jack Clark)" title="Import AI (Jack Clark)" xmlUrl="https://jack-clark.net/feed/" htmlUrl="https://jack-clark.net"/>
+        
+        
+        <outline type="rss" text="AI Alignment Forum" title="AI Alignment Forum" xmlUrl="https://www.alignmentforum.org/feed.xml" htmlUrl="https://www.alignmentforum.org"/>
+        
+        
+        <outline type="rss" text="DeepLearning.AI Blog" title="DeepLearning.AI Blog" xmlUrl="https://www.deeplearning.ai/blog/feed/" htmlUrl="https://www.deeplearning.ai/blog/"/>
+        
+      
+      </outline>
+      <outline text="Independent AI Analysis" title="Independent AI Analysis">
+        <outline type="rss" text="MarkTechPost" title="MarkTechPost" xmlUrl="https://marktechpost.com/feed" htmlUrl="https://marktechpost.com"/>
+        
+        
+      </outline>
+    </outline>
+    <outline text="12 — General Technology" title="12 — General Technology">
+      <outline text="General Tech News" title="General Tech News">
+        <outline type="rss" text="The Verge" title="The Verge" xmlUrl="https://www.theverge.com/rss/index.xml" htmlUrl="https://www.theverge.com"/>
+        
+        
+        <outline type="rss" text="Wired" title="Wired" xmlUrl="https://www.wired.com/feed/rss" htmlUrl="https://www.wired.com"/>
+        
+        
+      </outline>
+    </outline>
+    <outline text="90 — Watch / Experimental" title="90 — Watch / Experimental"/>
+    <outline text="99 — Archive" title="99 — Archive"/>
+  </body>
+</opml>

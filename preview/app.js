@@ -10,59 +10,673 @@ let activeArticleViewMode = 'html';  // Current active view mode
 
 // Full Feed Tree Structure
 let treeData = [
-  { id: 'f-1', type: 'folder', name: 'AI Company Blogs', expanded: true, children: [
-    { id: 'feed-openai', type: 'feed', name: 'OpenAI Blog', url: 'https://openai.com/news', unreadCount: 42 },
-    { id: 'feed-deepmind', type: 'feed', name: 'DeepMind Blog', url: 'https://deepmind.google/blog/', unreadCount: 35 },
-    { id: 'feed-google-res', type: 'feed', name: 'Google Research Blog', url: 'https://research.google/blog/', unreadCount: 28 },
-    { id: 'feed-ms-res', type: 'feed', name: 'Microsoft Research Blog', url: 'https://www.microsoft.com/en-us/research/blog/', unreadCount: 19 },
-    { id: 'feed-nvidia', type: 'feed', name: 'NVIDIA AI Blog', url: 'https://blogs.nvidia.com/', unreadCount: 14 }
-  ]},
-  { id: 'f-2', type: 'folder', name: 'Apple & Swift', expanded: true, children: [
-    { id: 'feed-macstories', type: 'feed', name: 'MacStories', url: 'https://www.macstories.net/feed', unreadCount: 538 },
-    { id: 'feed-swiftui', type: 'feed', name: 'SwiftUI Recipes', url: 'https://swiftuirecipes.com/blog.rss', unreadCount: 500 },
-    { id: 'feed-fatbobman', type: 'feed', name: "Fatbobman's Swift Weekly", url: 'https://weekly.fatbobman.com/feed', unreadCount: 120 },
-    { id: 'feed-marco', type: 'feed', name: 'Marco.org', url: 'https://marco.org/rss', unreadCount: 80 }
-  ]},
-  { id: 'f-3', type: 'folder', name: 'Major Tech Publications - AI', expanded: false, children: [
-    { id: 'feed-techcrunch', type: 'feed', name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/', unreadCount: 106 },
-    { id: 'feed-verge', type: 'feed', name: 'The Verge', url: 'https://www.theverge.com', unreadCount: 80 },
-    { id: 'feed-wired', type: 'feed', name: 'Wired', url: 'https://www.wired.com', unreadCount: 95 },
-    { id: 'feed-mit-tech', type: 'feed', name: 'MIT Technology Review', url: 'https://www.technologyreview.com', unreadCount: 65 }
-  ]},
-  { id: 'f-4', type: 'folder', name: 'Academic & Research Institutions', expanded: false, children: [
-    { id: 'feed-stanford', type: 'feed', name: 'Stanford AI Lab (SAIL)', url: 'http://ai.stanford.edu/blog/', unreadCount: 30 },
-    { id: 'feed-mit-csail', type: 'feed', name: 'MIT CSAIL News - AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2', unreadCount: 36 },
-    { id: 'feed-alignment', type: 'feed', name: 'AI Alignment Forum', url: 'https://www.alignmentforum.org', unreadCount: 22 }
-  ]},
-  { id: 'f-5', type: 'folder', name: 'Tech Infrastructure', expanded: true, children: [
-    { id: 'subf-51', type: 'folder', name: 'Cloud AI Platforms', expanded: true, children: [
-      { id: 'feed-aws-ml', type: 'feed', name: 'AWS Machine Learning Blog', url: 'https://aws.amazon.com/blogs/machine-learning/', unreadCount: 50 },
-      { id: 'feed-azure-ai', type: 'feed', name: 'Azure AI Blog', url: 'https://azure.microsoft.com/en-us/blog/', unreadCount: 40 }
-    ]},
-    { id: 'subf-52', type: 'folder', name: 'Hugging Face', expanded: false, children: [
-      { id: 'feed-hf', type: 'feed', name: 'Hugging Face Blog', url: 'https://huggingface.co/blog', unreadCount: 906 }
-    ]}
-  ]},
-  { id: 'f-6', type: 'folder', name: 'arXiv Research Papers', expanded: true, children: [
-    { id: 'feed-arxiv-ai', type: 'feed', name: 'arXiv - Artificial Intelligence', url: 'http://rss.arxiv.org/rss/cs.AI', unreadCount: 1500 },
-    { id: 'feed-arxiv-lg', type: 'feed', name: 'arXiv - Machine Learning', url: 'http://rss.arxiv.org/rss/cs.LG', unreadCount: 1609 },
-    { id: 'feed-arxiv-cv', type: 'feed', name: 'arXiv - Computer Vision', url: 'http://rss.arxiv.org/rss/cs.CV', unreadCount: 1000 }
-  ]},
-  { id: 'f-7', type: 'folder', name: 'Specialized AI Content', expanded: false, children: [
-    { id: 'feed-tds', type: 'feed', name: 'Towards Data Science', url: 'https://towardsdatascience.com/', unreadCount: 142 },
-    { id: 'feed-unite', type: 'feed', name: 'Unite.AI', url: 'https://www.unite.ai', unreadCount: 424 },
-    { id: 'feed-kdnuggets', type: 'feed', name: 'KDnuggets', url: 'https://www.kdnuggets.com', unreadCount: 88 }
-  ]},
-  { id: 'f-8', type: 'folder', name: 'AI Newsletters & Analysis', expanded: false, children: [
-    { id: 'feed-import-ai', type: 'feed', name: 'Import AI (Jack Clark)', url: 'https://jack-clark.net', unreadCount: 42 },
-    { id: 'feed-ai-weekly', type: 'feed', name: 'AI Weekly', url: 'https://aiweekly.co', unreadCount: 25 },
-    { id: 'feed-hermes', type: 'feed', name: 'hermesagent', url: 'https://www.reddit.com/r/hermesagent/', unreadCount: 18 }
-  ]},
-  { id: 'f-9', type: 'folder', name: 'Marketing & SEO AI', expanded: false, children: [
-    { id: 'feed-chiefmartec', type: 'feed', name: 'Chiefmartec', url: 'https://chiefmartec.com', unreadCount: 30 },
-    { id: 'feed-marketing-ai', type: 'feed', name: 'Marketing AI Institute', url: 'https://www.marketingaiinstitute.com/blog', unreadCount: 54 },
-    { id: 'feed-wordlift', type: 'feed', name: 'WordLift Blog (AI/SEO)', url: 'https://wordlift.io/blog/en/', unreadCount: 37 }
-  ]}
+  {
+    "id": "f-0-6592",
+    "type": "folder",
+    "name": "01 \u2014 AI Industry & Strategy",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-5779",
+        "type": "folder",
+        "name": "AI Market & Industry News",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-9218",
+            "type": "feed",
+            "name": "TechCrunch AI",
+            "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+            "unreadCount": 17
+          },
+          {
+            "id": "feed-2-3997",
+            "type": "feed",
+            "name": "VentureBeat AI",
+            "url": "https://venturebeat.com/category/ai/feed/",
+            "unreadCount": 18
+          },
+          {
+            "id": "feed-2-5123",
+            "type": "feed",
+            "name": "MIT Technology Review",
+            "url": "https://www.technologyreview.com/feed/",
+            "unreadCount": 79
+          },
+          {
+            "id": "feed-2-4533",
+            "type": "feed",
+            "name": "Unite.AI",
+            "url": "https://unite.ai/feed",
+            "unreadCount": 34
+          },
+          {
+            "id": "feed-2-3581",
+            "type": "feed",
+            "name": "DailyAI",
+            "url": "https://dailyai.com/feed",
+            "unreadCount": 38
+          },
+          {
+            "id": "feed-2-5247",
+            "type": "feed",
+            "name": "Artificial Intelligence News",
+            "url": "https://www.artificialintelligence-news.com/feed/rss/",
+            "unreadCount": 23
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-3336",
+    "type": "folder",
+    "name": "02 \u2014 AI Companies & Platforms",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-4395",
+        "type": "folder",
+        "name": "OpenAI",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-1384",
+            "type": "feed",
+            "name": "OpenAI Blog",
+            "url": "https://openai.com/blog/rss/",
+            "unreadCount": 63
+          }
+        ]
+      },
+      {
+        "id": "f-1-5338",
+        "type": "folder",
+        "name": "Google / DeepMind",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-1723",
+            "type": "feed",
+            "name": "Google AI Research Blog",
+            "url": "https://ai.googleblog.com/feeds/posts/default",
+            "unreadCount": 58
+          },
+          {
+            "id": "feed-2-6902",
+            "type": "feed",
+            "name": "DeepMind Blog",
+            "url": "https://deepmind.com/blog/feed/basic",
+            "unreadCount": 41
+          }
+        ]
+      },
+      {
+        "id": "f-1-2900",
+        "type": "folder",
+        "name": "Microsoft",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-2046",
+            "type": "feed",
+            "name": "Microsoft AI Blog",
+            "url": "https://blogs.microsoft.com/ai/feed/",
+            "unreadCount": 39
+          }
+        ]
+      },
+      {
+        "id": "f-1-8292",
+        "type": "folder",
+        "name": "Meta",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-7850",
+            "type": "feed",
+            "name": "Meta AI Blog",
+            "url": "https://ai.meta.com/blog/rss/",
+            "unreadCount": 47
+          }
+        ]
+      },
+      {
+        "id": "f-1-5831",
+        "type": "folder",
+        "name": "Cohere",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-2150",
+            "type": "feed",
+            "name": "Cohere AI Blog",
+            "url": "https://cohere.com/blog/rss.xml",
+            "unreadCount": 22
+          }
+        ]
+      },
+      {
+        "id": "f-1-4407",
+        "type": "folder",
+        "name": "Stability AI",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-6005",
+            "type": "feed",
+            "name": "Stability AI Blog",
+            "url": "https://stability.ai/blog/rss",
+            "unreadCount": 17
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-3194",
+    "type": "folder",
+    "name": "03 \u2014 Models & Research",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-8353",
+        "type": "folder",
+        "name": "Company Research",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-1224",
+            "type": "feed",
+            "name": "OpenAI Research Index",
+            "url": "https://openai.com/research/feed.xml",
+            "unreadCount": 67
+          },
+          {
+            "id": "feed-2-8675",
+            "type": "feed",
+            "name": "Anthropic Research",
+            "url": "https://www.anthropic.com/research/rss",
+            "unreadCount": 36
+          },
+          {
+            "id": "feed-2-5185",
+            "type": "feed",
+            "name": "Google Research Blog",
+            "url": "https://research.google/blog/rss",
+            "unreadCount": 67
+          },
+          {
+            "id": "feed-2-4485",
+            "type": "feed",
+            "name": "Microsoft Research Blog",
+            "url": "https://www.microsoft.com/en-us/research/blog/feed/",
+            "unreadCount": 63
+          }
+        ]
+      },
+      {
+        "id": "f-1-2873",
+        "type": "folder",
+        "name": "Research Institutions",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-8324",
+            "type": "feed",
+            "name": "Stanford AI Lab (SAIL)",
+            "url": "https://ai.stanford.edu/blog/feed.xml",
+            "unreadCount": 25
+          },
+          {
+            "id": "feed-2-6948",
+            "type": "feed",
+            "name": "MIT CSAIL News - AI",
+            "url": "https://news.mit.edu/rss/topic/artificial-intelligence2",
+            "unreadCount": 31
+          },
+          {
+            "id": "feed-2-9056",
+            "type": "feed",
+            "name": "Berkeley AI Research (BAIR)",
+            "url": "http://bair.berkeley.edu/blog/feed.xml",
+            "unreadCount": 56
+          },
+          {
+            "id": "feed-2-4438",
+            "type": "feed",
+            "name": "Allen Institute for AI",
+            "url": "http://feeds.feedburner.com/AIInTheNews",
+            "unreadCount": 67
+          }
+        ]
+      },
+      {
+        "id": "f-1-4247",
+        "type": "folder",
+        "name": "arXiv \u2014 AI & ML",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-3579",
+            "type": "feed",
+            "name": "arXiv - Artificial Intelligence",
+            "url": "https://rss.arxiv.org/rss/cs.ai",
+            "unreadCount": 62
+          },
+          {
+            "id": "feed-2-5071",
+            "type": "feed",
+            "name": "arXiv - Machine Learning",
+            "url": "https://rss.arxiv.org/rss/cs.LG",
+            "unreadCount": 36
+          },
+          {
+            "id": "feed-2-7344",
+            "type": "feed",
+            "name": "arXiv - AI + ML + Stats",
+            "url": "https://rss.arxiv.org/rss/cs.ai+cs.LG+stat.ML",
+            "unreadCount": 47
+          }
+        ]
+      },
+      {
+        "id": "f-1-9335",
+        "type": "folder",
+        "name": "arXiv \u2014 Vision & Language",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-9453",
+            "type": "feed",
+            "name": "arXiv - Computer Vision",
+            "url": "https://rss.arxiv.org/rss/cs.CV",
+            "unreadCount": 57
+          },
+          {
+            "id": "feed-2-7686",
+            "type": "feed",
+            "name": "arXiv - Natural Language Processing",
+            "url": "https://rss.arxiv.org/rss/cs.CL",
+            "unreadCount": 6
+          }
+        ]
+      },
+      {
+        "id": "f-1-9292",
+        "type": "folder",
+        "name": "Research Discovery",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-7276",
+            "type": "feed",
+            "name": "Hugging Face Papers (Community)",
+            "url": "https://jamesg.blog/hf-papers.xml",
+            "unreadCount": 12
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-8537",
+    "type": "folder",
+    "name": "04 \u2014 Agents & Agentic AI",
+    "expanded": true,
+    "children": []
+  },
+  {
+    "id": "f-0-1838",
+    "type": "folder",
+    "name": "05 \u2014 AI Engineering & Infrastructure",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-2889",
+        "type": "folder",
+        "name": "LLM / ML Engineering",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-1491",
+            "type": "feed",
+            "name": "Machine Learning Mastery",
+            "url": "http://feeds.feedburner.com/MachineLearningMastery",
+            "unreadCount": 36
+          },
+          {
+            "id": "feed-2-3337",
+            "type": "feed",
+            "name": "Towards Data Science",
+            "url": "https://towardsdatascience.com/feed",
+            "unreadCount": 6
+          },
+          {
+            "id": "feed-2-3298",
+            "type": "feed",
+            "name": "KDnuggets",
+            "url": "https://kdnuggets.com/feed",
+            "unreadCount": 15
+          }
+        ]
+      },
+      {
+        "id": "f-1-2394",
+        "type": "folder",
+        "name": "Hugging Face",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-7165",
+            "type": "feed",
+            "name": "Hugging Face Blog",
+            "url": "https://huggingface.co/blog/feed.xml",
+            "unreadCount": 63
+          }
+        ]
+      },
+      {
+        "id": "f-1-7605",
+        "type": "folder",
+        "name": "Cloud AI Platforms",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-4778",
+            "type": "feed",
+            "name": "AWS Machine Learning Blog",
+            "url": "https://aws.amazon.com/blogs/ai/feed/",
+            "unreadCount": 64
+          },
+          {
+            "id": "feed-2-9533",
+            "type": "feed",
+            "name": "Google Cloud Blog",
+            "url": "https://cloudblog.withgoogle.com/rss",
+            "unreadCount": 71
+          },
+          {
+            "id": "feed-2-6287",
+            "type": "feed",
+            "name": "Azure AI Blog",
+            "url": "https://azure.microsoft.com/en-us/blog/topics/ai-machine-learning/feed/",
+            "unreadCount": 47
+          }
+        ]
+      },
+      {
+        "id": "f-1-6626",
+        "type": "folder",
+        "name": "AI Hardware & Compute",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-2211",
+            "type": "feed",
+            "name": "NVIDIA AI Blog",
+            "url": "https://blogs.nvidia.com/blog/category/ai/feed/",
+            "unreadCount": 34
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-8435",
+    "type": "folder",
+    "name": "06 \u2014 AI Automation & Workflows",
+    "expanded": true,
+    "children": []
+  },
+  {
+    "id": "f-0-8139",
+    "type": "folder",
+    "name": "07 \u2014 AI for Business",
+    "expanded": true,
+    "children": []
+  },
+  {
+    "id": "f-0-4809",
+    "type": "folder",
+    "name": "08 \u2014 AI Marketing & Growth",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-3398",
+        "type": "folder",
+        "name": "MarTech",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-3992",
+            "type": "feed",
+            "name": "MarTech",
+            "url": "https://martech.org/feed",
+            "unreadCount": 21
+          },
+          {
+            "id": "feed-2-3511",
+            "type": "feed",
+            "name": "Martech Zone",
+            "url": "https://feed.martech.zone",
+            "unreadCount": 62
+          },
+          {
+            "id": "feed-2-3539",
+            "type": "feed",
+            "name": "MarTech Series",
+            "url": "https://martechseries.com/feed",
+            "unreadCount": 60
+          },
+          {
+            "id": "feed-2-1828",
+            "type": "feed",
+            "name": "Marketing Tech News",
+            "url": "https://marketingtechnews.net/feed",
+            "unreadCount": 68
+          },
+          {
+            "id": "feed-2-7669",
+            "type": "feed",
+            "name": "Chiefmartec (Scott Brinker)",
+            "url": "https://chiefmartec.com/feed",
+            "unreadCount": 35
+          },
+          {
+            "id": "feed-2-9737",
+            "type": "feed",
+            "name": "VentureBeat Marketing",
+            "url": "https://venturebeat.com/category/marketing/feed/",
+            "unreadCount": 36
+          }
+        ]
+      },
+      {
+        "id": "f-1-6963",
+        "type": "folder",
+        "name": "Marketing AI",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-4452",
+            "type": "feed",
+            "name": "Marketing AI Institute",
+            "url": "http://www.marketingaiinstitute.com/blog/rss.xml",
+            "unreadCount": 30
+          },
+          {
+            "id": "feed-2-4269",
+            "type": "feed",
+            "name": "StoryLab.ai Blog",
+            "url": "https://storylab.ai/feed",
+            "unreadCount": 18
+          },
+          {
+            "id": "feed-2-2451",
+            "type": "feed",
+            "name": "Rad AI Blog",
+            "url": "https://blog.radintel.ai/rss.xml",
+            "unreadCount": 37
+          },
+          {
+            "id": "feed-2-3115",
+            "type": "feed",
+            "name": "Marketing SoundBytes",
+            "url": "https://rahulsandil.com/feed",
+            "unreadCount": 35
+          }
+        ]
+      },
+      {
+        "id": "f-1-1299",
+        "type": "folder",
+        "name": "SEO / GEO / AEO",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-1327",
+            "type": "feed",
+            "name": "WordLift Blog (AI/SEO)",
+            "url": "https://wordlift.io/blog/en/feed",
+            "unreadCount": 5
+          }
+        ]
+      },
+      {
+        "id": "f-1-3009",
+        "type": "folder",
+        "name": "Content Marketing",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-7318",
+            "type": "feed",
+            "name": "Content Marketing Institute",
+            "url": "https://contentmarketinginstitute.com/feed/",
+            "unreadCount": 7
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-3525",
+    "type": "folder",
+    "name": "09 \u2014 AI Learning & Education",
+    "expanded": true,
+    "children": []
+  },
+  {
+    "id": "f-0-8417",
+    "type": "folder",
+    "name": "10 \u2014 AI Applications",
+    "expanded": true,
+    "children": []
+  },
+  {
+    "id": "f-0-1633",
+    "type": "folder",
+    "name": "11 \u2014 Analysis & Commentary",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-9793",
+        "type": "folder",
+        "name": "AI Newsletters & Analysis",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-8474",
+            "type": "feed",
+            "name": "AI Weekly",
+            "url": "https://aiweekly.co/issues.rss",
+            "unreadCount": 16
+          },
+          {
+            "id": "feed-2-2819",
+            "type": "feed",
+            "name": "Import AI (Jack Clark)",
+            "url": "https://jack-clark.net/feed/",
+            "unreadCount": 22
+          },
+          {
+            "id": "feed-2-1852",
+            "type": "feed",
+            "name": "AI Alignment Forum",
+            "url": "https://www.alignmentforum.org/feed.xml",
+            "unreadCount": 29
+          },
+          {
+            "id": "feed-2-8546",
+            "type": "feed",
+            "name": "DeepLearning.AI Blog",
+            "url": "https://www.deeplearning.ai/blog/feed/",
+            "unreadCount": 69
+          }
+        ]
+      },
+      {
+        "id": "f-1-8886",
+        "type": "folder",
+        "name": "Independent AI Analysis",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-7771",
+            "type": "feed",
+            "name": "MarkTechPost",
+            "url": "https://marktechpost.com/feed",
+            "unreadCount": 15
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-1007",
+    "type": "folder",
+    "name": "12 \u2014 General Technology",
+    "expanded": true,
+    "children": [
+      {
+        "id": "f-1-9829",
+        "type": "folder",
+        "name": "General Tech News",
+        "expanded": true,
+        "children": [
+          {
+            "id": "feed-2-3757",
+            "type": "feed",
+            "name": "The Verge",
+            "url": "https://www.theverge.com/rss/index.xml",
+            "unreadCount": 49
+          },
+          {
+            "id": "feed-2-2565",
+            "type": "feed",
+            "name": "Wired",
+            "url": "https://www.wired.com/feed/rss",
+            "unreadCount": 13
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f-0-9083",
+    "type": "folder",
+    "name": "90 \u2014 Watch / Experimental",
+    "expanded": true,
+    "children": []
+  },
+  {
+    "id": "f-0-2765",
+    "type": "folder",
+    "name": "99 \u2014 Archive",
+    "expanded": true,
+    "children": []
+  }
 ];
 
 // Helper to open links natively in default browser (Safari/Chrome/Arc) via Swift message handler

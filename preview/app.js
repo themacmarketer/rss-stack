@@ -1063,6 +1063,56 @@ function setupColumnResizers() {
 setupColumnResizers();
 
 
+// Toast & OPML Status Notification System
+function showToast(msg, type = 'success') {
+  let toastContainer = document.getElementById('toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.style.cssText = 'position:fixed; top:54px; right:20px; z-index:3000; display:flex; flex-direction:column; gap:8px; pointer-events:none;';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  const bg = type === 'error' ? '#ff3b30' : (type === 'info' ? '#007aff' : '#70b643');
+  toast.style.cssText = `background:${bg}; color:#ffffff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; box-shadow:0 10px 25px rgba(0,0,0,0.25); opacity:0; transform:translateY(-10px); transition:all 0.2s ease; pointer-events:auto;`;
+  toast.textContent = msg;
+  toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-10px)';
+    setTimeout(() => toast.remove(), 250);
+  }, 4000);
+}
+
+function showOPMLStatus(msg, type = 'success') {
+  const el = document.getElementById('opml-status-message');
+  if (el) {
+    el.textContent = msg;
+    el.className = `opml-status-box ${type}`;
+  }
+  showToast(msg, type);
+}
+
+// Native Swift OPML Export Callback
+window.onNativeOPMLExported = (success, detail) => {
+  if (success) {
+    showOPMLStatus(`✅ Successfully exported subscriptions to ${detail}`, 'success');
+  } else {
+    if (detail === 'Export cancelled') {
+      showOPMLStatus('ℹ️ OPML export cancelled', 'info');
+    } else {
+      showOPMLStatus(`❌ Export failed: ${detail}`, 'error');
+    }
+  }
+};
+
 // OPML Import & Export Engine with Replace Option
 const importOpmlBtn = document.getElementById('import-opml-btn');
 const exportOpmlBtn = document.getElementById('export-opml-btn');
@@ -1078,6 +1128,8 @@ if (importOpmlBtn && opmlFileInput) {
     const file = e.target.files[0];
     if (!file) return;
 
+    showOPMLStatus('⏳ Reading OPML file...', 'info');
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -1086,7 +1138,7 @@ if (importOpmlBtn && opmlFileInput) {
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         const bodyNode = xmlDoc.querySelector('body');
         if (!bodyNode) {
-          alert('Invalid OPML file structure.');
+          showOPMLStatus('❌ Invalid OPML file structure (missing <body> tag)', 'error');
           return;
         }
 
@@ -1125,7 +1177,7 @@ if (importOpmlBtn && opmlFileInput) {
         const importedTree = parseOutlineNodes(bodyNode);
 
         if (importedTree.length === 0) {
-          alert('No feeds or folders found in the OPML file.');
+          showOPMLStatus('❌ No feeds or folders found in the OPML file', 'error');
           return;
         }
 
@@ -1133,17 +1185,17 @@ if (importOpmlBtn && opmlFileInput) {
 
         if (replaceExisting) {
           treeData = importedTree;
-          alert(`Successfully replaced all subscriptions with ${importedTree.length} imported items!`);
+          showOPMLStatus(`✅ Successfully replaced all subscriptions with ${importedTree.length} imported items!`, 'success');
         } else {
           treeData = treeData.concat(importedTree);
-          alert(`Successfully imported and merged ${importedTree.length} items!`);
+          showOPMLStatus(`✅ Successfully imported and merged ${importedTree.length} items!`, 'success');
         }
 
         renderTree();
         fetchAndDisplayArticles('latest');
         opmlFileInput.value = '';
       } catch (err) {
-        alert('Failed to parse OPML file: ' + err.message);
+        showOPMLStatus('❌ Failed to parse OPML file: ' + err.message, 'error');
       }
     };
     reader.readAsText(file);
@@ -1187,9 +1239,11 @@ if (exportOpmlBtn) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      showOPMLStatus('✅ Subscriptions exported to quickrss_subscriptions.opml', 'success');
     }
   };
 }
+
 
 // Initial Render & Load
 renderTree();

@@ -60,9 +60,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             savePanel.nameFieldStringValue = "quickrss_subscriptions.opml"
             savePanel.allowedContentTypes = [UTType.xml, UTType(filenameExtension: "opml")].compactMap { $0 }
             
-            savePanel.begin { result in
+            savePanel.begin { [weak self] result in
+                guard let self = self else { return }
                 if result == .OK, let url = savePanel.url {
-                    try? xmlContent.write(to: url, atomically: true, encoding: .utf8)
+                    do {
+                        try xmlContent.write(to: url, atomically: true, encoding: .utf8)
+                        let filename = url.lastPathComponent
+                        let jsCode = "if (window.onNativeOPMLExported) { window.onNativeOPMLExported(true, '\(filename)'); }"
+                        DispatchQueue.main.async { self.webView.evaluateJavaScript(jsCode, completionHandler: nil) }
+                    } catch {
+                        let errStr = error.localizedDescription.replacingOccurrences(of: "'", with: "\\'")
+                        let jsCode = "if (window.onNativeOPMLExported) { window.onNativeOPMLExported(false, '\(errStr)'); }"
+                        DispatchQueue.main.async { self.webView.evaluateJavaScript(jsCode, completionHandler: nil) }
+                    }
+                } else {
+                    let jsCode = "if (window.onNativeOPMLExported) { window.onNativeOPMLExported(false, 'Export cancelled'); }"
+                    DispatchQueue.main.async { self.webView.evaluateJavaScript(jsCode, completionHandler: nil) }
                 }
             }
         } else if message.name == "fetchURL", let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let requestId = dict["requestId"] as? String, let url = URL(string: urlString) {
@@ -111,6 +124,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 completionHandler(nil)
             }
         }
+    }
+
+    // Native macOS Alert Dialog for JavaScript alert(...)
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Quick RSS"
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        completionHandler()
     }
 
 

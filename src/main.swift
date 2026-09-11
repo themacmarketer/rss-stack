@@ -7,6 +7,51 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     var window: NSWindow!
     var webView: WKWebView!
     var mcpServer: MCPServer?
+    var pendingDeepLinkURL: URL?
+    var isWebViewLoaded: Bool = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+    }
+
+    func application(_ sender: NSApplication, open urls: [URL]) {
+        for url in urls {
+            handleDeepLink(url)
+        }
+    }
+
+    @objc func handleGetURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+        if let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+           let url = URL(string: urlString) {
+            handleDeepLink(url)
+        }
+    }
+
+    func handleDeepLink(_ url: URL) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        guard scheme == "quickrss" || scheme == "quick-rss" else { return }
+
+        DispatchQueue.main.async {
+            if let win = self.window {
+                win.makeKeyAndOrderFront(nil)
+            }
+            NSApp.activate(ignoringOtherApps: true)
+
+            let absoluteUrlStr = url.absoluteString.replacingOccurrences(of: "'", with: "\\'")
+            let jsCode = "if (window.handleDeepLink) { window.handleDeepLink('\(absoluteUrlStr)'); }"
+
+            if self.isWebViewLoaded, let wv = self.webView {
+                wv.evaluateJavaScript(jsCode, completionHandler: nil)
+            } else {
+                self.pendingDeepLinkURL = url
+            }
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -62,7 +107,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
             mcpServer?.handleMCPResponse(requestId: requestId, result: result)
         } else if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
-            NSWorkspace.shared.open(url)
+            let scheme = url.scheme?.lowercased() ?? ""
+            if scheme == "quickrss" || scheme == "quick-rss" {
+                handleDeepLink(url)
+            } else {
+                NSWorkspace.shared.open(url)
+            }
         } else if message.name == "saveOPML", let xmlContent = message.body as? String {
             let savePanel = NSSavePanel()
             savePanel.title = "Export OPML Subscriptions"
@@ -155,22 +205,42 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     }
 
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        isWebViewLoaded = true
+        if let pendingURL = pendingDeepLinkURL {
+            pendingDeepLinkURL = nil
+            handleDeepLink(pendingURL)
+        }
+    }
+
     // Handle window.open(...) in JavaScript to open in default Mac browser
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = navigationAction.request.url {
-            NSWorkspace.shared.open(url)
+            let scheme = url.scheme?.lowercased() ?? ""
+            if scheme == "quickrss" || scheme == "quick-rss" {
+                handleDeepLink(url)
+            } else {
+                NSWorkspace.shared.open(url)
+            }
         }
         return nil
     }
 
     // Intercept link clicks targeting _blank or external URLs
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url {
-            // If link click, open in default browser
-            if url.scheme == "http" || url.scheme == "https" {
-                NSWorkspace.shared.open(url)
+        if let url = navigationAction.request.url {
+            let scheme = url.scheme?.lowercased() ?? ""
+            if scheme == "quickrss" || scheme == "quick-rss" {
+                handleDeepLink(url)
                 decisionHandler(.cancel)
                 return
+            }
+            if navigationAction.navigationType == .linkActivated {
+                if scheme == "http" || scheme == "https" {
+                    NSWorkspace.shared.open(url)
+                    decisionHandler(.cancel)
+                    return
+                }
             }
         }
         decisionHandler(.allow)

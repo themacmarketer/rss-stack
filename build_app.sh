@@ -55,6 +55,20 @@ cat <<EOF > "${CONTENTS_DIR}/Info.plist"
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLName</key>
+            <string>com.wangchujiang.quickrss.folders</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>quickrss</string>
+                <string>quick-rss</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
 EOF

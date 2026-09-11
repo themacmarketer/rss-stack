@@ -854,6 +854,23 @@ let contextNodeId = null;
 let draggedNodeId = null;
 
 // Native MCP Tool Execution Bridge
+function formatArticleForMCP(art) {
+  if (!art) return null;
+  const artId = art.id || art.link || '';
+  const artUrl = art.link || '';
+  const deeplink = `quickrss://article?id=${encodeURIComponent(artId)}&url=${encodeURIComponent(artUrl)}`;
+  return {
+    id: art.id,
+    title: art.title,
+    feedTitle: art.feedTitle,
+    pubDate: art.pubDate,
+    author: art.author,
+    summary: art.summary,
+    link: art.link,
+    deeplink: deeplink
+  };
+}
+
 window.executeMCPTool = async function(name, args = {}) {
   try {
     if (name === 'get_unread_articles') {
@@ -868,15 +885,7 @@ window.executeMCPTool = async function(name, args = {}) {
           const key = art.id || (art.title + '---' + art.feedTitle);
           if (!seenKeys.has(key) && !art.isRead) {
             seenKeys.add(key);
-            unread.push({
-              id: art.id,
-              title: art.title,
-              feedTitle: art.feedTitle,
-              pubDate: art.pubDate,
-              author: art.author,
-              summary: art.summary,
-              link: art.link
-            });
+            unread.push(art);
           }
         });
       });
@@ -886,20 +895,12 @@ window.executeMCPTool = async function(name, args = {}) {
           const key = art.id || (art.title + '---' + art.feedTitle);
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
-            unread.push({
-              id: art.id,
-              title: art.title,
-              feedTitle: art.feedTitle,
-              pubDate: art.pubDate,
-              author: art.author,
-              summary: art.summary,
-              link: art.link
-            });
+            unread.push(art);
           }
         });
       }
 
-      return unread;
+      return unread.map(formatArticleForMCP);
     }
 
     if (name === 'search_articles') {
@@ -926,21 +927,13 @@ window.executeMCPTool = async function(name, args = {}) {
             );
 
             if (matchesAll) {
-              matches.push({
-                id: art.id,
-                title: art.title,
-                feedTitle: art.feedTitle,
-                pubDate: art.pubDate,
-                author: art.author,
-                summary: art.summary,
-                link: art.link
-              });
+              matches.push(art);
             }
           }
         });
       });
 
-      return matches;
+      return matches.map(formatArticleForMCP);
     }
 
     if (name === 'get_feed_tree') {
@@ -1142,15 +1135,7 @@ window.executeMCPTool = async function(name, args = {}) {
       const folderFeeds = getAllFeedsFromTree(pos.node.children || []);
       const articlesLists = await Promise.all(folderFeeds.map(f => getArticlesForFeed(f)));
       const pool = articlesLists.flat();
-      return pool.map(a => ({
-        id: a.id,
-        title: a.title,
-        feedTitle: a.feedTitle,
-        pubDate: a.pubDate,
-        author: a.author,
-        summary: a.summary,
-        link: a.link
-      }));
+      return pool.map(formatArticleForMCP);
     }
 
     if (name === 'mark_read') {
@@ -1200,7 +1185,7 @@ window.executeMCPTool = async function(name, args = {}) {
     }
 
     if (name === 'get_starred_articles') {
-      return getStarredArticlesFromStorage();
+      return getStarredArticlesFromStorage().map(formatArticleForMCP);
     }
 
 
@@ -3592,6 +3577,118 @@ function setupAIChatbotUI() {
   }
 }
 
+// Global Deep Link Handler (quickrss://article?id=xxx or quickrss://article?url=yyy)
+window.handleDeepLink = function(urlString) {
+  if (!urlString) return;
+  console.log('🔗 Deep link received:', urlString);
+  try {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(urlString);
+    } catch(e) {
+      const clean = urlString.replace(/^(quick-rss|quickrss):\/\//i, '');
+      parsedUrl = new URL('http://dummy/' + clean);
+    }
+
+    const pathAndHost = (parsedUrl.host + parsedUrl.pathname).toLowerCase();
+    const params = new URLSearchParams(parsedUrl.search);
+    const targetId = params.get('id') || params.get('art_id');
+    const targetUrlStr = params.get('url') || params.get('link');
+    const searchQuery = params.get('q') || params.get('query');
+
+    // Case 1: Search Query Deep Link (quickrss://search?q=AI)
+    if (pathAndHost.includes('search') && searchQuery) {
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.value = searchQuery;
+        searchInput.dispatchEvent(new Event('input'));
+      }
+      showToast(`🔍 Searching for "${searchQuery}" via deep link`, 'info');
+      return;
+    }
+
+    // Case 2: Article Deep Link (quickrss://article?id=xxx or quickrss://article?url=yyy)
+    let target = null;
+    const allFeeds = (typeof getAllFeedsFromTree === 'function') ? getAllFeedsFromTree(treeData) : [];
+    
+    // Check currently loaded articles first
+    if (loadedArticles && loadedArticles.length > 0) {
+      target = loadedArticles.find(a => 
+        (targetId && (a.id === targetId || a.link === targetId)) ||
+        (targetUrlStr && a.link && a.link.trim() === targetUrlStr.trim())
+      );
+    }
+
+    // Check feed article caches
+    if (!target) {
+      for (const feed of allFeeds) {
+        const cacheKey = feed.url || feed.id || feed.name;
+        const feedArts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
+        const found = feedArts.find(a => 
+          (targetId && (a.id === targetId || a.link === targetId)) ||
+          (targetUrlStr && a.link && a.link.trim() === targetUrlStr.trim())
+        );
+        if (found) {
+          target = found;
+          break;
+        }
+      }
+    }
+
+    // Check path-based ID: quickrss://article/art_123
+    if (!target) {
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+      const pathId = pathParts.length > 0 ? pathParts[pathParts.length - 1] : null;
+      if (pathId && pathId !== 'article') {
+        for (const feed of allFeeds) {
+          const cacheKey = feed.url || feed.id || feed.name;
+          const feedArts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
+          const found = feedArts.find(a => a.id === pathId || a.link === pathId);
+          if (found) {
+            target = found;
+            break;
+          }
+        }
+      }
+    }
+
+    if (target) {
+      let card = document.getElementById(`art-card-${target.id}`);
+      if (!card) {
+        const allArticlesItem = document.querySelector('.sidebar-item[data-filter="all"]');
+        if (allArticlesItem) {
+          allArticlesItem.click();
+          card = document.getElementById(`art-card-${target.id}`);
+        }
+      }
+      selectArticle(target, card);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      showToast(`📖 Opened article: "${(target.title || '').slice(0, 30)}..."`, 'success');
+    } else if (targetUrlStr) {
+      const pseudoArt = {
+        id: targetId || 'art_dl_' + Date.now(),
+        title: params.get('title') || 'Deep Link Article',
+        link: targetUrlStr,
+        feedTitle: 'Deep Link',
+        pubDate: 'Today',
+        summary: '',
+        content: ''
+      };
+      selectArticle(pseudoArt, null);
+      if (typeof openInDefaultBrowser === 'function') {
+        openInDefaultBrowser(targetUrlStr);
+      }
+      showToast(`🌐 Opened deep link URL`, 'info');
+    } else {
+      showToast(`⚠️ Could not find article matching deep link`, 'warning');
+    }
+  } catch (err) {
+    console.error('Failed to handle deep link:', err);
+  }
+};
+
 // Global Article Selection by Link or Title for Citation Links
 function selectArticleByLink(urlOrTitle) {
   if (!urlOrTitle) return;
@@ -3616,6 +3713,10 @@ function selectArticleByLink(urlOrTitle) {
 }
 
 function handleAICitationClick(url, title) {
+  if (url && (url.startsWith('quickrss://') || url.startsWith('quick-rss://'))) {
+    window.handleDeepLink(url);
+    return;
+  }
   if (url && url.startsWith('http')) {
     openInDefaultBrowser(url);
   }
@@ -3662,6 +3763,14 @@ function escapeHTML(str) {
 function formatAIMarkdown(text, articles = []) {
   if (!text) return 'No response generated.';
   let html = escapeHTML(text);
+
+  // 0. Convert deep links [Title](quickrss://...) or [Title](quick-rss://...)
+  html = html.replace(/\[([^\]]+)\]\(((?:quickrss|quick-rss):\/\/[^\s\)]+)\)/gi, (match, linkText, url) => {
+    const cleanTitle = escapeHTML(linkText);
+    const cleanUrl = escapeHTML(url);
+    const safeUrl = cleanUrl.replace(/'/g, "\\'");
+    return `<a href="#" onclick="window.handleDeepLink('${safeUrl}'); return false;" class="ai-citation-tag" title="Open in Quick RSS">🔗 ${cleanTitle} ↗</a>`;
+  });
 
   // 1. Convert markdown links [Article N: Title](URL) or [Title](URL) into clickable citation tags
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, linkText, url) => {

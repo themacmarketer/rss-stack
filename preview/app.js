@@ -3457,6 +3457,8 @@ function setupAIChatbotUI() {
         panel.style.left = '';
         panel.style.right = '';
         panel.style.width = '';
+        panel.style.position = '';
+        panel.style.transform = '';
         panel.classList.add('pinned');
         pinBtn.classList.add('active');
         pinBtn.title = "Unpin / Unlock AI Assistant Window";
@@ -3464,6 +3466,11 @@ function setupAIChatbotUI() {
       } else {
         panel.style.height = '';
         panel.style.width = '';
+        panel.style.top = '';
+        panel.style.left = '';
+        panel.style.right = '';
+        panel.style.position = '';
+        panel.style.transform = '';
         panel.classList.remove('pinned');
         pinBtn.classList.remove('active');
         pinBtn.title = "Pin / Lock AI Assistant Window in place";

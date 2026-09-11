@@ -361,36 +361,56 @@
 
           <!-- Tab 4: AI Assistant Authentication -->
           <div class="tab-pane" id="pane-ai">
-            <!-- OpenAI Authentication -->
+            <!-- OpenAI PKCE OAuth Login -->
             <div class="setting-block">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-weight:600; margin:0;">OpenAI (OAuth Login)</label>
+                <label style="font-weight:600; margin:0;">OpenAI (PKCE OAuth 2.0)</label>
                 <span id="openai-oauth-status" class="oauth-badge disconnected">Disconnected</span>
               </div>
-              <p class="help-text">Sign in to your OpenAI account in browser, then paste your access token or key below.</p>
-              <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
-                <button type="button" class="btn-secondary" id="openai-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 Login with OpenAI (OAuth)</span>
+              <p class="help-text">Authenticate directly with your OpenAI account using PKCE OAuth 2.0 authorization flow.</p>
+              <div style="display:flex; gap:8px; margin-top:8px; margin-bottom:4px;">
+                <button type="button" class="btn-primary" id="openai-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                  <span>🔑 Login with OpenAI (OAuth)</span>
                 </button>
                 <button type="button" class="btn-secondary" id="openai-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>
-              <input type="password" id="ai-token-openai" placeholder="Paste OpenAI Session Token / Key..." />
+
+              <!-- OAuth Authorization Code Input Box -->
+              <div id="openai-code-box" style="display:none; margin-top:8px; background:rgba(0,122,255,0.06); padding:10px; border-radius:8px; border:1px solid rgba(0,122,255,0.2);">
+                <label style="font-size:11.5px; font-weight:600; color:var(--text-primary); margin-bottom:4px; display:block;">
+                  Paste Callback URL or Code from browser:
+                </label>
+                <div style="display:flex; gap:6px;">
+                  <input type="text" id="openai-auth-code-input" placeholder="http://localhost:1455/auth/callback?code=..." style="flex:1; font-size:11.5px;" />
+                  <button type="button" class="btn-sm primary" id="openai-submit-code-btn" style="white-space:nowrap; font-weight:600;">Complete OAuth</button>
+                </div>
+              </div>
             </div>
 
-            <!-- Claude / Anthropic Authentication -->
+            <!-- Claude / Anthropic PKCE OAuth Login -->
             <div class="setting-block" style="margin-top:14px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-weight:600; margin:0;">Claude / Anthropic (OAuth Login)</label>
+                <label style="font-weight:600; margin:0;">Claude / Anthropic (PKCE OAuth 2.0)</label>
                 <span id="claude-oauth-status" class="oauth-badge disconnected">Disconnected</span>
               </div>
-              <p class="help-text">Sign in to your Claude account in browser, then paste your access token or key below.</p>
-              <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
-                <button type="button" class="btn-secondary" id="claude-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 Login with Claude (OAuth)</span>
+              <p class="help-text">Authenticate directly with your Claude account using PKCE OAuth 2.0 authorization flow.</p>
+              <div style="display:flex; gap:8px; margin-top:8px; margin-bottom:4px;">
+                <button type="button" class="btn-primary" id="claude-oauth-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
+                  <span>🔑 Login with Claude (OAuth)</span>
                 </button>
                 <button type="button" class="btn-secondary" id="claude-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>
-              <input type="password" id="ai-token-claude" placeholder="Paste Claude Session Token / Key..." />
+
+              <!-- Claude OAuth Authorization Code Input Box -->
+              <div id="claude-code-box" style="display:none; margin-top:8px; background:rgba(112,182,67,0.06); padding:10px; border-radius:8px; border:1px solid rgba(112,182,67,0.25);">
+                <label style="font-size:11.5px; font-weight:600; color:var(--text-primary); margin-bottom:4px; display:block;">
+                  Paste Callback URL or Code from browser:
+                </label>
+                <div style="display:flex; gap:6px;">
+                  <input type="text" id="claude-auth-code-input" placeholder="http://localhost:1455/auth/callback?code=..." style="flex:1; font-size:11.5px;" />
+                  <button type="button" class="btn-sm primary" id="claude-submit-code-btn" style="white-space:nowrap; font-weight:600;">Complete OAuth</button>
+                </div>
+              </div>
             </div>
 
             <!-- OpenRouter API Key -->

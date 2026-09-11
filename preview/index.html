@@ -110,6 +110,56 @@
     <!-- COLUMN 2: Article List -->
     <div class="article-list-column">
       <div class="article-list-header">
+        <!-- AI Assistant Chatbot Bar -->
+        <div id="ai-chatbot-panel" class="ai-chatbot-panel">
+          <div class="ai-chat-header" id="ai-chat-header-toggle">
+            <div class="ai-chat-title">
+              <span class="ai-sparkle-icon">🤖</span>
+              <span>AI News Assistant</span>
+            </div>
+            <div class="ai-chat-header-actions" onclick="event.stopPropagation();">
+              <select id="ai-model-select" class="ai-model-select">
+                <optgroup label="OpenAI">
+                  <option value="openai:gpt-4o" selected>OpenAI — GPT-4o</option>
+                  <option value="openai:gpt-4o-mini">OpenAI — GPT-4o mini</option>
+                </optgroup>
+                <optgroup label="Claude (Anthropic)">
+                  <option value="claude:claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                  <option value="claude:claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                </optgroup>
+                <optgroup label="OpenRouter (API Key)">
+                  <option value="openrouter:auto">OpenRouter — Auto</option>
+                  <option value="openrouter:anthropic/claude-3.5-sonnet">OpenRouter — Claude 3.5 Sonnet</option>
+                  <option value="openrouter:openai/gpt-4o">OpenRouter — GPT-4o</option>
+                  <option value="openrouter:deepseek/deepseek-chat">OpenRouter — DeepSeek Chat</option>
+                </optgroup>
+              </select>
+              <button id="ai-settings-btn" class="ai-btn-icon" title="Configure AI API Keys & Auth">⚙️</button>
+              <button id="ai-toggle-btn" class="ai-btn-icon" title="Expand / Collapse AI Chatbot">▼</button>
+            </div>
+          </div>
+          <div id="ai-chat-body" class="ai-chat-body collapsed">
+            <div class="ai-quick-prompts">
+              <button class="quick-prompt-btn" data-prompt="Summarize the top news headlines right now">📰 Summarize Top News</button>
+              <button class="quick-prompt-btn" data-prompt="What are the latest AI model releases and research breakthroughs?">🚀 AI Model Releases</button>
+              <button class="quick-prompt-btn" data-prompt="Which companies have the most updates in the current articles?">🏢 Key Companies</button>
+            </div>
+            <div id="ai-chat-thread" class="ai-chat-thread">
+              <div class="ai-message assistant">
+                <div class="ai-avatar">🤖</div>
+                <div class="ai-msg-content">
+                  Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+                </div>
+              </div>
+            </div>
+            <div class="ai-chat-input-bar">
+              <input type="text" id="ai-chat-input" placeholder="Ask AI about news content (e.g. 'Summarize tech news')..." />
+              <button id="ai-chat-send-btn" class="ai-send-btn">Send ➔</button>
+              <button id="ai-chat-clear-btn" class="ai-clear-btn" title="Clear chat history">🗑️</button>
+            </div>
+          </div>
+        </div>
+
         <div class="search-bar-wrapper">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
             <path d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zM12 12l3 3"/>
@@ -186,6 +236,7 @@
       <div class="settings-body">
         <div class="settings-sidebar">
           <button class="settings-tab active" data-tab="general">General</button>
+          <button class="settings-tab" data-tab="ai">AI Assistant</button>
           <button class="settings-tab" data-tab="mcp">MCP Service</button>
           <button class="settings-tab" data-tab="opml">OPML & Sync</button>
         </div>
@@ -298,6 +349,26 @@
               <label>iCloud Subscription Sync</label>
               <input type="checkbox" id="icloud-sync-toggle" checked>
             </div>
+          </div>
+
+          <!-- Tab 4: AI Assistant Keys -->
+          <div class="tab-pane" id="pane-ai">
+            <div class="setting-block">
+              <label>OpenAI (API Key / OAuth Token)</label>
+              <input type="password" id="ai-key-openai" placeholder="sk-proj-..." />
+              <p class="help-text">Direct integration for GPT-4o & GPT-4o-mini.</p>
+            </div>
+            <div class="setting-block" style="margin-top:10px;">
+              <label>Claude / Anthropic (API Key / OAuth Token)</label>
+              <input type="password" id="ai-key-claude" placeholder="sk-ant-..." />
+              <p class="help-text">Direct integration for Claude 3.5 Sonnet & Haiku.</p>
+            </div>
+            <div class="setting-block" style="margin-top:10px;">
+              <label>OpenRouter (API Key)</label>
+              <input type="password" id="ai-key-openrouter" placeholder="sk-or-v1-..." />
+              <p class="help-text">Access DeepSeek, Llama, GPT-4o, Claude 3.5 via single OpenRouter API key.</p>
+            </div>
+            <button class="btn-primary" id="save-ai-keys-btn" style="margin-top:14px; width:100%;">Save AI Configuration</button>
           </div>
         </div>
       </div>

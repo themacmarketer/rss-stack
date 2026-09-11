@@ -1220,6 +1220,13 @@ window.executeMCPTool = async function(name, args = {}) {
       });
       return starred;
     }
+
+    if (name === 'chat_with_news') {
+      const query = args.query || args.prompt || '';
+      if (!query) return { error: 'Missing query/prompt parameter' };
+      const responseText = await processAIChatQuery(query);
+      return { success: true, query: query, response: responseText };
+    }
   } catch (err) {
     return { error: err.toString() };
   }
@@ -2910,7 +2917,322 @@ if (exportOpmlBtn) {
 }
 
 
+// AI Chatbot Engine & Preferences Storage
+const AI_KEYS_STORAGE_KEY = 'quickrss_ai_keys';
+
+function getAIKeys() {
+  try {
+    const raw = localStorage.getItem(AI_KEYS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { openai: '', claude: '', openrouter: '', preferredModel: 'openai:gpt-4o' };
+}
+
+function saveAIKeys(keysObj) {
+  try {
+    const existing = getAIKeys();
+    const updated = { ...existing, ...keysObj };
+    localStorage.setItem(AI_KEYS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {}
+}
+
+// Load AI keys into Settings UI
+function initAISettingsUI() {
+  const keys = getAIKeys();
+  const inputOpenAI = document.getElementById('ai-key-openai');
+  const inputClaude = document.getElementById('ai-key-claude');
+  const inputOpenRouter = document.getElementById('ai-key-openrouter');
+  const saveBtn = document.getElementById('save-ai-keys-btn');
+  const modelSelect = document.getElementById('ai-model-select');
+
+  if (inputOpenAI) inputOpenAI.value = keys.openai || '';
+  if (inputClaude) inputClaude.value = keys.claude || '';
+  if (inputOpenRouter) inputOpenRouter.value = keys.openrouter || '';
+  if (modelSelect && keys.preferredModel) modelSelect.value = keys.preferredModel;
+
+  if (saveBtn) {
+    saveBtn.onclick = () => {
+      saveAIKeys({
+        openai: inputOpenAI ? inputOpenAI.value.trim() : '',
+        claude: inputClaude ? inputClaude.value.trim() : '',
+        openrouter: inputOpenRouter ? inputOpenRouter.value.trim() : '',
+        preferredModel: modelSelect ? modelSelect.value : 'openai:gpt-4o'
+      });
+      showToast('✅ Saved AI API Key configuration!', 'success');
+    };
+  }
+
+  if (modelSelect) {
+    modelSelect.onchange = (e) => {
+      saveAIKeys({ preferredModel: e.target.value });
+    };
+  }
+}
+
+// AI Chatbot UI Interactivity
+function setupAIChatbotUI() {
+  const panel = document.getElementById('ai-chatbot-panel');
+  const headerToggle = document.getElementById('ai-chat-header-toggle');
+  const body = document.getElementById('ai-chat-body');
+  const toggleBtn = document.getElementById('ai-toggle-btn');
+  const settingsBtn = document.getElementById('ai-settings-btn');
+  const sendBtn = document.getElementById('ai-chat-send-btn');
+  const clearBtn = document.getElementById('ai-chat-clear-btn');
+  const chatInput = document.getElementById('ai-chat-input');
+  const chatThread = document.getElementById('ai-chat-thread');
+
+  if (!panel || !headerToggle || !body) return;
+
+  // Header Toggle (Expand / Collapse)
+  headerToggle.onclick = () => {
+    const isCollapsed = body.classList.contains('collapsed');
+    if (isCollapsed) {
+      body.classList.remove('collapsed');
+      if (toggleBtn) toggleBtn.textContent = '▲';
+    } else {
+      body.classList.add('collapsed');
+      if (toggleBtn) toggleBtn.textContent = '▼';
+    }
+  };
+
+  // Settings Icon click -> Open Settings Modal to AI tab
+  if (settingsBtn) {
+    settingsBtn.onclick = (e) => {
+      e.stopPropagation();
+      openSettings();
+      const aiTab = document.querySelector('.settings-tab[data-tab="ai"]');
+      if (aiTab) aiTab.click();
+    };
+  }
+
+  // Quick Prompt Chips
+  document.querySelectorAll('.quick-prompt-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const promptText = btn.dataset.prompt;
+      if (promptText) {
+        if (body.classList.contains('collapsed')) {
+          body.classList.remove('collapsed');
+          if (toggleBtn) toggleBtn.textContent = '▲';
+        }
+        sendUserAIMessage(promptText);
+      }
+    };
+  });
+
+  // Send Action
+  if (sendBtn && chatInput) {
+    sendBtn.onclick = () => {
+      const q = chatInput.value.trim();
+      if (q) {
+        chatInput.value = '';
+        sendUserAIMessage(q);
+      }
+    };
+
+    chatInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = chatInput.value.trim();
+        if (q) {
+          chatInput.value = '';
+          sendUserAIMessage(q);
+        }
+      }
+    };
+  }
+
+  // Clear Chat Thread
+  if (clearBtn && chatThread) {
+    clearBtn.onclick = () => {
+      chatThread.innerHTML = `
+        <div class="ai-message assistant">
+          <div class="ai-avatar">🤖</div>
+          <div class="ai-msg-content">
+            Thread cleared. How can I help you analyze your RSS news today?
+          </div>
+        </div>
+      `;
+    };
+  }
+}
+
+// Send User Message & Query Selected LLM Provider
+async function sendUserAIMessage(userQuery) {
+  const thread = document.getElementById('ai-chat-thread');
+  if (!thread) return;
+
+  // Append User Message
+  const userMsgDiv = document.createElement('div');
+  userMsgDiv.className = 'ai-message user';
+  userMsgDiv.innerHTML = `
+    <div class="ai-avatar">👤</div>
+    <div class="ai-msg-content">${escapeHTML(userQuery)}</div>
+  `;
+  thread.appendChild(userMsgDiv);
+
+  // Append Assistant Loading Indicator
+  const assistantMsgDiv = document.createElement('div');
+  assistantMsgDiv.className = 'ai-message assistant';
+  assistantMsgDiv.innerHTML = `
+    <div class="ai-avatar">🤖</div>
+    <div class="ai-msg-content">
+      <span style="color:#8e8e93;">⏳ Analyzing news articles & querying LLM...</span>
+    </div>
+  `;
+  thread.appendChild(assistantMsgDiv);
+  thread.scrollTop = thread.scrollHeight;
+
+  const responseText = await processAIChatQuery(userQuery);
+  assistantMsgDiv.querySelector('.ai-msg-content').innerHTML = formatAIMarkdown(responseText);
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function escapeHTML(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatAIMarkdown(text) {
+  if (!text) return 'No response generated.';
+  let html = escapeHTML(text);
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/^[•\*]\s+(.*)$/gm, '• $1');
+  html = html.replace(/\n/g, '<br/>');
+  return html;
+}
+
+// Gather RSS Context & Query Provider
+async function processAIChatQuery(userQuery) {
+  const modelSelect = document.getElementById('ai-model-select');
+  const rawModelVal = modelSelect ? modelSelect.value : 'openai:gpt-4o';
+  const parts = rawModelVal.split(':');
+  const provider = parts[0];
+  const modelName = parts.slice(1).join(':');
+
+  const keys = getAIKeys();
+
+  // Gather current loaded/filtered RSS articles for RAG
+  const articlesToUse = (loadedArticles && loadedArticles.length > 0)
+    ? loadedArticles.slice(0, 30)
+    : getAllFeedsFromTree(treeData).slice(0, 30);
+
+  let contextSnippet = 'Here are the latest news articles currently loaded in Quick RSS:\n';
+  articlesToUse.forEach((art, idx) => {
+    contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
+  });
+
+  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context provided below. Be concise, informative, and cite specific article numbers or titles when relevant.\n\n${contextSnippet}`;
+
+  try {
+    if (provider === 'openai') {
+      const apiKey = keys.openai;
+      if (!apiKey) {
+        return "⚠️ OpenAI API Key / OAuth Token is missing. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI key.";
+      }
+      return await queryOpenAI(systemPrompt, userQuery, modelName, apiKey);
+    } else if (provider === 'claude') {
+      const apiKey = keys.claude;
+      if (!apiKey) {
+        return "⚠️ Claude / Anthropic API Key is missing. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your Claude key.";
+      }
+      return await queryClaude(systemPrompt, userQuery, modelName, apiKey);
+    } else if (provider === 'openrouter') {
+      const apiKey = keys.openrouter;
+      if (!apiKey) {
+        return "⚠️ OpenRouter API Key is missing. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenRouter key.";
+      }
+      const actualModel = modelName === 'auto' ? 'anthropic/claude-3.5-sonnet' : modelName;
+      return await queryOpenRouter(systemPrompt, userQuery, actualModel, apiKey);
+    }
+  } catch (err) {
+    return `❌ AI API Error: ${err.message || err.toString()}`;
+  }
+
+  return "⚠️ Unknown LLM Provider selected.";
+}
+
+// OpenAI Chat Completions API Handler
+async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model || 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userQuery }
+      ],
+      max_tokens: 1024
+    })
+  });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content || 'No output generated from OpenAI.';
+}
+
+// Anthropic Claude Messages API Handler
+async function queryClaude(systemPrompt, userQuery, model, apiKey) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: model || 'claude-3-5-sonnet-20241022',
+      system: systemPrompt,
+      max_tokens: 1024,
+      messages: [
+        { role: 'user', content: userQuery }
+      ]
+    })
+  });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  return json.content?.[0]?.text || 'No output generated from Claude.';
+}
+
+// OpenRouter Chat Completions API Handler
+async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://quickrss.app',
+      'X-Title': 'Quick RSS Desktop'
+    },
+    body: JSON.stringify({
+      model: model || 'anthropic/claude-3.5-sonnet',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userQuery }
+      ],
+      max_tokens: 1024
+    })
+  });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content || 'No output generated from OpenRouter.';
+}
+
+
 // Initial Render & Load
 renderTree();
 fetchAndDisplayArticles('latest');
+initAISettingsUI();
+setupAIChatbotUI();
 

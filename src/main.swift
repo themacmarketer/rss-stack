@@ -505,6 +505,17 @@ class MCPServer {
                     "name": "get_starred_articles",
                     "description": "Fetch all starred/favorite RSS articles",
                     "inputSchema": ["type": "object", "properties": [:]]
+                ],
+                [
+                    "name": "chat_with_news",
+                    "description": "Ask AI assistant questions about all currently loaded RSS articles and news content",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "query": ["type": "string", "description": "Question or prompt for AI news assistant"]
+                        ],
+                        "required": ["query"]
+                    ]
                 ]
             ]
             let result: [String: Any] = ["tools": tools]

@@ -3186,6 +3186,78 @@ function initAISettingsUI() {
   }
 }
 
+// General Preferences Settings Engine
+function initGeneralSettingsUI() {
+  // 1. Article Description Lines Setting (0 to 4 lines)
+  const descLinesSelect = document.getElementById('setting-description-lines');
+  const savedLines = localStorage.getItem('quickrss_desc_lines') || '2';
+  document.documentElement.setAttribute('data-desc-lines', savedLines);
+  if (descLinesSelect) {
+    descLinesSelect.value = savedLines;
+    descLinesSelect.onchange = (e) => {
+      const val = e.target.value;
+      localStorage.setItem('quickrss_desc_lines', val);
+      document.documentElement.setAttribute('data-desc-lines', val);
+    };
+  }
+
+  // 2. Default Article View Mode (HTML vs Text)
+  const defaultViewSelect = document.getElementById('setting-default-view');
+  if (defaultViewSelect) {
+    const savedView = localStorage.getItem('quickrss_default_view') || 'html';
+    defaultViewSelect.value = savedView;
+    defaultArticleViewMode = savedView;
+
+    defaultViewSelect.onchange = (e) => {
+      const val = e.target.value;
+      localStorage.setItem('quickrss_default_view', val);
+      defaultArticleViewMode = val;
+    };
+  }
+
+  // 3. Auto Refresh Feeds Interval
+  const refreshIntervalSelect = document.getElementById('setting-refresh-interval');
+  if (refreshIntervalSelect) {
+    const savedRefresh = localStorage.getItem('quickrss_refresh_interval') || '30';
+    refreshIntervalSelect.value = savedRefresh;
+
+    refreshIntervalSelect.onchange = (e) => {
+      localStorage.setItem('quickrss_refresh_interval', e.target.value);
+    };
+  }
+
+  // 4. Article Link Opening (Default Mac Browser vs App)
+  const openLinkSelect = document.getElementById('setting-open-link');
+  if (openLinkSelect) {
+    const savedOpenLink = localStorage.getItem('quickrss_open_link') || 'browser';
+    openLinkSelect.value = savedOpenLink;
+
+    openLinkSelect.onchange = (e) => {
+      localStorage.setItem('quickrss_open_link', e.target.value);
+    };
+  }
+
+  // 5. Appearance Theme (System Default / Dark Mode / Light Mode)
+  const themeSelect = document.getElementById('setting-theme');
+  if (themeSelect) {
+    const savedTheme = localStorage.getItem('quickrss_theme') || 'system';
+    themeSelect.value = savedTheme;
+    if (savedTheme !== 'system') {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    themeSelect.onchange = (e) => {
+      const val = e.target.value;
+      localStorage.setItem('quickrss_theme', val);
+      if (val === 'system') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', val);
+      }
+    };
+  }
+}
+
 // AI Chatbot UI Interactivity
 function setupAIChatbotUI() {
   const panel = document.getElementById('ai-chatbot-panel');
@@ -3514,6 +3586,7 @@ async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
 // Initial Render & Load
 renderTree();
 fetchAndDisplayArticles('latest');
+initGeneralSettingsUI();
 initAISettingsUI();
 setupAIChatbotUI();
 

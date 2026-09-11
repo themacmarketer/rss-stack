@@ -1,10 +1,12 @@
 import AppKit
 import WebKit
 import UniformTypeIdentifiers
+import Network
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
+    var mcpServer: MCPServer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
@@ -30,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "openExternal")
         config.userContentController.add(self, name: "fetchURL")
         config.userContentController.add(self, name: "saveOPML")
+        config.userContentController.add(self, name: "mcpResponse")
         
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
@@ -46,13 +49,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             webView.load(URLRequest(url: fallbackURL))
         }
         
+        // Start Local MCP HTTP Server on Port 8745
+        mcpServer = MCPServer(webView: webView)
+        mcpServer?.start()
+
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML)
+    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML, mcpResponse)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
+        if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
+            mcpServer?.handleMCPResponse(requestId: requestId, result: result)
+        } else if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
         } else if message.name == "saveOPML", let xmlContent = message.body as? String {
             let savePanel = NSSavePanel()
@@ -203,6 +212,267 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
+    }
+}
+
+// Native Local MCP HTTP Server on Port 8745
+class MCPServer {
+    private var listener: NWListener?
+    private weak var webView: WKWebView?
+    private let mcpQueue = DispatchQueue(label: "com.quickrss.mcp", qos: .userInitiated)
+    let port: UInt16 = 8745
+    let token = "MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1"
+    
+    init(webView: WKWebView) {
+        self.webView = webView
+    }
+    
+    func start() {
+        do {
+            guard let nwPort = NWEndpoint.Port(rawValue: port) else { return }
+            let listener = try NWListener(using: .tcp, on: nwPort)
+            self.listener = listener
+            
+            listener.newConnectionHandler = { [weak self] connection in
+                self?.handleConnection(connection)
+            }
+            
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    print("✅ MCP Server listening on http://127.0.0.1:8745/mcp")
+                case .failed(let err):
+                    print("❌ MCP Server failed: \(err)")
+                default:
+                    break
+                }
+            }
+            
+            listener.start(queue: mcpQueue)
+        } catch {
+            print("❌ Failed to start MCP Server: \(error)")
+        }
+    }
+    
+    private func handleConnection(_ connection: NWConnection) {
+        connection.start(queue: mcpQueue)
+        receiveData(connection)
+    }
+    
+    private func receiveData(_ connection: NWConnection) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, context, isComplete, error in
+            guard let self = self, let data = data, !data.isEmpty else {
+                connection.cancel()
+                return
+            }
+            
+            let requestString = String(data: data, encoding: .utf8) ?? ""
+            let response = self.processHTTPRequest(requestString)
+            
+            if let responseData = response.data(using: .utf8) {
+                connection.send(content: responseData, completion: .contentProcessed({ _ in
+                    connection.cancel()
+                }))
+            } else {
+                connection.cancel()
+            }
+        }
+    }
+    
+    private func processHTTPRequest(_ req: String) -> String {
+        let lines = req.components(separatedBy: "\r\n")
+        guard let firstLine = lines.first else {
+            return makeHTTPResponse(status: 400, body: "{\"error\":\"Bad Request\"}")
+        }
+        
+        let parts = firstLine.components(separatedBy: " ")
+        guard parts.count >= 2 else {
+            return makeHTTPResponse(status: 400, body: "{\"error\":\"Bad Request\"}")
+        }
+        
+        let method = parts[0]
+        let pathWithQuery = parts[1]
+        
+        // CORS Preflight
+        if method == "OPTIONS" {
+            return "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nContent-Length: 0\r\n\r\n"
+        }
+        
+        // Validate Token
+        var tokenValid = pathWithQuery.contains("token=\(token)")
+        if !tokenValid {
+            for line in lines {
+                if line.lowercased().hasPrefix("authorization:") && line.contains(token) {
+                    tokenValid = true
+                    break
+                }
+            }
+        }
+        
+        if !tokenValid {
+            return makeHTTPResponse(status: 401, body: "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32001,\"message\":\"Unauthorized: Invalid Access Token\"}}")
+        }
+        
+        if method == "GET" {
+            let statusJson = "{\"status\":\"ok\",\"service\":\"Quick RSS MCP Server\",\"version\":\"1.0.0\",\"protocolVersion\":\"2024-11-05\"}"
+            return makeHTTPResponse(status: 200, body: statusJson)
+        }
+        
+        if method == "POST" {
+            if let bodyRange = req.range(of: "\r\n\r\n") {
+                let body = String(req[bodyRange.upperBound...])
+                if let bodyData = body.data(using: .utf8),
+                   let jsonObj = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any] {
+                    let rpcMethod = jsonObj["method"] as? String ?? ""
+                    let rpcId = jsonObj["id"] ?? 1
+                    let responseBody = self.handleJSONRPC(method: rpcMethod, params: jsonObj["params"] as? [String: Any], id: rpcId)
+                    return makeHTTPResponse(status: 200, body: responseBody)
+                }
+            }
+            return makeHTTPResponse(status: 200, body: "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"status\":\"ok\"}}")
+        }
+        
+        return makeHTTPResponse(status: 404, body: "{\"error\":\"Not Found\"}")
+    }
+    
+    private func handleJSONRPC(method: String, params: [String: Any]?, id: Any) -> String {
+        switch method {
+        case "initialize":
+            let result: [String: Any] = [
+                "protocolVersion": "2024-11-05",
+                "capabilities": ["tools": [:]],
+                "serverInfo": ["name": "Quick RSS", "version": "1.0.0"]
+            ]
+            let resDict: [String: Any] = ["jsonrpc": "2.0", "id": id, "result": result]
+            if let data = try? JSONSerialization.data(withJSONObject: resDict), let str = String(data: data, encoding: .utf8) {
+                return str
+            }
+        case "tools/list":
+            let tools: [[String: Any]] = [
+                [
+                    "name": "get_unread_articles",
+                    "description": "Fetch unread RSS articles from Quick RSS",
+                    "inputSchema": ["type": "object", "properties": [:]]
+                ],
+                [
+                    "name": "search_articles",
+                    "description": "Search RSS articles by keyword across all feeds",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "query": ["type": "string", "description": "Search keyword or query"]
+                        ],
+                        "required": ["query"]
+                    ]
+                ],
+                [
+                    "name": "add_feed",
+                    "description": "Subscribe to a new RSS feed",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": [
+                            "url": ["type": "string", "description": "RSS Feed URL"],
+                            "title": ["type": "string", "description": "Feed Title"]
+                        ],
+                        "required": ["url"]
+                    ]
+                ],
+                [
+                    "name": "mark_read",
+                    "description": "Mark an article as read",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": ["id": ["type": "string"]],
+                        "required": ["id"]
+                    ]
+                ],
+                [
+                    "name": "star",
+                    "description": "Star an article",
+                    "inputSchema": [
+                        "type": "object",
+                        "properties": ["id": ["type": "string"]],
+                        "required": ["id"]
+                    ]
+                ]
+            ]
+            let result: [String: Any] = ["tools": tools]
+            let resDict: [String: Any] = ["jsonrpc": "2.0", "id": id, "result": result]
+            if let data = try? JSONSerialization.data(withJSONObject: resDict), let str = String(data: data, encoding: .utf8) {
+                return str
+            }
+        case "tools/call":
+            let toolName = (params?["name"] as? String) ?? ""
+            let toolArgs = (params?["arguments"] as? [String: Any]) ?? [:]
+            
+            let textOutput = self.callJSTool(name: toolName, args: toolArgs)
+            let content: [[String: Any]] = [["type": "text", "text": textOutput]]
+            let result: [String: Any] = ["content": content]
+            let resDict: [String: Any] = ["jsonrpc": "2.0", "id": id, "result": result]
+            if let data = try? JSONSerialization.data(withJSONObject: resDict), let str = String(data: data, encoding: .utf8) {
+                return str
+            }
+        default:
+            let result: [String: Any] = ["status": "ok", "message": "Method \(method) handled"]
+            let resDict: [String: Any] = ["jsonrpc": "2.0", "id": id, "result": result]
+            if let data = try? JSONSerialization.data(withJSONObject: resDict), let str = String(data: data, encoding: .utf8) {
+                return str
+            }
+        }
+        
+        return "{\"jsonrpc\":\"2.0\",\"id\":\(id),\"result\":{\"status\":\"ok\"}}"
+    }
+    
+    private var mcpCallbacks: [String: (String) -> Void] = [:]
+    private let callbackLock = NSLock()
+
+    func handleMCPResponse(requestId: String, result: String) {
+        callbackLock.lock()
+        let cb = mcpCallbacks.removeValue(forKey: requestId)
+        callbackLock.unlock()
+        cb?(result)
+    }
+
+    private func callJSTool(name: String, args: [String: Any]) -> String {
+        guard let webView = self.webView else {
+            return "{\"error\":\"WKWebView not available\"}"
+        }
+        
+        let requestId = "req_\(UUID().uuidString)"
+        var resultJsonString = "[]"
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        callbackLock.lock()
+        mcpCallbacks[requestId] = { resStr in
+            resultJsonString = resStr
+            semaphore.signal()
+        }
+        callbackLock.unlock()
+        
+        DispatchQueue.main.async {
+            var argsJson = "{}"
+            if let data = try? JSONSerialization.data(withJSONObject: args),
+               let str = String(data: data, encoding: .utf8) {
+                argsJson = str
+            }
+            
+            let jsCode = "window.executeMCPToolNative('\(requestId)', '\(name)', \(argsJson))"
+            webView.evaluateJavaScript(jsCode, completionHandler: nil)
+        }
+        
+        _ = semaphore.wait(timeout: .now() + 5.0)
+        
+        callbackLock.lock()
+        _ = mcpCallbacks.removeValue(forKey: requestId)
+        callbackLock.unlock()
+        
+        return resultJsonString.isEmpty ? "[]" : resultJsonString
+    }
+    
+    private func makeHTTPResponse(status: Int, body: String) -> String {
+        let statusText = status == 200 ? "OK" : status == 401 ? "Unauthorized" : status == 400 ? "Bad Request" : "Not Found"
+        let dataLength = body.utf8.count
+        return "HTTP/1.1 \(status) \(statusText)\r\nContent-Type: application/json; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nContent-Length: \(dataLength)\r\nConnection: close\r\n\r\n\(body)"
     }
 }
 

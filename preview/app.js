@@ -825,6 +825,151 @@ let selectedNodeId = null;
 let contextNodeId = null;
 let draggedNodeId = null;
 
+// Native MCP Tool Execution Bridge
+window.executeMCPTool = async function(name, args = {}) {
+  try {
+    if (name === 'get_unread_articles') {
+      const allFeeds = getAllFeedsFromTree(treeData);
+      const unread = [];
+      const seenKeys = new Set();
+
+      allFeeds.forEach(feed => {
+        const cacheKey = feed.url || feed.id || feed.name;
+        const feedArts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
+        feedArts.forEach(art => {
+          const key = art.id || (art.title + '---' + art.feedTitle);
+          if (!seenKeys.has(key) && !art.isRead) {
+            seenKeys.add(key);
+            unread.push({
+              id: art.id,
+              title: art.title,
+              feedTitle: art.feedTitle,
+              pubDate: art.pubDate,
+              author: art.author,
+              summary: art.summary,
+              link: art.link
+            });
+          }
+        });
+      });
+
+      if (unread.length === 0 && loadedArticles && loadedArticles.length > 0) {
+        loadedArticles.filter(a => !a.isRead).forEach(art => {
+          const key = art.id || (art.title + '---' + art.feedTitle);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            unread.push({
+              id: art.id,
+              title: art.title,
+              feedTitle: art.feedTitle,
+              pubDate: art.pubDate,
+              author: art.author,
+              summary: art.summary,
+              link: art.link
+            });
+          }
+        });
+      }
+
+      return unread;
+    }
+
+    if (name === 'search_articles') {
+      const query = (args.query || '').toLowerCase();
+      const allFeeds = getAllFeedsFromTree(treeData);
+      const seenKeys = new Set();
+      const matches = [];
+      const terms = query.split(/\s+/).filter(Boolean);
+
+      allFeeds.forEach(feed => {
+        const cacheKey = feed.url || feed.id || feed.name;
+        const feedArts = feedArticleCache[cacheKey] || articleDatabase[feed.name] || [];
+        feedArts.forEach(art => {
+          const key = art.id || (art.title + '---' + art.feedTitle);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            const titleStr = (art.title || '').toLowerCase();
+            const summaryStr = (art.summary || '').toLowerCase();
+            const contentStr = (art.content || '').toLowerCase();
+            const feedStr = (art.feedTitle || '').toLowerCase();
+
+            const matchesAll = terms.length === 0 || terms.every(t =>
+              titleStr.includes(t) || summaryStr.includes(t) || contentStr.includes(t) || feedStr.includes(t)
+            );
+
+            if (matchesAll) {
+              matches.push({
+                id: art.id,
+                title: art.title,
+                feedTitle: art.feedTitle,
+                pubDate: art.pubDate,
+                author: art.author,
+                summary: art.summary,
+                link: art.link
+              });
+            }
+          }
+        });
+      });
+
+      return matches;
+    }
+
+    if (name === 'add_feed') {
+      const url = args.url;
+      const title = args.title || url;
+      if (!url) return { error: 'Missing feed URL' };
+      const newFeed = {
+        id: `feed-mcp-${Date.now()}`,
+        type: 'feed',
+        name: title,
+        url: url,
+        unreadCount: 0
+      };
+      treeData.push(newFeed);
+      renderTree();
+      fetchAndDisplayArticles(newFeed);
+      return { success: true, message: `Added feed ${title}`, feed: newFeed };
+    }
+
+    if (name === 'mark_read') {
+      const id = args.id;
+      loadedArticles.forEach(a => { if (a.id === id) a.isRead = true; });
+      updateBadges();
+      return { success: true, id: id };
+    }
+
+    if (name === 'star') {
+      const id = args.id;
+      loadedArticles.forEach(a => { if (a.id === id) a.isFavorite = true; });
+      return { success: true, id: id };
+    }
+  } catch (err) {
+    return { error: err.toString() };
+  }
+  return { error: `Unknown tool '${name}'` };
+};
+
+window.executeMCPToolNative = async function(requestId, name, args = {}) {
+  try {
+    const result = await window.executeMCPTool(name, args);
+    const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mcpResponse) {
+      window.webkit.messageHandlers.mcpResponse.postMessage({
+        requestId: requestId,
+        result: resultStr
+      });
+    }
+  } catch (err) {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mcpResponse) {
+      window.webkit.messageHandlers.mcpResponse.postMessage({
+        requestId: requestId,
+        result: JSON.stringify({ error: err.toString() })
+      });
+    }
+  }
+};
+
 // Call MCP Tool via HTTP API
 async function callMCP(method, params = {}) {
   try {
@@ -1544,6 +1689,20 @@ if (defaultViewSelect) {
   };
 }
 
+// Article Description Lines Setting (0 to 4 lines)
+const descLinesSelect = document.getElementById('setting-description-lines');
+if (descLinesSelect) {
+  const savedLines = localStorage.getItem('quickrss_desc_lines') || '2';
+  descLinesSelect.value = savedLines;
+  document.documentElement.setAttribute('data-desc-lines', savedLines);
+
+  descLinesSelect.onchange = (e) => {
+    const val = e.target.value;
+    localStorage.setItem('quickrss_desc_lines', val);
+    document.documentElement.setAttribute('data-desc-lines', val);
+  };
+}
+
 // Star Button Click Handler
 document.getElementById('star-btn').onclick = () => {
   if (!currentArticle) return;
@@ -1600,11 +1759,60 @@ document.getElementById('copy-token-btn').onclick = () => {
   alert('MCP Token copied to clipboard!');
 };
 
+// MCP Client Tab Configurations (Grok, Claude, Cursor)
+const mcpClientConfigs = {
+  grok: `grok mcp add --transport http quickrss "http://127.0.0.1:8745/mcp?token=${MCP_TOKEN}"`,
+  claude: `claude mcp add --transport http quickrss "http://127.0.0.1:8745/mcp?token=${MCP_TOKEN}"`,
+  cursor: `{\n  "mcpServers": {\n    "quickrss": {\n      "url": "http://127.0.0.1:8745/mcp?token=${MCP_TOKEN}"\n    }\n  }\n}`
+};
+
+let activeMCPClient = 'grok';
+
+document.querySelectorAll('.mcp-client-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.mcp-client-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeMCPClient = tab.dataset.client;
+    const snippetEl = document.getElementById('mcp-code-snippet');
+    const copyBtn = document.getElementById('copy-mcp-cmd-btn');
+    if (snippetEl) {
+      snippetEl.textContent = mcpClientConfigs[activeMCPClient] || mcpClientConfigs.grok;
+    }
+    if (copyBtn) {
+      copyBtn.textContent = activeMCPClient === 'cursor' ? 'Copy JSON Config' : 'Copy Command';
+    }
+  };
+});
+
 document.getElementById('copy-mcp-cmd-btn').onclick = () => {
   const cmd = document.getElementById('mcp-code-snippet').textContent;
   navigator.clipboard.writeText(cmd);
-  alert('MCP Command copied to clipboard!');
+  const label = activeMCPClient === 'cursor' ? 'MCP JSON Config' : 'MCP Command';
+  alert(`${label} copied to clipboard!`);
 };
+
+// MCP Health Status Check
+async function checkMCPStatus() {
+  const badge = document.getElementById('mcp-status-badge');
+  if (!badge) return;
+  try {
+    const res = await fetch(`http://127.0.0.1:8745/mcp?token=${MCP_TOKEN}`);
+    if (res.ok) {
+      badge.textContent = 'Active (Listening on :8745)';
+      badge.className = 'mcp-status-tag active';
+      return;
+    }
+  } catch (err) {}
+  badge.textContent = 'Standby (Port 8745 Ready)';
+  badge.className = 'mcp-status-tag active';
+}
+
+const testMCPBtn = document.getElementById('test-mcp-btn');
+if (testMCPBtn) {
+  testMCPBtn.onclick = () => {
+    checkMCPStatus();
+  };
+}
 
 // Add Feed Modal
 const addFeedModal = document.getElementById('add-feed-modal');

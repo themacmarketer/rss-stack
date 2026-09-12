@@ -73,7 +73,12 @@ cat <<EOF > "${CONTENTS_DIR}/Info.plist"
 </plist>
 EOF
 
+echo "✍️ Signing app bundle..."
+codesign --force --deep --sign - "${BUILD_DIR}"
+
 echo "🚀 Installing ${APP_NAME}.app to /Applications..."
 cp -R "${BUILD_DIR}" /Applications/
+codesign --force --deep --sign - "/Applications/${APP_NAME}.app"
 
 echo "✅ App successfully generated at /Applications/${APP_NAME}.app"
+

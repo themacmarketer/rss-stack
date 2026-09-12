@@ -688,7 +688,7 @@ let defaultTreeData = [
 
 function loadSavedTreeData() {
   try {
-    const saved = localStorage.getItem('quickrss_user_tree');
+    const saved = safeGetStorage('quickrss_user_tree');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -701,7 +701,7 @@ let treeData = loadSavedTreeData();
 
 function saveTreeData() {
   try {
-    localStorage.setItem('quickrss_user_tree', JSON.stringify(treeData));
+    safeSetStorage('quickrss_user_tree', JSON.stringify(treeData));
   } catch(e) {}
 }
 
@@ -1286,6 +1286,7 @@ function getTotalUnreadCount() {
 // Render Tree Hierarchy
 function renderTree() {
   const container = document.getElementById('tree-container');
+  if (!container) return;
   container.innerHTML = '';
   const rootUl = document.createElement('ul');
   rootUl.className = 'nav-list';
@@ -2268,19 +2269,21 @@ if (descLinesSelect) {
 }
 
 // Star Button Click Handler (Single Article)
-document.getElementById('star-btn').onclick = () => {
-  if (!currentArticle) return;
-  setArticleStarred(currentArticle);
-  const starBtn = document.getElementById('star-btn');
-  if (currentArticle.isFavorite) {
-    starBtn.classList.add('starred');
-    showToast(`Starred "${currentArticle.title.slice(0, 30)}..."`, 'success');
-  } else {
-    starBtn.classList.remove('starred');
-    showToast(`Unstarred "${currentArticle.title.slice(0, 30)}..."`, 'info');
-  }
-  renderArticleList(loadedArticles);
-};
+const mainStarBtn = document.getElementById('star-btn');
+if (mainStarBtn) {
+  mainStarBtn.onclick = () => {
+    if (!currentArticle) return;
+    setArticleStarred(currentArticle);
+    if (currentArticle.isFavorite) {
+      mainStarBtn.classList.add('starred');
+      showToast(`Starred "${currentArticle.title.slice(0, 30)}..."`, 'success');
+    } else {
+      mainStarBtn.classList.remove('starred');
+      showToast(`Unstarred "${currentArticle.title.slice(0, 30)}..."`, 'info');
+    }
+    renderArticleList(loadedArticles);
+  };
+}
 
 // Bulk Star / Unstar Handlers
 const bulkStarBtn = document.getElementById('bulk-star-btn');
@@ -2323,11 +2326,14 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Open in Browser
-document.getElementById('open-browser-btn').onclick = () => {
-  if (currentArticle && currentArticle.link) {
-    openInDefaultBrowser(currentArticle.link);
-  }
-};
+const openBrowserBtn = document.getElementById('open-browser-btn');
+if (openBrowserBtn) {
+  openBrowserBtn.onclick = () => {
+    if (currentArticle && currentArticle.link) {
+      openInDefaultBrowser(currentArticle.link);
+    }
+  };
+}
 
 
 // Settings Modal Navigation
@@ -2413,10 +2419,13 @@ document.querySelectorAll('.settings-tab').forEach(tab => {
 });
 
 // Copy Tokens & Commands
-document.getElementById('copy-token-btn').onclick = () => {
-  navigator.clipboard.writeText(MCP_TOKEN);
-  alert('MCP Token copied to clipboard!');
-};
+const copyTokenBtn = document.getElementById('copy-token-btn');
+if (copyTokenBtn) {
+  copyTokenBtn.onclick = () => {
+    navigator.clipboard.writeText(MCP_TOKEN);
+    alert('MCP Token copied to clipboard!');
+  };
+}
 
 // MCP Client Tab Configurations (Grok, Claude, Cursor)
 const mcpClientConfigs = {
@@ -2443,12 +2452,16 @@ document.querySelectorAll('.mcp-client-tab').forEach(tab => {
   };
 });
 
-document.getElementById('copy-mcp-cmd-btn').onclick = () => {
-  const cmd = document.getElementById('mcp-code-snippet').textContent;
-  navigator.clipboard.writeText(cmd);
-  const label = activeMCPClient === 'cursor' ? 'MCP JSON Config' : 'MCP Command';
-  alert(`${label} copied to clipboard!`);
-};
+const copyMcpCmdBtn = document.getElementById('copy-mcp-cmd-btn');
+if (copyMcpCmdBtn) {
+  copyMcpCmdBtn.onclick = () => {
+    const snippetEl = document.getElementById('mcp-code-snippet');
+    const cmd = snippetEl ? snippetEl.textContent : '';
+    navigator.clipboard.writeText(cmd);
+    const label = activeMCPClient === 'cursor' ? 'MCP JSON Config' : 'MCP Command';
+    alert(`${label} copied to clipboard!`);
+  };
+}
 
 // MCP Health Status Check
 async function checkMCPStatus() {
@@ -2709,10 +2722,14 @@ const deleteFolderModal = document.getElementById('delete-folder-modal');
 const renameFolderModal = document.getElementById('rename-folder-modal');
 const subfolderModal = document.getElementById('subfolder-modal');
 
-document.getElementById('add-folder-btn').onclick = () => {
-  document.getElementById('new-folder-name-input').value = 'New Folder';
-  addFolderModal.classList.remove('hidden');
-};
+const addFolderBtn = document.getElementById('add-folder-btn');
+if (addFolderBtn) {
+  addFolderBtn.onclick = () => {
+    const input = document.getElementById('new-folder-name-input');
+    if (input) input.value = 'New Folder';
+    if (addFolderModal) addFolderModal.classList.remove('hidden');
+  };
+}
 
 const closeAddFolderBtn = document.getElementById('close-add-folder-btn');
 const cancelAddFolderBtn = document.getElementById('cancel-add-folder-btn');
@@ -2829,13 +2846,17 @@ if (ctxOpenWebBtn) {
 }
 
 // Context Menu Action: New Subfolder Modal
-document.getElementById('ctx-new-subfolder').onclick = (e) => {
-  e.stopPropagation();
-  contextMenu.classList.add('hidden');
-  if (!contextNodeId) return;
-  document.getElementById('subfolder-name-input').value = 'New Subfolder';
-  subfolderModal.classList.remove('hidden');
-};
+const ctxNewSubfolder = document.getElementById('ctx-new-subfolder');
+if (ctxNewSubfolder) {
+  ctxNewSubfolder.onclick = (e) => {
+    e.stopPropagation();
+    if (contextMenu) contextMenu.classList.add('hidden');
+    if (!contextNodeId) return;
+    const input = document.getElementById('subfolder-name-input');
+    if (input) input.value = 'New Subfolder';
+    if (subfolderModal) subfolderModal.classList.remove('hidden');
+  };
+}
 
 const closeSubfolderBtn = document.getElementById('close-subfolder-btn');
 const cancelSubfolderBtn = document.getElementById('cancel-subfolder-btn');
@@ -2846,7 +2867,8 @@ if (cancelSubfolderBtn) cancelSubfolderBtn.onclick = () => subfolderModal.classL
 
 if (confirmSubfolderBtn) {
   confirmSubfolderBtn.onclick = () => {
-    const name = document.getElementById('subfolder-name-input').value.trim();
+    const input = document.getElementById('subfolder-name-input');
+    const name = input ? input.value.trim() : '';
     if (name && contextNodeId) {
       const pos = findNodePosition(treeData, contextNodeId);
       if (pos && pos.node.type === 'folder') {
@@ -2857,21 +2879,25 @@ if (confirmSubfolderBtn) {
         showToast(`Created subfolder "${name}"`, 'success');
       }
     }
-    subfolderModal.classList.add('hidden');
+    if (subfolderModal) subfolderModal.classList.add('hidden');
   };
 }
 
 // Context Menu Action: Rename Folder Modal
-document.getElementById('ctx-rename').onclick = (e) => {
-  e.stopPropagation();
-  contextMenu.classList.add('hidden');
-  if (!contextNodeId) return;
-  const pos = findNodePosition(treeData, contextNodeId);
-  if (pos) {
-    document.getElementById('rename-folder-input').value = pos.node.name;
-    renameFolderModal.classList.remove('hidden');
-  }
-};
+const ctxRename = document.getElementById('ctx-rename');
+if (ctxRename) {
+  ctxRename.onclick = (e) => {
+    e.stopPropagation();
+    if (contextMenu) contextMenu.classList.add('hidden');
+    if (!contextNodeId) return;
+    const pos = findNodePosition(treeData, contextNodeId);
+    if (pos) {
+      const input = document.getElementById('rename-folder-input');
+      if (input) input.value = pos.node.name;
+      if (renameFolderModal) renameFolderModal.classList.remove('hidden');
+    }
+  };
+}
 
 const closeRenameFolderBtn = document.getElementById('close-rename-folder-btn');
 const cancelRenameFolderBtn = document.getElementById('cancel-rename-folder-btn');
@@ -2882,7 +2908,8 @@ if (cancelRenameFolderBtn) cancelRenameFolderBtn.onclick = () => renameFolderMod
 
 if (confirmRenameFolderBtn) {
   confirmRenameFolderBtn.onclick = () => {
-    const newName = document.getElementById('rename-folder-input').value.trim();
+    const input = document.getElementById('rename-folder-input');
+    const newName = input ? input.value.trim() : '';
     if (newName && contextNodeId) {
       const pos = findNodePosition(treeData, contextNodeId);
       if (pos) {
@@ -2891,30 +2918,33 @@ if (confirmRenameFolderBtn) {
         showToast(`Renamed folder to "${newName}"`, 'success');
       }
     }
-    renameFolderModal.classList.add('hidden');
+    if (renameFolderModal) renameFolderModal.classList.add('hidden');
   };
 }
 
 // Context Menu Action: Delete Modal (Folder or Feed)
-document.getElementById('ctx-delete').onclick = (e) => {
-  e.stopPropagation();
-  contextMenu.classList.add('hidden');
-  if (!contextNodeId) return;
-  const pos = findNodePosition(treeData, contextNodeId);
-  if (pos) {
-    const isFolder = pos.node.type === 'folder';
-    const modalTitle = document.getElementById('delete-modal-title');
-    const msgEl = document.getElementById('delete-folder-message');
+const ctxDelete = document.getElementById('ctx-delete');
+if (ctxDelete) {
+  ctxDelete.onclick = (e) => {
+    e.stopPropagation();
+    if (contextMenu) contextMenu.classList.add('hidden');
+    if (!contextNodeId) return;
+    const pos = findNodePosition(treeData, contextNodeId);
+    if (pos) {
+      const isFolder = pos.node.type === 'folder';
+      const modalTitle = document.getElementById('delete-modal-title');
+      const msgEl = document.getElementById('delete-folder-message');
 
-    if (modalTitle) modalTitle.textContent = isFolder ? 'Delete Folder' : 'Delete Feed';
-    if (msgEl) {
-      msgEl.textContent = isFolder
-        ? `Are you sure you want to delete folder "${pos.node.name}" and all subfolders/feeds inside?`
-        : `Are you sure you want to delete feed "${pos.node.name}"?`;
+      if (modalTitle) modalTitle.textContent = isFolder ? 'Delete Folder' : 'Delete Feed';
+      if (msgEl) {
+        msgEl.textContent = isFolder
+          ? `Are you sure you want to delete folder "${pos.node.name}" and all subfolders/feeds inside?`
+          : `Are you sure you want to delete feed "${pos.node.name}"?`;
+      }
+      if (deleteFolderModal) deleteFolderModal.classList.remove('hidden');
     }
-    deleteFolderModal.classList.remove('hidden');
-  }
-};
+  };
+}
 
 const closeDeleteFolderBtn = document.getElementById('close-delete-folder-btn');
 const cancelDeleteFolderBtn = document.getElementById('cancel-delete-folder-btn');
@@ -3180,7 +3210,7 @@ const AI_KEYS_STORAGE_KEY = 'quickrss_ai_keys';
 
 function getAIKeys() {
   try {
-    const raw = localStorage.getItem(AI_KEYS_STORAGE_KEY);
+    const raw = safeGetStorage(AI_KEYS_STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
   return { openai: '', claude: '', openrouter: '', preferredModel: 'openai:gpt-4o' };
@@ -3190,25 +3220,25 @@ function saveAIKeys(keysObj) {
   try {
     const existing = getAIKeys();
     const updated = { ...existing, ...keysObj };
-    localStorage.setItem(AI_KEYS_STORAGE_KEY, JSON.stringify(updated));
+    safeSetStorage(AI_KEYS_STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {}
 }
 
 function getOpenAIOAuthToken() {
-  return localStorage.getItem('quickrss_openai_oauth_token') || getAIKeys().openai || '';
+  return safeGetStorage('quickrss_openai_oauth_token', '') || getAIKeys().openai || '';
 }
 
 function getClaudeOAuthToken() {
-  return localStorage.getItem('quickrss_claude_oauth_token') || getAIKeys().claude || '';
+  return safeGetStorage('quickrss_claude_oauth_token', '') || getAIKeys().claude || '';
 }
 
 function getXAuthToken() {
-  return localStorage.getItem('quickrss_x_auth_token') || '663c659bedde3f9aee2db74314f3b3a56d7aa4ee';
+  return safeGetStorage('quickrss_x_auth_token', '663c659bedde3f9aee2db74314f3b3a56d7aa4ee');
 }
 
 function setXAuthToken(token) {
   const cleanToken = (token || '').trim();
-  localStorage.setItem('quickrss_x_auth_token', cleanToken);
+  safeSetStorage('quickrss_x_auth_token', cleanToken);
   if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.setXAuthToken) {
     window.webkit.messageHandlers.setXAuthToken.postMessage(cleanToken);
   }
@@ -3333,7 +3363,7 @@ function initAISettingsUI() {
 
   if (openaiDiscBtn) {
     openaiDiscBtn.onclick = () => {
-      localStorage.removeItem('quickrss_openai_oauth_token');
+      safeRemoveStorage('quickrss_openai_oauth_token');
       saveAIKeys({ openai: '' });
       if (inputOpenAI) inputOpenAI.value = '';
       updateOAuthStatusUI();
@@ -3351,7 +3381,7 @@ function initAISettingsUI() {
 
   if (claudeDiscBtn) {
     claudeDiscBtn.onclick = () => {
-      localStorage.removeItem('quickrss_claude_oauth_token');
+      safeRemoveStorage('quickrss_claude_oauth_token');
       saveAIKeys({ claude: '' });
       if (inputClaude) inputClaude.value = '';
       updateOAuthStatusUI();
@@ -3373,15 +3403,15 @@ function initAISettingsUI() {
       const openrouterVal = inputOpenRouter ? inputOpenRouter.value.trim() : '';
 
       if (openaiVal) {
-        localStorage.setItem('quickrss_openai_oauth_token', openaiVal);
+        safeSetStorage('quickrss_openai_oauth_token', openaiVal);
       } else {
-        localStorage.removeItem('quickrss_openai_oauth_token');
+        safeRemoveStorage('quickrss_openai_oauth_token');
       }
 
       if (claudeVal) {
-        localStorage.setItem('quickrss_claude_oauth_token', claudeVal);
+        safeSetStorage('quickrss_claude_oauth_token', claudeVal);
       } else {
-        localStorage.removeItem('quickrss_claude_oauth_token');
+        safeRemoveStorage('quickrss_claude_oauth_token');
       }
 
       saveAIKeys({
@@ -3407,13 +3437,13 @@ function initAISettingsUI() {
 function initGeneralSettingsUI() {
   // 1. Article Description Lines Setting (0 to 4 lines)
   const descLinesSelect = document.getElementById('setting-description-lines');
-  const savedLines = localStorage.getItem('quickrss_desc_lines') || '2';
+  const savedLines = safeGetStorage('quickrss_desc_lines', '2');
   document.documentElement.setAttribute('data-desc-lines', savedLines);
   if (descLinesSelect) {
     descLinesSelect.value = savedLines;
     descLinesSelect.onchange = (e) => {
       const val = e.target.value;
-      localStorage.setItem('quickrss_desc_lines', val);
+      safeSetStorage('quickrss_desc_lines', val);
       document.documentElement.setAttribute('data-desc-lines', val);
     };
   }
@@ -3421,11 +3451,11 @@ function initGeneralSettingsUI() {
   // 1b. Timestamp & Date Format Setting
   const dateFormatSelect = document.getElementById('setting-date-format');
   if (dateFormatSelect) {
-    const savedFormat = localStorage.getItem('quickrss_date_format') || 'relative';
+    const savedFormat = safeGetStorage('quickrss_date_format', 'relative');
     dateFormatSelect.value = savedFormat;
     dateFormatSelect.onchange = (e) => {
       const val = e.target.value;
-      localStorage.setItem('quickrss_date_format', val);
+      safeSetStorage('quickrss_date_format', val);
       if (loadedArticles && loadedArticles.length > 0) {
         renderArticleList(loadedArticles);
       }
@@ -3435,13 +3465,13 @@ function initGeneralSettingsUI() {
   // 2. Default Article View Mode (HTML vs Text)
   const defaultViewSelect = document.getElementById('setting-default-view');
   if (defaultViewSelect) {
-    const savedView = localStorage.getItem('quickrss_default_view') || 'html';
+    const savedView = safeGetStorage('quickrss_default_view', 'html');
     defaultViewSelect.value = savedView;
     defaultArticleViewMode = savedView;
 
     defaultViewSelect.onchange = (e) => {
       const val = e.target.value;
-      localStorage.setItem('quickrss_default_view', val);
+      safeSetStorage('quickrss_default_view', val);
       defaultArticleViewMode = val;
     };
   }
@@ -3449,29 +3479,29 @@ function initGeneralSettingsUI() {
   // 3. Auto Refresh Feeds Interval
   const refreshIntervalSelect = document.getElementById('setting-refresh-interval');
   if (refreshIntervalSelect) {
-    const savedRefresh = localStorage.getItem('quickrss_refresh_interval') || '30';
+    const savedRefresh = safeGetStorage('quickrss_refresh_interval', '30');
     refreshIntervalSelect.value = savedRefresh;
 
     refreshIntervalSelect.onchange = (e) => {
-      localStorage.setItem('quickrss_refresh_interval', e.target.value);
+      safeSetStorage('quickrss_refresh_interval', e.target.value);
     };
   }
 
   // 4. Article Link Opening (Default Mac Browser vs App)
   const openLinkSelect = document.getElementById('setting-open-link');
   if (openLinkSelect) {
-    const savedOpenLink = localStorage.getItem('quickrss_open_link') || 'browser';
+    const savedOpenLink = safeGetStorage('quickrss_open_link', 'browser');
     openLinkSelect.value = savedOpenLink;
 
     openLinkSelect.onchange = (e) => {
-      localStorage.setItem('quickrss_open_link', e.target.value);
+      safeSetStorage('quickrss_open_link', e.target.value);
     };
   }
 
   // 5. Appearance Theme (System Default / Dark Mode / Light Mode)
   const themeSelect = document.getElementById('setting-theme');
   if (themeSelect) {
-    const savedTheme = localStorage.getItem('quickrss_theme') || 'system';
+    const savedTheme = safeGetStorage('quickrss_theme', 'system');
     themeSelect.value = savedTheme;
     if (savedTheme !== 'system') {
       document.documentElement.setAttribute('data-theme', savedTheme);
@@ -3479,7 +3509,7 @@ function initGeneralSettingsUI() {
 
     themeSelect.onchange = (e) => {
       const val = e.target.value;
-      localStorage.setItem('quickrss_theme', val);
+      safeSetStorage('quickrss_theme', val);
       if (val === 'system') {
         document.documentElement.removeAttribute('data-theme');
       } else {
@@ -4032,11 +4062,41 @@ async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
 }
 
 
+function safeGetStorage(key, fallback = null) {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function safeSetStorage(key, val) {
+  try {
+    localStorage.setItem(key, val);
+  } catch (e) {}
+}
+
+function safeRemoveStorage(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {}
+}
+
 // Initial Render & Load
-renderTree();
-fetchAndDisplayArticles('latest');
-updateBadges();
-initGeneralSettingsUI();
-initAISettingsUI();
-setupAIChatbotUI();
+function startApp() {
+  renderTree();
+  fetchAndDisplayArticles('latest');
+  updateBadges();
+  initGeneralSettingsUI();
+  initAISettingsUI();
+  setupAIChatbotUI();
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    startApp();
+  } else {
+    document.addEventListener('DOMContentLoaded', startApp);
+  }
+}
 

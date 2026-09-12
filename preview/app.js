@@ -1251,11 +1251,30 @@ async function callMCP(method, params = {}) {
   return null;
 }
 
-// Compute Aggregate Unread Count Recursively
+// Compute Aggregate Unread Count Recursively (including nested subfolders and cached live feeds)
 function getAggregateUnreadCount(item) {
-  if (item.type === 'feed') return item.unreadCount || 0;
-  if (item.children && item.children.length > 0) {
+  if (!item) return 0;
+  if (item.type === 'feed') {
+    const cacheKey = item.url || item.id || item.name;
+    const readSet = (typeof getReadArticleIdsFromStorage === 'function') ? getReadArticleIdsFromStorage() : new Set();
+    if (feedArticleCache[cacheKey] && Array.isArray(feedArticleCache[cacheKey]) && feedArticleCache[cacheKey].length > 0) {
+      const unread = feedArticleCache[cacheKey].filter(a => !a.isRead && !readSet.has(getArticleKey(a)));
+      return unread.length;
+    }
+    if (articleDatabase[item.name] && Array.isArray(articleDatabase[item.name])) {
+      const unread = articleDatabase[item.name].filter(a => !a.isRead && !readSet.has(getArticleKey(a)));
+      return unread.length;
+    }
+    if (typeof item.unreadCount === 'number' && !isNaN(item.unreadCount)) {
+      return item.unreadCount;
+    }
+    return 0;
+  }
+  if (item.children && Array.isArray(item.children) && item.children.length > 0) {
     return item.children.reduce((sum, child) => sum + getAggregateUnreadCount(child), 0);
+  }
+  if (typeof item.unreadCount === 'number' && !isNaN(item.unreadCount)) {
+    return item.unreadCount;
   }
   return 0;
 }
@@ -1588,7 +1607,39 @@ function applyPersistedArticleStates(articles) {
   return articles;
 }
 
+function updateTreeBadges() {
+  function updateNodeBadge(node) {
+    const li = document.querySelector(`.tree-node[data-id="${node.id}"]`);
+    if (li) {
+      const row = li.querySelector('.node-row');
+      if (row) {
+        const count = getAggregateUnreadCount(node);
+        let badge = row.querySelector('.item-badge');
+        if (count > 0) {
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'item-badge';
+            row.appendChild(badge);
+          }
+          badge.textContent = count;
+        } else if (badge) {
+          badge.remove();
+        }
+      }
+    }
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach(updateNodeBadge);
+    }
+  }
+
+  if (Array.isArray(treeData)) {
+    treeData.forEach(updateNodeBadge);
+  }
+}
+
 function updateBadges() {
+  updateTreeBadges();
+
   const total = getTotalUnreadCount();
   const badgeAll = document.getElementById('badge-all');
   if (badgeAll) badgeAll.textContent = total;
@@ -1856,6 +1907,7 @@ async function fetchAndDisplayArticles(target) {
   // Fetch articles for target feeds in parallel
   const articlesLists = await Promise.all(targetFeeds.map(f => getArticlesForFeed(f)));
   let pool = applyPersistedArticleStates(articlesLists.flat());
+  updateBadges();
 
   let items = [];
   if (typeof target === 'string') {

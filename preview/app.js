@@ -2107,14 +2107,37 @@ function renderReaderBody() {
       const containerId = `html-pane-${Date.now()}`;
 
       if (isXUrl) {
+        const pubDateFormatted = art.pubDate ? new Date(art.pubDate).toLocaleString() : '';
+        const postContent = art.htmlContent || art.content || art.summary || `<div>No content preview available. Click <strong>Open on 𝕏 ↗</strong> to view original post.</div>`;
+
         readerContainer.innerHTML = `
           <div class="html-view-container">
             <div class="html-view-bar">
               <span class="html-view-url-label">🌐 Web View: <a href="#" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link}</a></span>
               <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
             </div>
-            <div id="${containerId}" class="html-view-scroll-pane">
-              <iframe src="${art.link}" class="html-view-iframe" allow="autoplay; encrypted-media; clipboard-write" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <div id="${containerId}" class="html-view-scroll-pane" style="padding: 24px;">
+              <div class="x-post-card" style="max-width: 680px; margin: 20px auto; padding: 24px; background: var(--bg-card, #ffffff); border: 1px solid var(--border-color, rgba(0,0,0,0.12)); border-radius: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.06); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 50%; background: #0f1419; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px;">
+                      𝕏
+                    </div>
+                    <div>
+                      <div style="font-weight: 700; font-size: 16px; color: var(--text-primary, #0f1419);">${art.author || art.feedTitle || '𝕏 Post'}</div>
+                      <div style="font-size: 13px; color: #8e8e93;">${pubDateFormatted}</div>
+                    </div>
+                  </div>
+                  <button class="btn-sm-open" style="background: #0f1419; color: #fff; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer;" onclick="openInDefaultBrowser('${art.link}')">Open on 𝕏 ↗</button>
+                </div>
+                <div class="x-post-body" style="font-size: 16px; line-height: 1.6; color: var(--text-primary, #0f1419); margin-bottom: 20px; word-break: break-word;">
+                  ${postContent}
+                </div>
+                <div style="border-top: 1px solid var(--border-color, rgba(0,0,0,0.08)); padding-top: 14px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #8e8e93;">
+                  <span>🔗 <a href="#" onclick="openInDefaultBrowser('${art.link}'); return false;" style="color: #1d9bf0; text-decoration: none; word-break: break-all;">${art.link}</a></span>
+                  <span style="font-size: 12px;">Quick RSS 𝕏 Reader</span>
+                </div>
+              </div>
             </div>
           </div>
         `;

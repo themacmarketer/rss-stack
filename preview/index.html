@@ -306,6 +306,16 @@
                 <option value="light">Light Mode</option>
               </select>
             </div>
+            <div class="setting-block" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+              <label style="font-weight: 600; color: var(--text-primary); font-size: 13px;">🔑 X.com (Twitter) Auth Token</label>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <input type="text" id="setting-x-authtoken" placeholder="Paste X.com auth_token cookie..." style="flex:1; font-family: monospace; font-size: 12px; padding: 6px 10px;" />
+                <button class="btn-sm" id="save-x-token-btn">Save Token</button>
+              </div>
+              <div style="font-size: 11px; color: #8e8e93; margin-top: 4px;">
+                Injects your <code style="background:rgba(0,0,0,0.06); padding:1px 4px; border-radius:3px;">auth_token</code> cookie into WebKit for x.com & twitter.com so post web views load logged-in content instead of login walls.
+              </div>
+            </div>
           </div>
 
           <!-- Tab 2: MCP Service -->

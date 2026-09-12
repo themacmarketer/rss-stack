@@ -2102,7 +2102,24 @@ function renderReaderBody() {
     const hasLiveUrl = art.link && art.link.startsWith('http');
     
     if (hasLiveUrl) {
+      const isXUrl = art.link.includes('x.com/') || art.link.includes('twitter.com/');
       const containerId = `html-pane-${Date.now()}`;
+
+      if (isXUrl) {
+        readerContainer.innerHTML = `
+          <div class="html-view-container">
+            <div class="html-view-bar">
+              <span class="html-view-url-label">🌐 Web View: <a href="#" onclick="openInDefaultBrowser('${art.link}'); return false;">${art.link}</a></span>
+              <button class="btn-sm-open" onclick="openInDefaultBrowser('${art.link}')">Open in Default Browser ↗</button>
+            </div>
+            <div id="${containerId}" class="html-view-scroll-pane">
+              <iframe src="${art.link}" class="html-view-iframe" allow="autoplay; encrypted-media; clipboard-write" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
       readerContainer.innerHTML = `
         <div class="html-view-container">
           <div class="html-view-bar">
@@ -3185,6 +3202,19 @@ function getClaudeOAuthToken() {
   return localStorage.getItem('quickrss_claude_oauth_token') || getAIKeys().claude || '';
 }
 
+function getXAuthToken() {
+  return localStorage.getItem('quickrss_x_auth_token') || '663c659bedde3f9aee2db74314f3b3a56d7aa4ee';
+}
+
+function setXAuthToken(token) {
+  const cleanToken = (token || '').trim();
+  localStorage.setItem('quickrss_x_auth_token', cleanToken);
+  if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.setXAuthToken) {
+    window.webkit.messageHandlers.setXAuthToken.postMessage(cleanToken);
+  }
+}
+
+
 function updateOAuthStatusUI() {
   const openaiStatusEl = document.getElementById('openai-oauth-status');
   const openaiOAuthBtn = document.getElementById('openai-oauth-btn');
@@ -3455,6 +3485,20 @@ function initGeneralSettingsUI() {
       } else {
         document.documentElement.setAttribute('data-theme', val);
       }
+    };
+  }
+
+  // 6. X.com (Twitter) Auth Token
+  const xTokenInput = document.getElementById('setting-x-authtoken');
+  const saveXTokenBtn = document.getElementById('save-x-token-btn');
+  if (xTokenInput) {
+    xTokenInput.value = getXAuthToken();
+  }
+  if (saveXTokenBtn) {
+    saveXTokenBtn.onclick = () => {
+      const val = xTokenInput ? xTokenInput.value : '';
+      setXAuthToken(val);
+      showToast('🔑 X.com Auth Token saved & WebKit cookies updated!', 'success');
     };
   }
 }

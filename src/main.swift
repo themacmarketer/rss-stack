@@ -78,6 +78,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "fetchURL")
         config.userContentController.add(self, name: "saveOPML")
         config.userContentController.add(self, name: "mcpResponse")
+        config.userContentController.add(self, name: "setXAuthToken")
         
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
@@ -85,6 +86,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         webView.navigationDelegate = self
         
         window.contentView?.addSubview(webView)
+
+        // Inject stored X (Twitter) auth_token cookie
+        let storedToken = UserDefaults.standard.string(forKey: "quickrss_x_auth_token") ?? "663c659bedde3f9aee2db74314f3b3a56d7aa4ee"
+        setXAuthTokenCookie(storedToken)
         
         if let htmlPath = Bundle.main.path(forResource: "index", ofType: "html") {
             let url = URL(fileURLWithPath: htmlPath)
@@ -102,10 +107,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML, mcpResponse)
+    func setXAuthTokenCookie(_ token: String) {
+        let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanToken.isEmpty else { return }
+        
+        let cookieStore = WKWebsiteDataStore.default().httpCookieStore
+        let domains = [".x.com", "x.com", ".twitter.com", "twitter.com"]
+        for dom in domains {
+            if let cookie = HTTPCookie(properties: [
+                .domain: dom,
+                .path: "/",
+                .name: "auth_token",
+                .value: cleanToken,
+                .secure: "TRUE",
+                .expires: Date(timeIntervalSinceNow: 315360000)
+            ]) {
+                cookieStore.setCookie(cookie, completionHandler: nil)
+            }
+        }
+    }
+
+    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML, mcpResponse, setXAuthToken)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
             mcpServer?.handleMCPResponse(requestId: requestId, result: result)
+        } else if message.name == "setXAuthToken", let token = message.body as? String {
+            UserDefaults.standard.set(token, forKey: "quickrss_x_auth_token")
+            setXAuthTokenCookie(token)
         } else if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
             let scheme = url.scheme?.lowercased() ?? ""
             if scheme == "quickrss" || scheme == "quick-rss" {
@@ -140,7 +168,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         } else if message.name == "fetchURL", let dict = message.body as? [String: Any], let urlString = dict["url"] as? String, let requestId = dict["requestId"] as? String, let url = URL(string: urlString) {
             
             var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10.0)
-            if urlString.contains("reddit.com") {
+            if urlString.contains("x.com") || urlString.contains("twitter.com") {
+                let timeToken = Int(Date().timeIntervalSince1970)
+                request.setValue("desktop:com.quickrss.app:v1.0.0 (by /u/quickrss_\(timeToken))", forHTTPHeaderField: "User-Agent")
+                let authToken = UserDefaults.standard.string(forKey: "quickrss_x_auth_token") ?? "663c659bedde3f9aee2db74314f3b3a56d7aa4ee"
+                if !authToken.isEmpty {
+                    request.setValue("auth_token=\(authToken)", forHTTPHeaderField: "Cookie")
+                }
+            } else if urlString.contains("reddit.com") {
                 let timeToken = Int(Date().timeIntervalSince1970)
                 request.setValue("desktop:com.quickrss.app:v1.0.0 (by /u/quickrss_\(timeToken))", forHTTPHeaderField: "User-Agent")
             } else {

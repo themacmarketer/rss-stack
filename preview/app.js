@@ -3571,13 +3571,49 @@ function setupAIChatbotUI() {
 
   if (!panel) return;
 
-  let isAIPinned = false;
+  let isAIPinned = safeGetStorage('quickrss_ai_pinned', 'true') === 'true';
+
+  function applyPinState() {
+    if (isAIPinned) {
+      panel.style.top = '';
+      panel.style.left = '';
+      panel.style.right = '';
+      panel.style.width = '';
+      panel.style.position = '';
+      panel.style.transform = '';
+      panel.classList.add('pinned');
+      if (pinBtn) {
+        pinBtn.classList.add('active');
+        pinBtn.title = "Unpin / Unlock AI Assistant Window";
+      }
+    } else {
+      panel.style.height = '';
+      panel.style.width = '';
+      panel.style.top = '';
+      panel.style.left = '';
+      panel.style.right = '';
+      panel.style.position = '';
+      panel.style.transform = '';
+      panel.classList.remove('pinned');
+      if (pinBtn) {
+        pinBtn.classList.remove('active');
+        pinBtn.title = "Pin / Lock AI Assistant Window in place";
+      }
+    }
+  }
+
+  // Apply default pinned state on load
+  applyPinState();
 
   // Toggle Trigger Button
   if (triggerBtn) {
     triggerBtn.onclick = (e) => {
       e.stopPropagation();
+      const isOpening = panel.classList.contains('hidden');
       panel.classList.toggle('hidden');
+      if (isOpening) {
+        applyPinState();
+      }
     };
   }
 
@@ -3586,28 +3622,11 @@ function setupAIChatbotUI() {
     pinBtn.onclick = (e) => {
       e.stopPropagation();
       isAIPinned = !isAIPinned;
+      safeSetStorage('quickrss_ai_pinned', isAIPinned ? 'true' : 'false');
+      applyPinState();
       if (isAIPinned) {
-        panel.style.top = '';
-        panel.style.left = '';
-        panel.style.right = '';
-        panel.style.width = '';
-        panel.style.position = '';
-        panel.style.transform = '';
-        panel.classList.add('pinned');
-        pinBtn.classList.add('active');
-        pinBtn.title = "Unpin / Unlock AI Assistant Window";
         showToast('📌 AI Assistant pinned inside column below search bar', 'success');
       } else {
-        panel.style.height = '';
-        panel.style.width = '';
-        panel.style.top = '';
-        panel.style.left = '';
-        panel.style.right = '';
-        panel.style.position = '';
-        panel.style.transform = '';
-        panel.classList.remove('pinned');
-        pinBtn.classList.remove('active');
-        pinBtn.title = "Pin / Lock AI Assistant Window in place";
         showToast('Unpinned AI Assistant window', 'info');
       }
     };

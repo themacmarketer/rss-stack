@@ -1142,6 +1142,37 @@ body {
   color: var(--text-primary);
 }
 
+/* Responsive Media Constraints for X Posts & Reader Views */
+.x-post-card,
+.x-post-body,
+.reader-html-body,
+.formatted-html-view {
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.x-post-card img,
+.x-post-card video,
+.x-post-card iframe,
+.x-post-card svg,
+.x-post-body img,
+.x-post-body video,
+.x-post-body iframe,
+.x-post-body svg,
+.reader-html-body img,
+.reader-html-body video,
+.reader-html-body iframe,
+.formatted-html-view img,
+.formatted-html-view video,
+.formatted-html-view iframe {
+  max-width: 100% !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+  border-radius: 12px;
+  margin: 12px 0;
+  display: block;
+}
+
 /* OPML Status Message Box */
 .opml-status-box {
   margin-top: 12px;

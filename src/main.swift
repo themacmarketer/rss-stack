@@ -79,6 +79,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "saveOPML")
         config.userContentController.add(self, name: "mcpResponse")
         config.userContentController.add(self, name: "setXAuthToken")
+        config.userContentController.add(self, name: "saveStarredArticles")
+        config.userContentController.add(self, name: "saveReadArticles")
+        config.userContentController.add(self, name: "saveUserTree")
+
+        // Inject stored UserDefault states into WKWebView localStorage at DocumentStart
+        var initScript = ""
+        if let starredJson = UserDefaults.standard.string(forKey: "quickrss_starred_articles") {
+            let safeStarred = starredJson.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
+            initScript += "try { localStorage.setItem('quickrss_starred_articles', '\(safeStarred)'); } catch(e){}\n"
+        }
+        if let readJson = UserDefaults.standard.string(forKey: "quickrss_read_article_ids") {
+            let safeRead = readJson.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
+            initScript += "try { localStorage.setItem('quickrss_read_article_ids', '\(safeRead)'); } catch(e){}\n"
+        }
+        if let treeJson = UserDefaults.standard.string(forKey: "quickrss_user_tree") {
+            let safeTree = treeJson.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
+            initScript += "try { localStorage.setItem('quickrss_user_tree', '\(safeTree)'); } catch(e){}\n"
+        }
+        
+        if !initScript.isEmpty {
+            let userScript = WKUserScript(source: initScript, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            config.userContentController.addUserScript(userScript)
+        }
         
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
@@ -127,13 +150,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         }
     }
 
-    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML, mcpResponse, setXAuthToken)
+    // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML, mcpResponse, setXAuthToken, saveStarredArticles, saveReadArticles, saveUserTree)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
             mcpServer?.handleMCPResponse(requestId: requestId, result: result)
         } else if message.name == "setXAuthToken", let token = message.body as? String {
             UserDefaults.standard.set(token, forKey: "quickrss_x_auth_token")
             setXAuthTokenCookie(token)
+        } else if message.name == "saveStarredArticles", let json = message.body as? String {
+            UserDefaults.standard.set(json, forKey: "quickrss_starred_articles")
+        } else if message.name == "saveReadArticles", let json = message.body as? String {
+            UserDefaults.standard.set(json, forKey: "quickrss_read_article_ids")
+        } else if message.name == "saveUserTree", let json = message.body as? String {
+            UserDefaults.standard.set(json, forKey: "quickrss_user_tree")
         } else if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
             let scheme = url.scheme?.lowercased() ?? ""
             if scheme == "quickrss" || scheme == "quick-rss" {

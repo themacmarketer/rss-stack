@@ -701,7 +701,11 @@ let treeData = loadSavedTreeData();
 
 function saveTreeData() {
   try {
-    safeSetStorage('quickrss_user_tree', JSON.stringify(treeData));
+    const jsonStr = JSON.stringify(treeData);
+    safeSetStorage('quickrss_user_tree', jsonStr);
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.saveUserTree) {
+      window.webkit.messageHandlers.saveUserTree.postMessage(jsonStr);
+    }
   } catch(e) {}
 }
 
@@ -1518,7 +1522,11 @@ function getStarredArticlesFromStorage() {
 
 function saveStarredArticlesToStorage(starredArray) {
   try {
-    localStorage.setItem(STARRED_ARTICLES_KEY, JSON.stringify(starredArray));
+    const jsonStr = JSON.stringify(starredArray);
+    safeSetStorage(STARRED_ARTICLES_KEY, jsonStr);
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.saveStarredArticles) {
+      window.webkit.messageHandlers.saveStarredArticles.postMessage(jsonStr);
+    }
   } catch (e) {}
 }
 
@@ -1571,7 +1579,11 @@ function getReadArticleIdsFromStorage() {
 
 function saveReadArticleIdsToStorage(readSet) {
   try {
-    localStorage.setItem(READ_ARTICLES_KEY, JSON.stringify(Array.from(readSet)));
+    const jsonStr = JSON.stringify(Array.from(readSet));
+    safeSetStorage(READ_ARTICLES_KEY, jsonStr);
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.saveReadArticles) {
+      window.webkit.messageHandlers.saveReadArticles.postMessage(jsonStr);
+    }
   } catch (e) {}
 }
 
@@ -3068,6 +3080,14 @@ function setupColumnResizers() {
 
   if (!resizer1 || !resizer2) return;
 
+  function checkCompact() {
+    if (sidebar) {
+      const w = sidebar.getBoundingClientRect().width;
+      sidebar.classList.toggle('compact-toolbar', w < 250);
+    }
+  }
+  checkCompact();
+
   let isResizing1 = false;
   let isResizing2 = false;
 
@@ -3089,8 +3109,9 @@ function setupColumnResizers() {
 
   document.addEventListener('mousemove', (e) => {
     if (isResizing1) {
-      const newWidth = Math.max(180, Math.min(480, e.clientX));
+      const newWidth = Math.max(160, Math.min(480, e.clientX));
       sidebar.style.width = `${newWidth}px`;
+      checkCompact();
     } else if (isResizing2) {
       const sidebarWidth = sidebar.getBoundingClientRect().width;
       const newWidth = Math.max(220, Math.min(650, e.clientX - sidebarWidth));
@@ -3106,6 +3127,7 @@ function setupColumnResizers() {
       resizer2.classList.remove('dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      checkCompact();
     }
   });
 }

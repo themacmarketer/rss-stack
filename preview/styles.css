@@ -104,6 +104,8 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  container-type: inline-size;
+  container-name: sidebar;
 }
 
 .sidebar-header {
@@ -124,15 +126,18 @@ body {
 .action-toolbar {
   padding: 6px 10px;
   display: flex;
-  gap: 6px;
+  gap: 5px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .toolbar-btn {
+  flex: 1;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 5px 9px;
+  padding: 5px 6px;
   background: var(--bg-reader);
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -141,6 +146,11 @@ body {
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.toolbar-btn svg {
+  flex-shrink: 0;
 }
 
 .toolbar-btn:hover {
@@ -156,6 +166,31 @@ body {
 
 .toolbar-btn.primary:hover {
   background: #62a338;
+}
+
+/* Compact Toolbar Mode when Sidebar is narrowed (< 250px) */
+@container sidebar (max-width: 250px) {
+  .action-toolbar {
+    padding: 6px 6px;
+    gap: 4px;
+  }
+  .toolbar-btn .btn-text {
+    display: none;
+  }
+  .toolbar-btn {
+    padding: 6px 4px;
+  }
+}
+
+.sidebar.compact-toolbar .action-toolbar {
+  padding: 6px 6px;
+  gap: 4px;
+}
+.sidebar.compact-toolbar .toolbar-btn .btn-text {
+  display: none;
+}
+.sidebar.compact-toolbar .toolbar-btn {
+  padding: 6px 4px;
 }
 
 @keyframes spinRefresh {

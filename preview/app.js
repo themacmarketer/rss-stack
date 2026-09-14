@@ -1889,6 +1889,60 @@ async function getArticlesForFeed(feed) {
   return applyPersistedArticleStates(articles);
 }
 
+// Manual & Periodic Feed Refresh System
+async function refreshAllFeeds(isManual = false) {
+  const refreshBtn = document.getElementById('refresh-feeds-btn');
+  const refreshIcon = refreshBtn ? refreshBtn.querySelector('.refresh-icon') : null;
+  if (refreshIcon) refreshIcon.classList.add('spinning');
+  
+  if (isManual) showToast('🔄 Refreshing all RSS feeds...', 'info');
+
+  // Purge in-memory feed article cache to force fresh native RSS fetch
+  for (const k of Object.keys(feedArticleCache)) {
+    delete feedArticleCache[k];
+  }
+
+  try {
+    const allFeeds = getAllFeedsFromTree();
+    await Promise.all(allFeeds.map(feed => getArticlesForFeed(feed)));
+    renderTree();
+    if (activeFilter) {
+      fetchAndDisplayArticles(activeFilter);
+    } else if (activeFeedId) {
+      renderFeedArticles(activeFeedId);
+    } else {
+      fetchAndDisplayArticles('all');
+    }
+    updateBadges();
+    if (isManual) showToast('✅ All RSS feeds updated!', 'success');
+  } catch (err) {
+    console.error('Error refreshing feeds:', err);
+  } finally {
+    if (refreshIcon) refreshIcon.classList.remove('spinning');
+  }
+}
+
+let autoRefreshIntervalTimer = null;
+
+function setupAutoRefreshTimer() {
+  if (autoRefreshIntervalTimer) {
+    clearInterval(autoRefreshIntervalTimer);
+    autoRefreshIntervalTimer = null;
+  }
+
+  const intervalMinStr = safeGetStorage('quickrss_refresh_interval', '30');
+  const intervalMin = parseInt(intervalMinStr, 10);
+
+  if (!isNaN(intervalMin) && intervalMin > 0) {
+    const ms = intervalMin * 60 * 1000;
+    autoRefreshIntervalTimer = setInterval(() => {
+      console.log(`⏰ Auto-refreshing feeds (configured interval: ${intervalMin}m)...`);
+      refreshAllFeeds(false);
+    }, ms);
+  }
+}
+
+
 // Fetch & Display Articles for Filter, Folder, or Feed
 async function fetchAndDisplayArticles(target) {
   const container = document.getElementById('article-list-container');
@@ -2338,12 +2392,25 @@ if (bulkUnstarBtn) {
   };
 }
 
-// Keyboard Shortcut 'S' to Star/Unstar Selected Article
+// Refresh Feeds Button Handler & Keyboard Shortcut (Cmd+R / Ctrl+R)
+const refreshFeedsBtn = document.getElementById('refresh-feeds-btn');
+if (refreshFeedsBtn) {
+  refreshFeedsBtn.onclick = () => {
+    refreshAllFeeds(true);
+  };
+}
+
+// Keyboard Shortcuts ('S' for Star, 'Cmd+R' for Refresh)
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'r' || e.key === 'R')) {
+    e.preventDefault();
+    refreshAllFeeds(true);
+  }
   if (e.key === 's' || e.key === 'S') {
     if (currentArticle) {
-      document.getElementById('star-btn').click();
+      const starBtn = document.getElementById('star-btn');
+      if (starBtn) starBtn.click();
     }
   }
 });
@@ -3507,6 +3574,7 @@ function initGeneralSettingsUI() {
 
     refreshIntervalSelect.onchange = (e) => {
       safeSetStorage('quickrss_refresh_interval', e.target.value);
+      setupAutoRefreshTimer();
     };
   }
 
@@ -4132,6 +4200,7 @@ function startApp() {
   initGeneralSettingsUI();
   initAISettingsUI();
   setupAIChatbotUI();
+  setupAutoRefreshTimer();
 }
 
 if (typeof document !== 'undefined') {

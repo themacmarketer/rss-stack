@@ -1323,7 +1323,7 @@ function createNodeElement(node, depth) {
   if (isFolder) {
     const chevron = document.createElement('span');
     chevron.className = `chevron ${node.expanded ? 'expanded' : ''}`;
-    chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>`;
+    chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg>`;
     chevron.onclick = (e) => {
       e.stopPropagation();
       node.expanded = !node.expanded;
@@ -1340,10 +1340,10 @@ function createNodeElement(node, depth) {
   const iconSpan = document.createElement('span');
   if (isFolder) {
     iconSpan.className = 'icon-box folder-icon';
-    iconSpan.innerHTML = `<svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 3l.04.87a1.99 1.99 0 0 0-.342 1.311l.637 7A2 2 0 0 0 2.826 14H13.174a2 2 0 0 0 1.991-1.819l.637-7A1.99 1.99 0 0 0 15.46 3.87L15.5 3A1.5 1.5 0 0 0 14 1.5H8.828a1.5 1.5 0 0 1-1.06-.44L6.44.73A1.5 1.5 0 0 0 5.378.293H2A1.5 1.5 0 0 0 .5 1.793V3z"/></svg>`;
+    iconSpan.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 13V4a1.5 1.5 0 0 1 1.5-1.5h3.5L8 4.5h6.5A1.5 1.5 0 0 1 16 6v7a1.5 1.5 0 0 1-1.5 1.5h-11.5A1.5 1.5 0 0 1 1.5 13z"/></svg>`;
   } else {
     iconSpan.className = 'icon-box feed-icon';
-    iconSpan.innerHTML = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2zm1.5 2.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm0 4a5.5 5.5 0 0 1 5.5 5.5h-2a3.5 3.5 0 0 0-3.5-3.5v-2zm0 4a9.5 9.5 0 0 1 9.5 9.5h-2a7.5 7.5 0 0 0-7.5-7.5v-2z"/></svg>`;
+    iconSpan.innerHTML = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="3.5" cy="12.5" r="1.25" fill="currentColor"/><path d="M2.5 7.5a6 6 0 0 1 6 6"/><path d="M2.5 2.5a11 11 0 0 1 11 11"/></svg>`;
   }
   leftDiv.appendChild(iconSpan);
 
@@ -3135,32 +3135,40 @@ function setupColumnResizers() {
 setupColumnResizers();
 
 
-// Toast & OPML Status Notification System
+// Toast & OPML Status Notification System (Modern macOS UX)
 function showToast(msg, type = 'success') {
   let toastContainer = document.getElementById('toast-container');
   if (!toastContainer) {
     toastContainer = document.createElement('div');
     toastContainer.id = 'toast-container';
-    toastContainer.style.cssText = 'position:fixed; top:54px; right:20px; z-index:3000; display:flex; flex-direction:column; gap:8px; pointer-events:none;';
     document.body.appendChild(toastContainer);
   }
 
   const toast = document.createElement('div');
-  const bg = type === 'error' ? '#ff3b30' : (type === 'info' ? '#007aff' : '#70b643');
-  toast.style.cssText = `background:${bg}; color:#ffffff; padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; box-shadow:0 10px 25px rgba(0,0,0,0.25); opacity:0; transform:translateY(-10px); transition:all 0.2s ease; pointer-events:auto;`;
-  toast.textContent = msg;
+  toast.className = `toast-notification toast-${type}`;
+
+  let iconSvg = '';
+  if (type === 'success') {
+    iconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3.75 9 6.5 11.75 12.25 4.75"/></svg>`;
+  } else if (type === 'info') {
+    iconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="8" x2="8" y2="11.5"/><line x1="8" y1="5" x2="8" y2="5.5"/></svg>`;
+  } else if (type === 'warning') {
+    iconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.25L1.5 13.5h13L8 2.25z"/><line x1="8" y1="6.5" x2="8" y2="9.5"/><line x1="8" y1="11.5" x2="8" y2="11.5"/></svg>`;
+  } else {
+    iconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="10" y1="6" x2="6" y2="10"/><line x1="6" y1="6" x2="10" y2="10"/></svg>`;
+  }
+
+  toast.innerHTML = `<span class="toast-icon">${iconSvg}</span><span class="toast-message">${msg}</span>`;
   toastContainer.appendChild(toast);
 
   requestAnimationFrame(() => {
-    toast.style.opacity = '1';
-    toast.style.transform = 'translateY(0)';
+    toast.classList.add('visible');
   });
 
   setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(-10px)';
-    setTimeout(() => toast.remove(), 250);
-  }, 4000);
+    toast.classList.remove('visible');
+    setTimeout(() => toast.remove(), 260);
+  }, 3800);
 }
 
 function showOPMLStatus(msg, type = 'success') {

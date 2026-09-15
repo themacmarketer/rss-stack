@@ -124,7 +124,7 @@ body {
 }
 
 .action-toolbar {
-  padding: 10px 12px;
+  padding: 12px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
@@ -137,8 +137,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 7px 10px;
-  height: 34px;
+  padding: 8px 12px;
+  height: 36px;
   background: var(--bg-reader);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -180,8 +180,8 @@ body {
   box-shadow: 0 3px 8px rgba(112, 182, 67, 0.4);
 }
 
-/* Compact Toolbar Mode when Sidebar is narrowed (< 210px) */
-@container sidebar (max-width: 210px) {
+/* Compact Toolbar Mode when Sidebar is narrowed (< 170px) */
+@container sidebar (max-width: 170px) {
   .action-toolbar {
     padding: 8px 6px;
     gap: 6px;

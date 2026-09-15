@@ -3083,7 +3083,7 @@ function setupColumnResizers() {
   function checkCompact() {
     if (sidebar) {
       const w = sidebar.getBoundingClientRect().width;
-      sidebar.classList.toggle('compact-toolbar', w < 250);
+      sidebar.classList.toggle('compact-toolbar', w < 170);
     }
   }
   checkCompact();

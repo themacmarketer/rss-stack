@@ -4452,12 +4452,13 @@ function startApp() {
   updateBadges();
   initGeneralSettingsUI();
   initAISettingsUI();
-  setupAIChatbotUI();
-  setupAutoRefreshTimer();
+  if (typeof setupSearchUI === 'function') setupSearchUI();
+  if (typeof setupAIChatbotUI === 'function') setupAIChatbotUI();
+  if (typeof setupAutoRefreshTimer === 'function') setupAutoRefreshTimer();
 
   // Async background network update after initial UI paint
   setTimeout(() => {
-    refreshAllFeeds(false);
+    if (typeof refreshAllFeeds === 'function') refreshAllFeeds(false);
   }, 800);
 }
 

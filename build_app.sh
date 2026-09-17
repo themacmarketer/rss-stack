@@ -23,6 +23,8 @@ echo "🎨 Copying UI resources..."
 cp preview/index.html "${RESOURCES_DIR}/"
 cp preview/styles.css "${RESOURCES_DIR}/"
 cp preview/app.js "${RESOURCES_DIR}/"
+mkdir -p "${RESOURCES_DIR}/js"
+cp -R preview/js/ "${RESOURCES_DIR}/js/"
 if [ -f "assets/AppIcon.icns" ]; then
   cp assets/AppIcon.icns "${RESOURCES_DIR}/"
 fi

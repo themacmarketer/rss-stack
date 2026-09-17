@@ -10,11 +10,23 @@
 		</data>
 		<key>Resources/app.js</key>
 		<data>
-		xGh8UBXM1MMBzGZbqkEMb015tSc=
+		xfHLPygoOnIdRmgsuWrKZgjdVlw=
 		</data>
 		<key>Resources/index.html</key>
 		<data>
-		/L4E11QECtMD6JJL78k7KJoqQPY=
+		qwjekLKD9P6JiZQJPDrijIFTySw=
+		</data>
+		<key>Resources/js/ai-assistant.js</key>
+		<data>
+		d1mR7yr6ESvL3WQLND1C1uO5JCY=
+		</data>
+		<key>Resources/js/cache-engine.js</key>
+		<data>
+		VTk8GUyXZQCnMHwb7bwyLqqvHqU=
+		</data>
+		<key>Resources/js/search-engine.js</key>
+		<data>
+		L6Zx5BIF9YFGUrspD7cxvSSjoSs=
 		</data>
 		<key>Resources/styles.css</key>
 		<data>
@@ -34,14 +46,35 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			RSKea7zJVrJpMZ+scZ7wTsTzi/likGhPNNWWV8coxTQ=
+			Lrn1MDzf1XSOOXHnjYTsdqXyO6UxvAvLVg0GEn7Eozs=
 			</data>
 		</dict>
 		<key>Resources/index.html</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			083bIS2ja0dKfIUO1qCiqdIPrhjh/dTTrUd3jAJFs6c=
+			RBsc2VQ2rrPSFG6O5etFtH4QhfuSd3VsGfVevOwkNTI=
+			</data>
+		</dict>
+		<key>Resources/js/ai-assistant.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			kRctBw4qK9wX9w4LU91SSE8TvAekU9WzquwhFjx/Omo=
+			</data>
+		</dict>
+		<key>Resources/js/cache-engine.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			RaGNvATjUjh8NjCgBfgG/vQrgTsKya7biTrhLSBPYko=
+			</data>
+		</dict>
+		<key>Resources/js/search-engine.js</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			dYz2jcI01p4CAOyfkmG76JN35Ff3rVxHleUwYIjQ7Q8=
 			</data>
 		</dict>
 		<key>Resources/styles.css</key>

@@ -855,6 +855,8 @@ const articleDatabase = {
 
 // App State
 let loadedArticles = [];
+let activeFilter = 'latest';
+let activeFeedId = null;
 let currentArticle = null;
 let selectedNodeId = null;
 let contextNodeId = null;
@@ -1917,7 +1919,86 @@ function renderArticleList(articles, emptyMessage = 'No articles in this feed.')
   });
 }
 
-// Render Reader View in Selected View Mode (HTML View vs Text View)
+async function fetchAndDisplayArticles(target, preferFast = false) {
+  let articlesToDisplay = [];
+  let emptyMsg = 'No articles in this view.';
+
+  try {
+    const allFeeds = (typeof getAllFeedsFromTree === 'function') ? getAllFeedsFromTree(treeData) : [];
+
+    if (typeof target === 'string') {
+      activeFilter = target;
+      activeFeedId = null;
+
+      const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f, preferFast)));
+      const allArticlesPool = articlesLists.flat();
+
+      const seenKeys = new Set();
+      const uniquePool = [];
+      allArticlesPool.forEach(art => {
+        const key = art.id || (art.title + '---' + art.feedTitle);
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniquePool.push(art);
+        }
+      });
+
+      if (typeof getArticleTimestamp === 'function') {
+        uniquePool.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+      }
+
+      if (target === 'starred') {
+        const starredList = getStarredArticlesFromStorage();
+        const starredKeys = new Set(starredList.map(a => getArticleKey(a)));
+        articlesToDisplay = uniquePool.filter(a => starredKeys.has(getArticleKey(a)) || a.isFavorite);
+        emptyMsg = 'No starred articles yet. Click the star icon to save articles here.';
+      } else if (target === 'read') {
+        const readSet = getReadArticleIdsFromStorage();
+        articlesToDisplay = uniquePool.filter(a => readSet.has(getArticleKey(a)) || a.isRead);
+        emptyMsg = 'No read articles yet.';
+      } else if (target === 'latest') {
+        articlesToDisplay = uniquePool.slice(0, 30);
+        emptyMsg = 'No recent news articles.';
+      } else {
+        // 'all'
+        articlesToDisplay = uniquePool;
+        emptyMsg = 'No articles found across all subscriptions.';
+      }
+    } else if (target && typeof target === 'object') {
+      activeFeedId = target.id || null;
+      activeFilter = null;
+
+      if (target.type === 'feed') {
+        articlesToDisplay = await getArticlesForFeed(target, preferFast);
+        emptyMsg = `No articles in feed "${target.name || 'Selected Feed'}".`;
+      } else if (target.type === 'folder') {
+        const folderFeeds = getAllFeedsFromTree([target]);
+        const lists = await Promise.all(folderFeeds.map(f => getArticlesForFeed(f, preferFast)));
+        const pool = lists.flat();
+        const seen = new Set();
+        pool.forEach(art => {
+          const k = art.id || (art.title + '---' + art.feedTitle);
+          if (!seen.has(k)) {
+            seen.add(k);
+            articlesToDisplay.push(art);
+          }
+        });
+        if (typeof getArticleTimestamp === 'function') {
+          articlesToDisplay.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+        }
+        emptyMsg = `No articles in folder "${target.name || 'Selected Folder'}".`;
+      } else {
+        articlesToDisplay = await getArticlesForFeed(target, preferFast);
+      }
+    }
+  } catch (err) {
+    console.error('Error in fetchAndDisplayArticles:', err);
+  }
+
+  loadedArticles = articlesToDisplay;
+  renderArticleList(articlesToDisplay, emptyMsg);
+  updateBadges();
+}
 function selectArticle(art, cardEl) {
   currentArticle = art;
   document.querySelectorAll('.article-item-card').forEach(c => c.classList.remove('selected'));
@@ -2905,7 +2986,8 @@ function showToast(msg, type = 'success') {
   toast.innerHTML = `<span class="toast-icon">${iconSvg}</span><span class="toast-message">${msg}</span>`;
   toastContainer.appendChild(toast);
 
-  requestAnimationFrame(() => {
+  const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
+  raf(() => {
     toast.classList.add('visible');
   });
 

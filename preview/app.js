@@ -908,11 +908,11 @@ window.executeMCPTool = async function(name, args = {}) {
     }
 
     if (name === 'search_articles') {
-      const query = (args.query || '').toLowerCase();
+      const rawQuery = (args.query || '').trim();
+      const terms = rawQuery.toLowerCase().split(/\s+/).filter(Boolean);
       const allFeeds = getAllFeedsFromTree(treeData);
       const seenKeys = new Set();
       const matches = [];
-      const terms = query.split(/\s+/).filter(Boolean);
 
       allFeeds.forEach(feed => {
         const cacheKey = feed.url || feed.id || feed.name;
@@ -921,14 +921,14 @@ window.executeMCPTool = async function(name, args = {}) {
           const key = art.id || (art.title + '---' + art.feedTitle);
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
-            const titleStr = (art.title || '').toLowerCase();
-            const summaryStr = (art.summary || '').toLowerCase();
-            const contentStr = (art.content || '').toLowerCase();
-            const feedStr = (art.feedTitle || '').toLowerCase();
+            const titleStr = art.title || '';
+            const summaryStr = art.summary || '';
+            const contentStr = art.content || art.htmlContent || '';
+            const authorStr = art.author || '';
+            const feedStr = art.feedTitle || '';
 
-            const matchesAll = terms.length === 0 || terms.every(t =>
-              titleStr.includes(t) || summaryStr.includes(t) || contentStr.includes(t) || feedStr.includes(t)
-            );
+            const combinedText = `${titleStr} ${summaryStr} ${authorStr} ${feedStr} ${contentStr}`;
+            const matchesAll = terms.length === 0 || terms.every(t => fuzzyMatchTerm(t, combinedText));
 
             if (matchesAll) {
               matches.push(art);
@@ -936,6 +936,8 @@ window.executeMCPTool = async function(name, args = {}) {
           }
         });
       });
+
+      matches.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
 
       return matches.map(formatArticleForMCP);
     }
@@ -2750,6 +2752,82 @@ document.querySelectorAll('.filter-item').forEach(item => {
   };
 });
 
+function getArticleTimestamp(art) {
+  if (!art || !art.pubDate) return 0;
+  if (typeof art.pubDate === 'number') return art.pubDate;
+  const str = String(art.pubDate).trim();
+  const d = new Date(str);
+  const time = d.getTime();
+  if (!isNaN(time)) return time;
+
+  const lower = str.toLowerCase();
+  const now = new Date();
+  if (lower.startsWith('today')) {
+    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      now.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    }
+    return now.getTime();
+  }
+  if (lower.startsWith('yesterday')) {
+    const yesterday = new Date(now.getTime() - 86400000);
+    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      yesterday.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    }
+    return yesterday.getTime();
+  }
+
+  return 0;
+}
+
+function levenshteinDistance(a, b) {
+  const alen = a.length;
+  const blen = b.length;
+  if (alen === 0) return blen;
+  if (blen === 0) return alen;
+
+  let row = new Array(alen + 1);
+  for (let i = 0; i <= alen; i++) row[i] = i;
+
+  for (let i = 1; i <= blen; i++) {
+    let prev = i;
+    for (let j = 1; j <= alen; j++) {
+      let val;
+      if (b[i - 1] === a[j - 1]) {
+        val = row[j - 1];
+      } else {
+        val = Math.min(row[j - 1] + 1, prev + 1, row[j] + 1);
+      }
+      row[j - 1] = prev;
+      prev = val;
+    }
+    row[alen] = prev;
+  }
+  return row[alen];
+}
+
+function fuzzyMatchTerm(term, text) {
+  if (!text || !term) return false;
+  const lowerTerm = term.toLowerCase();
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes(lowerTerm)) return true;
+  if (lowerTerm.length <= 2) return false;
+
+  const maxDist = lowerTerm.length > 5 ? 2 : 1;
+  const words = lowerText.split(/[^a-z0-9]+/);
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (!w) continue;
+    if (w.startsWith(lowerTerm)) return true;
+    if (Math.abs(w.length - lowerTerm.length) > maxDist) continue;
+    if (levenshteinDistance(lowerTerm, w) <= maxDist) return true;
+  }
+
+  return false;
+}
+
 // Search Bar Input Filtering Across All Feeds & Articles
 const searchInput = document.getElementById('search-input');
 if (searchInput) {
@@ -2796,22 +2874,18 @@ if (searchInput) {
       const terms = query.split(/\s+/).filter(Boolean);
 
       const filtered = uniquePool.filter(art => {
-        const titleStr = (art.title || '').toLowerCase();
-        const summaryStr = (art.summary || '').toLowerCase();
-        const contentStr = (art.content || '').toLowerCase();
-        const htmlStr = (art.htmlContent || '').toLowerCase();
-        const authorStr = (art.author || '').toLowerCase();
-        const feedStr = (art.feedTitle || '').toLowerCase();
+        const titleStr = art.title || '';
+        const summaryStr = art.summary || '';
+        const contentStr = (art.content || art.htmlContent || '').slice(0, 1000);
+        const authorStr = art.author || '';
+        const feedStr = art.feedTitle || '';
 
-        return terms.every(term =>
-          titleStr.includes(term) ||
-          summaryStr.includes(term) ||
-          contentStr.includes(term) ||
-          htmlStr.includes(term) ||
-          authorStr.includes(term) ||
-          feedStr.includes(term)
-        );
+        const combinedText = `${titleStr} ${summaryStr} ${authorStr} ${feedStr} ${contentStr}`;
+
+        return terms.every(term => fuzzyMatchTerm(term, combinedText));
       });
+
+      filtered.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
 
       renderArticleList(filtered, `No articles found matching "${rawQuery}"`);
     }, 150);
@@ -4072,6 +4146,21 @@ function formatAIMarkdown(text, articles = []) {
   return html;
 }
 
+function extractSearchTermsFromQuery(query) {
+  const stopWords = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+    'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
+    'with', 'this', 'but', 'they', 'have', 'had', 'what', 'when', 'where',
+    'who', 'which', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+    'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+    'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now', 'article',
+    'articles', 'related', 'about', 'news', 'find', 'show', 'list', 'tell', 'me',
+    'give', 'get', 'latest', 'recent'
+  ]);
+  const words = (query || '').toLowerCase().split(/[^a-z0-9]+/);
+  return words.filter(w => w.length > 2 && !stopWords.has(w));
+}
+
 // Gather RSS Context & Query Provider
 async function processAIChatQuery(userQuery) {
   const modelSelect = document.getElementById('ai-model-select');
@@ -4082,18 +4171,91 @@ async function processAIChatQuery(userQuery) {
 
   const keys = getAIKeys();
 
-  // Gather current loaded/filtered RSS articles for RAG
-  const articlesToUse = (loadedArticles && loadedArticles.length > 0)
-    ? loadedArticles.slice(0, 30)
-    : (typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData).slice(0, 30) : []);
-  currentRAGArticles = articlesToUse;
+  // 1. Gather all unique articles across all feeds in tree & cache
+  const allFeeds = typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData) : [];
+  const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f)));
+  const allArticlesPool = articlesLists.flat();
 
-  let contextSnippet = 'Here are the latest news articles currently loaded in Quick RSS:\n';
-  articlesToUse.forEach((art, idx) => {
+  const seenKeys = new Set();
+  const uniquePool = [];
+  allArticlesPool.forEach(art => {
+    const key = art.id || (art.title + '---' + art.feedTitle);
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniquePool.push(art);
+    }
+  });
+
+  // Sort pool by pubDate descending
+  uniquePool.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+
+  // 2. Extract query search terms for topic-targeted retrieval
+  const queryTerms = extractSearchTermsFromQuery(userQuery);
+
+  let candidateArticles = [];
+  if (queryTerms.length > 0) {
+    candidateArticles = uniquePool.filter(art => {
+      const titleStr = art.title || '';
+      const summaryStr = art.summary || '';
+      const contentStr = (art.content || art.htmlContent || '').slice(0, 1000);
+      const authorStr = art.author || '';
+      const feedStr = art.feedTitle || '';
+      const combinedText = `${titleStr} ${summaryStr} ${authorStr} ${feedStr} ${contentStr}`;
+
+      return queryTerms.some(term => fuzzyMatchTerm(term, combinedText));
+    });
+  }
+
+  // 3. Assemble RAG Context: prioritized matches + recent articles up to 50 total
+  const finalArticles = [];
+  const addedKeys = new Set();
+
+  candidateArticles.forEach(art => {
+    const key = art.id || (art.title + '---' + art.feedTitle);
+    if (!addedKeys.has(key)) {
+      addedKeys.add(key);
+      finalArticles.push(art);
+    }
+  });
+
+  if (loadedArticles && loadedArticles.length > 0) {
+    loadedArticles.forEach(art => {
+      if (finalArticles.length < 50) {
+        const key = art.id || (art.title + '---' + art.feedTitle);
+        if (!addedKeys.has(key)) {
+          addedKeys.add(key);
+          finalArticles.push(art);
+        }
+      }
+    });
+  }
+
+  uniquePool.forEach(art => {
+    if (finalArticles.length < 50) {
+      const key = art.id || (art.title + '---' + art.feedTitle);
+      if (!addedKeys.has(key)) {
+        addedKeys.add(key);
+        finalArticles.push(art);
+      }
+    }
+  });
+
+  finalArticles.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+  currentRAGArticles = finalArticles;
+
+  let contextSnippet = 'Here are the relevant RSS news articles currently available in Quick RSS:\n';
+  finalArticles.forEach((art, idx) => {
     contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
   });
 
-  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context provided below. Be concise, informative, and ALWAYS cite relevant source articles using markdown links in the format [Article N: Title](URL) or [Article N](URL).\n\n${contextSnippet}`;
+  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context provided below. Be concise and informative.
+
+CITATION & TOPIC AGGREGATION RULES:
+1. When answering queries about trending topics, news overviews, or specific subject searches: ALWAYS group and aggregate related articles under overarching topic headings or clear bullet points.
+2. For each topic/point, cite ALL relevant supporting articles from the provided context (e.g., [Article 1: Title](URL), [Article 3: Title](URL)). Do NOT restrict a topic to only a single citation if multiple articles discuss or relate to that topic.
+3. Use markdown links for citations in the format [Article N: Title](URL) or [Article N](URL).
+
+${contextSnippet}`;
 
   try {
     if (provider === 'openai') {

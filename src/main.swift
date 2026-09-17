@@ -85,17 +85,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
 
         // Inject stored UserDefault states into WKWebView localStorage at DocumentStart
         var initScript = ""
-        if let starredJson = UserDefaults.standard.string(forKey: "quickrss_starred_articles") {
-            let safeStarred = starredJson.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
-            initScript += "try { localStorage.setItem('quickrss_starred_articles', '\(safeStarred)'); } catch(e){}\n"
+        if let starredJson = UserDefaults.standard.string(forKey: "quickrss_starred_articles"),
+           let data = starredJson.data(using: .utf8) {
+            let base64 = data.base64EncodedString()
+            initScript += "try { localStorage.setItem('quickrss_starred_articles', decodeURIComponent(escape(atob('\(base64)')))); } catch(e){}\n"
         }
-        if let readJson = UserDefaults.standard.string(forKey: "quickrss_read_article_ids") {
-            let safeRead = readJson.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
-            initScript += "try { localStorage.setItem('quickrss_read_article_ids', '\(safeRead)'); } catch(e){}\n"
+        if let readJson = UserDefaults.standard.string(forKey: "quickrss_read_article_ids"),
+           let data = readJson.data(using: .utf8) {
+            let base64 = data.base64EncodedString()
+            initScript += "try { localStorage.setItem('quickrss_read_article_ids', decodeURIComponent(escape(atob('\(base64)')))); } catch(e){}\n"
         }
-        if let treeJson = UserDefaults.standard.string(forKey: "quickrss_user_tree") {
-            let safeTree = treeJson.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'").replacingOccurrences(of: "\n", with: "\\n")
-            initScript += "try { localStorage.setItem('quickrss_user_tree', '\(safeTree)'); } catch(e){}\n"
+        if let treeJson = UserDefaults.standard.string(forKey: "quickrss_user_tree"),
+           let data = treeJson.data(using: .utf8) {
+            let base64 = data.base64EncodedString()
+            initScript += "try { localStorage.setItem('quickrss_user_tree', decodeURIComponent(escape(atob('\(base64)')))); } catch(e){}\n"
         }
         
         if !initScript.isEmpty {

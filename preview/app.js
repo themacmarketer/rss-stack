@@ -701,12 +701,15 @@ let treeData = loadSavedTreeData();
 
 function saveTreeData() {
   try {
+    if (!Array.isArray(treeData) || treeData.length === 0) return;
     const jsonStr = JSON.stringify(treeData);
     safeSetStorage('quickrss_user_tree', jsonStr);
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.saveUserTree) {
       window.webkit.messageHandlers.saveUserTree.postMessage(jsonStr);
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error('Error saving tree data:', e);
+  }
 }
 
 

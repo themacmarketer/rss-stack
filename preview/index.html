@@ -117,6 +117,18 @@
           <!-- Dynamic Folders Tree -->
         </div>
       </div>
+
+      <!-- Docked Bottom-Left Word Cloud Container -->
+      <div class="sidebar-wordcloud-dock">
+        <div class="wordcloud-resizer" id="wordcloud-resizer" title="Drag up/down to adjust Word Cloud height"></div>
+        <div class="section-title word-cloud-header">
+          <span>🔥 Trending Topics</span>
+          <button id="refresh-wordcloud-btn" class="word-cloud-refresh-btn" title="Refresh Trending Topics">🔄</button>
+        </div>
+        <div id="word-cloud-container" class="word-cloud-box">
+          <div class="word-cloud-loading">Analyzing headlines...</div>
+        </div>
+      </div>
     </div>
 
     <!-- COLUMN RESIZER 1 -->
@@ -224,6 +236,21 @@
 
     <!-- COLUMN 3: Article Reader Pane -->
     <div class="reader-column">
+      <!-- Floating In-Article Find Bar (Cmd+F / Ctrl+F) -->
+      <div id="article-find-bar" class="article-find-bar hidden">
+        <div class="find-bar-inner">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7" cy="7" r="4.5"/>
+            <line x1="10.5" y1="10.5" x2="14.5" y2="14.5"/>
+          </svg>
+          <input type="text" id="article-find-input" placeholder="Find in article (Cmd+F)...">
+          <span id="article-find-counter" class="find-counter">0 of 0</span>
+          <button id="article-find-prev" class="find-nav-btn" title="Previous match (Shift+Enter)">▲</button>
+          <button id="article-find-next" class="find-nav-btn" title="Next match (Enter)">▼</button>
+          <button id="article-find-close" class="find-close-btn" title="Close (Esc)">✕</button>
+        </div>
+      </div>
+
       <div class="reader-header">
         <div class="reader-view-mode-toggle">
           <button id="toggle-view-html" class="view-mode-btn active" title="Full HTML Web View (Default)">
@@ -286,6 +313,7 @@
           <button class="settings-tab" data-tab="ai">AI Assistant</button>
           <button class="settings-tab" data-tab="mcp">MCP Service</button>
           <button class="settings-tab" data-tab="opml">OPML & Sync</button>
+          <button class="settings-tab" data-tab="diagnostics">Health & Diagnostics</button>
         </div>
         <div class="settings-content">
           <!-- Tab 1: General -->
@@ -332,6 +360,13 @@
               <select id="setting-open-link">
                 <option value="browser" selected>Open in Default Mac Browser</option>
                 <option value="app">Open inside Quick RSS App</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label>Word Cloud Topic Source</label>
+              <select id="setting-wordcloud-source">
+                <option value="titles" selected>Article Titles Only (Default - Cleaner)</option>
+                <option value="all">Titles & Article Summaries</option>
               </select>
             </div>
             <div class="setting-row">
@@ -463,6 +498,36 @@
             </div>
 
             <button class="btn-primary" id="save-ai-keys-btn" style="margin-top:16px; width:100%;">Save AI Credentials</button>
+          </div>
+
+          <!-- Tab 5: Health & Diagnostics -->
+          <div class="tab-pane" id="pane-diagnostics">
+            <div class="setting-block">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <label style="font-weight:600; margin:0; font-size:14px;">🏥 System Self-Diagnosis & Auto-Recovery</label>
+                <button class="btn-primary" id="run-diagnostics-btn" style="font-size:12px; padding:6px 12px;">🔍 Run Diagnostics</button>
+              </div>
+              <p class="help-text">Runs full self-tests across local data stores, network reachability, WebKit bridge integrity, and DOM bindings. Automatically proposes and executes fixes if anomalies are found.</p>
+            </div>
+
+            <!-- Diagnostics Results Box -->
+            <div id="diagnostics-results-box" class="code-box hidden" style="max-height:220px; overflow-y:auto; font-family:monospace; font-size:12px; margin-top:10px; line-height:1.5;"></div>
+
+            <!-- Auto-Fix Action Bar -->
+            <div id="diagnostics-fix-bar" class="setting-block hidden" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border-color); display:flex; gap:8px; align-items:center;">
+              <span id="diagnostics-status-text" style="flex:1; font-weight:600; font-size:13px; color:#ff9500;">⚠️ Issues detected!</span>
+              <button class="btn-secondary" id="auto-fix-btn" style="color:#70b643; font-weight:600;">🛠️ Auto-Fix & Recover</button>
+              <button class="btn-secondary" id="reset-cache-btn" style="color:#ff3b30;">🗑️ Reset Article Cache</button>
+            </div>
+
+            <!-- Live Error Log Viewer -->
+            <div class="setting-block" style="margin-top:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <label style="font-weight:600; font-size:13px; margin:0;">📋 Live Diagnostics & Error Log</label>
+                <button class="btn-sm" id="clear-logs-btn">Clear Logs</button>
+              </div>
+              <div id="live-error-log-box" class="code-box" style="max-height:160px; overflow-y:auto; font-family:monospace; font-size:11px; color:#a0a0a0; line-height:1.4;">No errors logged in current session.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -635,9 +700,7 @@
     </button>
   </div>
 
-  <script src="js/search-engine.js"></script>
-  <script src="js/ai-assistant.js"></script>
-  <script src="js/cache-engine.js"></script>
+  <div id="toast-container" class="toast-container"></div>
   <script src="app.js"></script>
 </body>
 </html>

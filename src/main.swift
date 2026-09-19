@@ -3,6 +3,14 @@ import WebKit
 import UniformTypeIdentifiers
 import Network
 
+func safeJSString(_ str: String) -> String {
+    if let data = try? JSONSerialization.data(withJSONObject: [str], options: []),
+       let jsonStr = String(data: data, encoding: .utf8) {
+        return String(jsonStr.dropFirst().dropLast())
+    }
+    return "\"\""
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
@@ -42,8 +50,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             }
             NSApp.activate(ignoringOtherApps: true)
 
-            let absoluteUrlStr = url.absoluteString.replacingOccurrences(of: "'", with: "\\'")
-            let jsCode = "if (window.handleDeepLink) { window.handleDeepLink('\(absoluteUrlStr)'); }"
+            let jsCode = "if (window.handleDeepLink) { window.handleDeepLink(\(safeJSString(url.absoluteString))); }"
 
             if self.isWebViewLoaded, let wv = self.webView {
                 wv.evaluateJavaScript(jsCode, completionHandler: nil)
@@ -73,6 +80,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         prefs.allowsContentJavaScript = true
         config.defaultWebpagePreferences = prefs
         
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        
         // Register Native Message Handlers
         config.userContentController.add(self, name: "openExternal")
         config.userContentController.add(self, name: "fetchURL")
@@ -82,17 +91,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "saveStarredArticles")
         config.userContentController.add(self, name: "saveReadArticles")
         config.userContentController.add(self, name: "saveUserTree")
+        config.userContentController.add(self, name: "consoleLog")
 
-        // Inject stored UserDefault states into WKWebView localStorage at DocumentStart
-        func safeJSString(_ str: String) -> String {
-            if let data = try? JSONSerialization.data(withJSONObject: [str], options: []),
-               let jsonStr = String(data: data, encoding: .utf8) {
-                return String(jsonStr.dropFirst().dropLast())
+        // Inject stored UserDefault states and global JS error handler into WKWebView at DocumentStart
+        var initScript = """
+        window.onerror = function(msg, url, line, col, error) {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.consoleLog) {
+                window.webkit.messageHandlers.consoleLog.postMessage({
+                    type: 'error',
+                    msg: String(msg),
+                    url: String(url),
+                    line: line,
+                    col: col,
+                    stack: error ? error.stack : ''
+                });
             }
-            return "\"\""
-        }
-
-        var initScript = ""
+        };
+        window.addEventListener('unhandledrejection', function(e) {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.consoleLog) {
+                window.webkit.messageHandlers.consoleLog.postMessage({
+                    type: 'unhandledrejection',
+                    msg: e.reason ? (e.reason.stack || String(e.reason)) : 'Unhandled Promise Rejection'
+                });
+            }
+        });
+        ['log', 'warn', 'error', 'debug'].forEach(function(verb) {
+            var orig = console[verb];
+            console[verb] = function() {
+                var args = Array.prototype.slice.call(arguments);
+                if (orig) orig.apply(console, args);
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.consoleLog) {
+                    window.webkit.messageHandlers.consoleLog.postMessage({
+                        type: verb,
+                        msg: args.map(function(a){ try { return typeof a === 'object' ? JSON.stringify(a) : String(a); } catch(err) { return String(a); } }).join(' ')
+                    });
+                }
+            };
+        });
+        """
         if let starredJson = UserDefaults.standard.string(forKey: "quickrss_starred_articles") {
             initScript += "try { localStorage.setItem('quickrss_starred_articles', \(safeJSString(starredJson))); } catch(e){}\n"
         }
@@ -157,7 +193,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
 
     // Handle JS postMessage calls (e.g. openExternal, fetchURL, saveOPML, mcpResponse, setXAuthToken, saveStarredArticles, saveReadArticles, saveUserTree)
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
+        if message.name == "consoleLog", let dict = message.body as? [String: Any] {
+            print("🔴 [WebKit Error]", dict["msg"] ?? "", "at", dict["url"] ?? "", "line", dict["line"] ?? "", ":", dict["col"] ?? "")
+            if let stack = dict["stack"] as? String, !stack.isEmpty {
+                print("   Stack:\n", stack)
+            }
+        } else if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
             mcpServer?.handleMCPResponse(requestId: requestId, result: result)
         } else if message.name == "setXAuthToken", let token = message.body as? String {
             UserDefaults.standard.set(token, forKey: "quickrss_x_auth_token")
@@ -223,16 +264,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 var jsCode = ""
                 let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 200
                 if let error = error {
-                    let errEscaped = error.localizedDescription.replacingOccurrences(of: "'", with: "\\'")
-                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', null, '\(errEscaped)'); }"
+                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched(\(safeJSString(requestId)), null, \(safeJSString(error.localizedDescription))); }"
                 } else if httpStatus >= 400 {
-                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', null, 'HTTP \(httpStatus)'); }"
+                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched(\(safeJSString(requestId)), null, \(safeJSString("HTTP \(httpStatus)"))); }"
                 } else if let data = data, let htmlString = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) {
-                    if let jsonData = try? JSONSerialization.data(withJSONObject: [htmlString], options: []),
-                       let jsonStr = String(data: jsonData, encoding: .utf8) {
-                        let innerJson = String(jsonStr.dropFirst().dropLast()) // JSON escaped string payload
-                        jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched('\(requestId)', \(innerJson), null); }"
-                    }
+                    jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched(\(safeJSString(requestId)), \(safeJSString(htmlString)), null); }"
                 }
                 
                 if !jsCode.isEmpty {
@@ -715,6 +751,19 @@ class MCPServer {
         
         let requestId = "req_\(UUID().uuidString)"
         var resultJsonString = "[]"
+        
+        var argsJson = "{}"
+        if let data = try? JSONSerialization.data(withJSONObject: args),
+           let str = String(data: data, encoding: .utf8) {
+            argsJson = str
+        }
+        let jsCode = "if (window.executeMCPToolNative) { window.executeMCPToolNative(\(safeJSString(requestId)), \(safeJSString(name)), \(argsJson)); }"
+        
+        if Thread.isMainThread {
+            webView.evaluateJavaScript(jsCode, completionHandler: nil)
+            return "[]"
+        }
+        
         let semaphore = DispatchSemaphore(value: 0)
         
         callbackLock.lock()
@@ -725,13 +774,6 @@ class MCPServer {
         callbackLock.unlock()
         
         DispatchQueue.main.async {
-            var argsJson = "{}"
-            if let data = try? JSONSerialization.data(withJSONObject: args),
-               let str = String(data: data, encoding: .utf8) {
-                argsJson = str
-            }
-            
-            let jsCode = "window.executeMCPToolNative('\(requestId)', '\(name)', \(argsJson))"
             webView.evaluateJavaScript(jsCode, completionHandler: nil)
         }
         

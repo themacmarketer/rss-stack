@@ -99,6 +99,9 @@ body {
    ========================================================================== */
 .sidebar {
   width: 275px;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -217,7 +220,8 @@ body {
 }
 
 .sidebar-scroll-area {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 6px 10px;
 }
@@ -1803,6 +1807,264 @@ html[data-theme="dark"] .toast-notification {
 .btn-primary.btn-danger:hover {
   background: #e03126;
 }
+
+/* ==========================================================================
+   Trending Topics Word Cloud Visualization (Bottom Left Sidebar)
+   ========================================================================== */
+.sidebar-wordcloud-dock {
+  position: relative;
+  padding: 6px 10px 10px 10px;
+  border-top: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  background: var(--bg-sidebar);
+  flex-shrink: 0;
+}
+
+.wordcloud-resizer {
+  height: 8px;
+  margin: -6px -10px 4px -10px;
+  cursor: ns-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  position: relative;
+  z-index: 10;
+}
+
+.wordcloud-resizer:hover, .wordcloud-resizer.dragging {
+  background: var(--accent-blue, #007aff);
+  opacity: 0.85;
+}
+
+.word-cloud-header {
+  margin-top: 0;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.word-cloud-refresh-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, transform 0.2s ease;
+}
+
+.word-cloud-refresh-btn:hover {
+  opacity: 1;
+  transform: rotate(45deg);
+}
+
+.word-cloud-box {
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.65));
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 6px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 120px;
+  min-height: 50px;
+  max-height: 450px;
+  overflow-y: auto;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.word-cloud-box::-webkit-scrollbar {
+  width: 4px;
+}
+.word-cloud-box::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+.word-cloud-loading {
+  font-size: 11px;
+  color: var(--text-muted, #8e8e93);
+  text-align: center;
+  padding: 12px;
+}
+
+.word-tag {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  max-width: 180px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.word-tag:hover {
+  transform: scale(1.08) translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+}
+
+/* Color & Size Hierarchy (Term Frequency Scaling) */
+.word-tag.weight-top {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.16);
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 11px;
+}
+
+.word-tag.weight-high {
+  color: #007aff;
+  background: rgba(0, 122, 255, 0.14);
+  font-weight: 600;
+  padding: 2.5px 7px;
+  border-radius: 10px;
+}
+
+.word-tag.weight-med {
+  color: #af52de;
+  background: rgba(175, 82, 222, 0.13);
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.word-tag.weight-low {
+  color: var(--text-secondary, #636366);
+  background: rgba(120, 120, 128, 0.11);
+  font-weight: 400;
+  padding: 1.5px 5px;
+  border-radius: 7px;
+}
+
+.word-tag .word-count {
+  font-size: 9px;
+  opacity: 0.65;
+  margin-left: 3px;
+  font-weight: 400;
+}
+
+/* ==========================================================================
+   In-Article Search / Find Bar (Cmd+F / Ctrl+F)
+   ========================================================================== */
+.article-find-bar {
+  position: absolute;
+  top: 54px;
+  right: 20px;
+  z-index: 900;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+  padding: 6px 10px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: findBarSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes findBarSlideDown {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.find-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.find-bar-inner input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  width: 170px;
+}
+
+.find-counter {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.find-nav-btn {
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+}
+
+.find-nav-btn:hover {
+  background: var(--bg-item-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text-primary);
+}
+
+.find-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 2px;
+}
+
+.find-close-btn:hover {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+
+/* Find Highlight Styling */
+mark.find-highlight {
+  background: rgba(255, 204, 0, 0.5);
+  color: inherit;
+  border-radius: 3px;
+  padding: 1px 2px;
+  box-shadow: 0 0 0 1px rgba(255, 149, 0, 0.5);
+}
+
+mark.find-highlight.active-match {
+  background: #ff9500;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px #ff3b30;
+}
+
+/* Diagnostics & Error Recovery UI */
+.diag-log-item {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.diag-log-item.error {
+  color: #ff3b30;
+}
+.diag-log-item.warn {
+  color: #ff9500;
+}
+.diag-log-item.info {
+  color: #34c759;
+}
+
 
 
 

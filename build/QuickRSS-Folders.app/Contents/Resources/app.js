@@ -855,6 +855,8 @@ const articleDatabase = {
 
 // App State
 let loadedArticles = [];
+let activeFilter = 'latest';
+let activeFeedId = null;
 let currentArticle = null;
 let selectedNodeId = null;
 let contextNodeId = null;
@@ -1514,18 +1516,26 @@ function getArticleKey(art) {
   return art.id || art.link || (art.title + '---' + (art.feedTitle || ''));
 }
 
+let inMemoryStarredList = null;
+
 function getStarredArticlesFromStorage() {
+  if (inMemoryStarredList) return inMemoryStarredList;
   try {
     const raw = localStorage.getItem(STARRED_ARTICLES_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return arr;
+      if (Array.isArray(arr)) {
+        inMemoryStarredList = arr;
+        return inMemoryStarredList;
+      }
     }
   } catch (e) {}
-  return [];
+  inMemoryStarredList = [];
+  return inMemoryStarredList;
 }
 
 function saveStarredArticlesToStorage(starredArray) {
+  inMemoryStarredList = starredArray;
   try {
     const jsonStr = JSON.stringify(starredArray);
     safeSetStorage(STARRED_ARTICLES_KEY, jsonStr);
@@ -1571,18 +1581,26 @@ function setArticleStarred(art, forceState) {
   updateBadges();
 }
 
+let inMemoryReadSet = null;
+
 function getReadArticleIdsFromStorage() {
+  if (inMemoryReadSet) return inMemoryReadSet;
   try {
     const raw = localStorage.getItem(READ_ARTICLES_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
+      if (Array.isArray(arr)) {
+        inMemoryReadSet = new Set(arr);
+        return inMemoryReadSet;
+      }
     }
   } catch (e) {}
-  return new Set();
+  inMemoryReadSet = new Set();
+  return inMemoryReadSet;
 }
 
 function saveReadArticleIdsToStorage(readSet) {
+  inMemoryReadSet = readSet;
   try {
     const jsonStr = JSON.stringify(Array.from(readSet));
     safeSetStorage(READ_ARTICLES_KEY, jsonStr);
@@ -1806,14 +1824,17 @@ function parseRssXml(xmlText, feed) {
 }
 
 function fetchWebPageHTMLWithTimeout(url, timeoutMs = 3500) {
-  return Promise.race([
-    fetchWebPageHTML(url),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Network fetch timeout')), timeoutMs))
-  ]);
+  if (typeof fetchWebPageHTML === 'function') {
+    return Promise.race([
+      fetchWebPageHTML(url),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Network fetch timeout')), timeoutMs))
+    ]);
+  }
+  return Promise.reject(new Error('fetchWebPageHTML function not available'));
 }
 
-// Get or fetch live RSS articles for a feed
 async function getArticlesForFeed(feed, preferFast = false) {
+  if (!feed) return [];
   const cacheKey = feed.url || feed.id || feed.name;
   let articles = null;
 
@@ -1836,7 +1857,7 @@ async function getArticlesForFeed(feed, preferFast = false) {
         author: `${feed.name} Team`,
         summary: `Latest technical insights, software releases, and research updates from ${feed.name}.`,
         htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
-          <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">${feed.name.toUpperCase()}</div>
+          <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">${(feed.name || 'FEED').toUpperCase()}</div>
           <h1 style="font-size:28px; font-weight:700; margin:10px 0 6px 0;">${feed.name}: Frontier Research & Technology Update</h1>
           <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published ${new Date(pubDate).toLocaleDateString()} • By ${feed.name} Team</div>
           <p style="font-size:16px;">Welcome to the live RSS content stream for <strong>${feed.name}</strong>.</p>
@@ -1851,7 +1872,6 @@ async function getArticlesForFeed(feed, preferFast = false) {
   }
 
   if (!articles && feed.url) {
-    // 1. Direct Native Fetch with Timeout
     try {
       const rawXml = await fetchWebPageHTMLWithTimeout(feed.url, 3500);
       if (rawXml) {
@@ -1867,7 +1887,6 @@ async function getArticlesForFeed(feed, preferFast = false) {
     }
 
     if (!articles) {
-      // 2. RSS2JSON API Fallback with Timeout
       try {
         const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
         const controller = new AbortController();
@@ -1921,7 +1940,7 @@ async function getArticlesForFeed(feed, preferFast = false) {
         author: `${feed.name} Team`,
         summary: `Latest technical insights, software releases, and research updates from ${feed.name}.`,
         htmlContent: `<div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', sans-serif; padding:32px; line-height:1.6; max-width:800px; margin:0 auto;">
-          <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">${feed.name.toUpperCase()}</div>
+          <div style="font-size:12px; font-weight:700; color:#70b643; text-transform:uppercase;">${(feed.name || 'FEED').toUpperCase()}</div>
           <h1 style="font-size:28px; font-weight:700; margin:10px 0 6px 0;">${feed.name}: Frontier Research & Technology Update</h1>
           <div style="font-size:13px; color:#8e8e93; margin-bottom:24px;">Published ${new Date(pubDate).toLocaleDateString()} • By ${feed.name} Team</div>
           <p style="font-size:16px;">Welcome to the live RSS content stream for <strong>${feed.name}</strong>.</p>
@@ -1935,35 +1954,34 @@ async function getArticlesForFeed(feed, preferFast = false) {
     articles = fallbackArticles;
   }
 
-  return applyPersistedArticleStates(articles);
+  return articles;
 }
 
-// Manual & Periodic Feed Refresh System
 async function refreshAllFeeds(isManual = false) {
   const refreshBtn = document.getElementById('refresh-feeds-btn');
   const refreshIcon = refreshBtn ? refreshBtn.querySelector('.refresh-icon') : null;
   if (refreshIcon) refreshIcon.classList.add('spinning');
   
-  if (isManual) showToast('🔄 Refreshing all RSS feeds...', 'info');
+  if (isManual && typeof showToast === 'function') showToast('🔄 Refreshing all RSS feeds...', 'info');
 
-  // Purge in-memory feed article cache to force fresh native RSS fetch
   for (const k of Object.keys(feedArticleCache)) {
     delete feedArticleCache[k];
   }
 
   try {
-    const allFeeds = getAllFeedsFromTree();
+    const allFeeds = typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData) : [];
     await Promise.all(allFeeds.map(feed => getArticlesForFeed(feed)));
-    renderTree();
-    if (activeFilter) {
+    if (typeof renderTree === 'function') renderTree();
+    if (typeof activeFilter !== 'undefined' && activeFilter && typeof fetchAndDisplayArticles === 'function') {
       fetchAndDisplayArticles(activeFilter);
-    } else if (activeFeedId) {
-      renderFeedArticles(activeFeedId);
-    } else {
+    } else if (typeof activeFeedId !== 'undefined' && activeFeedId && typeof fetchAndDisplayArticles === 'function') {
+      const pos = findNodePosition(treeData, activeFeedId);
+      if (pos) fetchAndDisplayArticles(pos.node);
+    } else if (typeof fetchAndDisplayArticles === 'function') {
       fetchAndDisplayArticles('all');
     }
-    updateBadges();
-    if (isManual) showToast('✅ All RSS feeds updated!', 'success');
+    if (typeof updateBadges === 'function') updateBadges();
+    if (isManual && typeof showToast === 'function') showToast('✅ All RSS feeds updated!', 'success');
   } catch (err) {
     console.error('Error refreshing feeds:', err);
   } finally {
@@ -1979,7 +1997,7 @@ function setupAutoRefreshTimer() {
     autoRefreshIntervalTimer = null;
   }
 
-  const intervalMinStr = safeGetStorage('quickrss_refresh_interval', '30');
+  const intervalMinStr = typeof safeGetStorage === 'function' ? safeGetStorage('quickrss_refresh_interval', '30') : '30';
   const intervalMin = parseInt(intervalMinStr, 10);
 
   if (!isNaN(intervalMin) && intervalMin > 0) {
@@ -1992,47 +2010,6 @@ function setupAutoRefreshTimer() {
 }
 
 
-// Fetch & Display Articles for Filter, Folder, or Feed
-async function fetchAndDisplayArticles(target, preferFast = false) {
-  const container = document.getElementById('article-list-container');
-  container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Loading articles...</div>';
-
-  let targetFeeds = [];
-  if (typeof target === 'string') {
-    targetFeeds = getAllFeedsFromTree(treeData);
-  } else if (target && target.type === 'feed') {
-    targetFeeds = [target];
-  } else if (target && target.type === 'folder') {
-    targetFeeds = getAllFeedsFromTree(target.children || []);
-  } else {
-    targetFeeds = getAllFeedsFromTree(treeData);
-  }
-
-  // Fetch articles for target feeds in parallel
-  const articlesLists = await Promise.all(targetFeeds.map(f => getArticlesForFeed(f, preferFast)));
-  let pool = applyPersistedArticleStates(articlesLists.flat());
-  updateBadges();
-
-  let items = [];
-  if (typeof target === 'string') {
-    if (target === 'read') {
-      const readSet = getReadArticleIdsFromStorage();
-      items = pool.filter(a => a.isRead || readSet.has(getArticleKey(a)));
-    } else if (target === 'starred') {
-      items = getStarredArticlesFromStorage();
-      items.forEach(a => a.isFavorite = true);
-    } else if (target === 'latest') {
-      items = [...pool].sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
-    } else { // 'all' or default
-      items = pool;
-    }
-  } else {
-    items = pool;
-  }
-
-  loadedArticles = items;
-  renderArticleList(loadedArticles, typeof target === 'string' && target === 'starred' ? 'No starred articles yet.' : 'No articles in this feed.');
-}
 
 
 function formatArticleTimestamp(pubDateRaw) {
@@ -2096,6 +2073,8 @@ function renderArticleList(articles, emptyMessage = 'No articles in this feed.')
     return;
   }
 
+  const fragment = document.createDocumentFragment();
+
   articles.forEach((art, idx) => {
     const card = document.createElement('div');
     card.className = `article-item-card ${currentArticle && currentArticle.id === art.id ? 'selected' : ''}`;
@@ -2136,15 +2115,97 @@ function renderArticleList(articles, emptyMessage = 'No articles in this feed.')
       });
     }
 
-    container.appendChild(card);
+    fragment.appendChild(card);
 
     if (idx === 0) {
       selectArticle(art, card);
     }
   });
+
+  container.appendChild(fragment);
 }
 
-// Render Reader View in Selected View Mode (HTML View vs Text View)
+async function fetchAndDisplayArticles(target, preferFast = false) {
+  let articlesToDisplay = [];
+  let emptyMsg = 'No articles in this view.';
+
+  try {
+    const allFeeds = (typeof getAllFeedsFromTree === 'function') ? getAllFeedsFromTree(treeData) : [];
+
+    if (typeof target === 'string') {
+      activeFilter = target;
+      activeFeedId = null;
+
+      const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f, preferFast)));
+      const allArticlesPool = articlesLists.flat();
+
+      const seenKeys = new Set();
+      const uniquePool = [];
+      allArticlesPool.forEach(art => {
+        const key = art.id || (art.title + '---' + art.feedTitle);
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniquePool.push(art);
+        }
+      });
+
+      if (typeof getArticleTimestamp === 'function') {
+        uniquePool.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+      }
+
+      if (target === 'starred') {
+        const starredList = getStarredArticlesFromStorage();
+        const starredKeys = new Set(starredList.map(a => getArticleKey(a)));
+        articlesToDisplay = uniquePool.filter(a => starredKeys.has(getArticleKey(a)) || a.isFavorite);
+        emptyMsg = 'No starred articles yet. Click the star icon to save articles here.';
+      } else if (target === 'read') {
+        const readSet = getReadArticleIdsFromStorage();
+        articlesToDisplay = uniquePool.filter(a => readSet.has(getArticleKey(a)) || a.isRead);
+        emptyMsg = 'No read articles yet.';
+      } else if (target === 'latest') {
+        articlesToDisplay = uniquePool.slice(0, 30);
+        emptyMsg = 'No recent news articles.';
+      } else {
+        // 'all'
+        articlesToDisplay = uniquePool;
+        emptyMsg = 'No articles found across all subscriptions.';
+      }
+    } else if (target && typeof target === 'object') {
+      activeFeedId = target.id || null;
+      activeFilter = null;
+
+      if (target.type === 'feed') {
+        articlesToDisplay = await getArticlesForFeed(target, preferFast);
+        emptyMsg = `No articles in feed "${target.name || 'Selected Feed'}".`;
+      } else if (target.type === 'folder') {
+        const folderFeeds = getAllFeedsFromTree([target]);
+        const lists = await Promise.all(folderFeeds.map(f => getArticlesForFeed(f, preferFast)));
+        const pool = lists.flat();
+        const seen = new Set();
+        pool.forEach(art => {
+          const k = art.id || (art.title + '---' + art.feedTitle);
+          if (!seen.has(k)) {
+            seen.add(k);
+            articlesToDisplay.push(art);
+          }
+        });
+        if (typeof getArticleTimestamp === 'function') {
+          articlesToDisplay.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+        }
+        emptyMsg = `No articles in folder "${target.name || 'Selected Folder'}".`;
+      } else {
+        articlesToDisplay = await getArticlesForFeed(target, preferFast);
+      }
+    }
+  } catch (err) {
+    console.error('Error in fetchAndDisplayArticles:', err);
+  }
+
+  loadedArticles = articlesToDisplay;
+  renderArticleList(articlesToDisplay, emptyMsg);
+  updateBadges();
+  if (typeof renderWordCloud === 'function') renderWordCloud();
+}
 function selectArticle(art, cardEl) {
   currentArticle = art;
   document.querySelectorAll('.article-item-card').forEach(c => c.classList.remove('selected'));
@@ -2179,7 +2240,16 @@ window.onNativeURLFetched = (requestId, htmlContent, error) => {
 function fetchWebPageHTML(url) {
   return new Promise((resolve, reject) => {
     const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const timeoutId = setTimeout(() => {
+      if (nativeFetchCallbacks[requestId]) {
+        delete nativeFetchCallbacks[requestId];
+        reject(new Error('Native fetch request timeout'));
+      }
+    }, 10000);
+
     nativeFetchCallbacks[requestId] = (html, err) => {
+      clearTimeout(timeoutId);
+      delete nativeFetchCallbacks[requestId];
       if (html) resolve(html);
       else reject(err || 'Failed to fetch');
     };
@@ -2189,8 +2259,16 @@ function fetchWebPageHTML(url) {
     } else {
       fetch(url)
         .then(res => res.text())
-        .then(html => resolve(html))
-        .catch(err => reject(err));
+        .then(html => {
+          clearTimeout(timeoutId);
+          delete nativeFetchCallbacks[requestId];
+          resolve(html);
+        })
+        .catch(err => {
+          clearTimeout(timeoutId);
+          delete nativeFetchCallbacks[requestId];
+          reject(err);
+        });
     }
   });
 }
@@ -2787,173 +2865,7 @@ document.querySelectorAll('.filter-item').forEach(item => {
   };
 });
 
-function getArticleTimestamp(art) {
-  if (!art || !art.pubDate) return 0;
-  if (typeof art.pubDate === 'number') return art.pubDate;
-  const str = String(art.pubDate).trim();
-  const d = new Date(str);
-  const time = d.getTime();
-  if (!isNaN(time)) return time;
 
-  const lower = str.toLowerCase();
-  const now = new Date();
-  if (lower.startsWith('today')) {
-    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      now.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
-    }
-    return now.getTime();
-  }
-  if (lower.startsWith('yesterday')) {
-    const yesterday = new Date(now.getTime() - 86400000);
-    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      yesterday.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
-    }
-    return yesterday.getTime();
-  }
-
-  return 0;
-}
-
-function levenshteinDistance(a, b) {
-  const alen = a.length;
-  const blen = b.length;
-  if (alen === 0) return blen;
-  if (blen === 0) return alen;
-
-  let row = new Array(alen + 1);
-  for (let i = 0; i <= alen; i++) row[i] = i;
-
-  for (let i = 1; i <= blen; i++) {
-    let prev = i;
-    for (let j = 1; j <= alen; j++) {
-      let val;
-      if (b[i - 1] === a[j - 1]) {
-        val = row[j - 1];
-      } else {
-        val = Math.min(row[j - 1] + 1, prev + 1, row[j] + 1);
-      }
-      row[j - 1] = prev;
-      prev = val;
-    }
-    row[alen] = prev;
-  }
-  return row[alen];
-}
-
-function fuzzyMatchTerm(term, text) {
-  if (!text || !term) return false;
-  const lowerTerm = term.toLowerCase();
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes(lowerTerm)) return true;
-  if (lowerTerm.length <= 2) return false;
-
-  const maxDist = lowerTerm.length > 5 ? 2 : 1;
-  const words = lowerText.split(/[^a-z0-9]+/);
-
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    if (!w) continue;
-    if (w.startsWith(lowerTerm)) return true;
-    if (Math.abs(w.length - lowerTerm.length) > maxDist) continue;
-    if (levenshteinDistance(lowerTerm, w) <= maxDist) return true;
-  }
-
-  return false;
-}
-
-// Search Bar Input Filtering Across All Feeds & Articles
-const searchInput = document.getElementById('search-input');
-const searchMatchBadge = document.getElementById('search-match-badge');
-const searchClearBtn = document.getElementById('search-clear-btn');
-
-function clearSearchInput() {
-  if (searchInput) searchInput.value = '';
-  if (searchMatchBadge) searchMatchBadge.classList.add('hidden');
-  if (searchClearBtn) searchClearBtn.classList.add('hidden');
-
-  const activeFilterEl = document.querySelector('.filter-item.active');
-  if (activeFilterEl) {
-    fetchAndDisplayArticles(activeFilterEl.dataset.filter);
-  } else if (selectedNodeId) {
-    const nodePos = findNodePosition(treeData, selectedNodeId);
-    fetchAndDisplayArticles(nodePos ? nodePos.node : 'all');
-  } else {
-    fetchAndDisplayArticles('all');
-  }
-}
-
-if (searchClearBtn) {
-  searchClearBtn.onclick = clearSearchInput;
-}
-
-if (searchInput) {
-  let searchDebounceTimeout = null;
-
-  searchInput.onkeydown = (e) => {
-    if (e.key === 'Escape') {
-      clearSearchInput();
-    }
-  };
-
-  searchInput.oninput = (e) => {
-    clearTimeout(searchDebounceTimeout);
-    const rawQuery = e.target.value;
-    const query = rawQuery.trim().toLowerCase();
-
-    if (!query) {
-      clearSearchInput();
-      return;
-    }
-
-    if (searchClearBtn) searchClearBtn.classList.remove('hidden');
-
-    searchDebounceTimeout = setTimeout(async () => {
-      const container = document.getElementById('article-list-container');
-      if (container) {
-        container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Searching articles...</div>';
-      }
-
-      const allFeeds = getAllFeedsFromTree(treeData);
-      const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f, true)));
-      const allArticlesPool = articlesLists.flat();
-
-      const seenKeys = new Set();
-      const uniquePool = [];
-      allArticlesPool.forEach(art => {
-        const key = art.id || (art.title + '---' + art.feedTitle);
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          uniquePool.push(art);
-        }
-      });
-
-      const terms = query.split(/\s+/).filter(Boolean);
-
-      const filtered = uniquePool.filter(art => {
-        const titleStr = art.title || '';
-        const summaryStr = art.summary || '';
-        const contentStr = (art.content || art.htmlContent || '').slice(0, 1000);
-        const authorStr = art.author || '';
-        const feedStr = art.feedTitle || '';
-
-        const combinedText = `${titleStr} ${summaryStr} ${authorStr} ${feedStr} ${contentStr}`;
-
-        return terms.every(term => fuzzyMatchTerm(term, combinedText));
-      });
-
-      filtered.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
-
-      if (searchMatchBadge) {
-        searchMatchBadge.textContent = `${filtered.length} result${filtered.length === 1 ? '' : 's'}`;
-        searchMatchBadge.classList.remove('hidden');
-      }
-
-      renderArticleList(filtered, `No articles found matching "${rawQuery}"`);
-    }, 150);
-  };
-}
 
 // Add New Folder Modal & Setup
 const addFolderModal = document.getElementById('add-folder-modal');
@@ -3298,7 +3210,8 @@ function showToast(msg, type = 'success') {
   toast.innerHTML = `<span class="toast-icon">${iconSvg}</span><span class="toast-message">${msg}</span>`;
   toastContainer.appendChild(toast);
 
-  requestAnimationFrame(() => {
+  const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
+  raf(() => {
     toast.classList.add('visible');
   });
 
@@ -3504,34 +3417,34 @@ function setXAuthToken(token) {
 
 function updateOAuthStatusUI() {
   const openaiStatusEl = document.getElementById('openai-oauth-status');
-  const openaiOAuthBtn = document.getElementById('openai-oauth-btn');
+  const openaiOAuthBtn = document.getElementById('openai-session-btn');
   const openaiDiscBtn = document.getElementById('openai-disconnect-btn');
 
   const claudeStatusEl = document.getElementById('claude-oauth-status');
-  const claudeOAuthBtn = document.getElementById('claude-oauth-btn');
+  const claudeOAuthBtn = document.getElementById('claude-session-btn');
   const claudeDiscBtn = document.getElementById('claude-disconnect-btn');
 
   const openaiToken = getOpenAIOAuthToken();
   if (openaiToken) {
     if (openaiStatusEl) {
-      openaiStatusEl.textContent = 'Connected (OAuth)';
+      openaiStatusEl.textContent = 'Connected (OAuth/Key)';
       openaiStatusEl.className = 'oauth-badge connected';
     }
-    if (openaiOAuthBtn) openaiOAuthBtn.innerHTML = '<span>✅ OpenAI Connected</span>';
+    if (openaiOAuthBtn) openaiOAuthBtn.innerHTML = '<span>✅ ChatGPT Connected</span>';
     if (openaiDiscBtn) openaiDiscBtn.style.display = 'inline-block';
   } else {
     if (openaiStatusEl) {
       openaiStatusEl.textContent = 'Disconnected';
       openaiStatusEl.className = 'oauth-badge disconnected';
     }
-    if (openaiOAuthBtn) openaiOAuthBtn.innerHTML = '<span>🌐 Login with OpenAI (OAuth)</span>';
+    if (openaiOAuthBtn) openaiOAuthBtn.innerHTML = '<span>🌐 1-Click Get ChatGPT Session Token</span>';
     if (openaiDiscBtn) openaiDiscBtn.style.display = 'none';
   }
 
   const claudeToken = getClaudeOAuthToken();
   if (claudeToken) {
     if (claudeStatusEl) {
-      claudeStatusEl.textContent = 'Connected (OAuth)';
+      claudeStatusEl.textContent = 'Connected (OAuth/Key)';
       claudeStatusEl.className = 'oauth-badge connected';
     }
     if (claudeOAuthBtn) claudeOAuthBtn.innerHTML = '<span>✅ Claude Connected</span>';
@@ -3541,7 +3454,7 @@ function updateOAuthStatusUI() {
       claudeStatusEl.textContent = 'Disconnected';
       claudeStatusEl.className = 'oauth-badge disconnected';
     }
-    if (claudeOAuthBtn) claudeOAuthBtn.innerHTML = '<span>🌐 Login with Claude (OAuth)</span>';
+    if (claudeOAuthBtn) claudeOAuthBtn.innerHTML = '<span>🌐 Open Claude Session Page</span>';
     if (claudeDiscBtn) claudeDiscBtn.style.display = 'none';
   }
 }
@@ -3756,6 +3669,18 @@ function initGeneralSettingsUI() {
     };
   }
 
+  // 5. Word Cloud Topic Source (Titles Only vs Titles & Summaries)
+  const wordCloudSourceSelect = document.getElementById('setting-wordcloud-source');
+  if (wordCloudSourceSelect) {
+    const savedSource = safeGetStorage('quickrss_wordcloud_source', 'titles');
+    wordCloudSourceSelect.value = savedSource;
+
+    wordCloudSourceSelect.onchange = (e) => {
+      safeSetStorage('quickrss_wordcloud_source', e.target.value);
+      renderWordCloud();
+    };
+  }
+
   // 5. Appearance Theme (System Default / Dark Mode / Light Mode)
   const themeSelect = document.getElementById('setting-theme');
   if (themeSelect) {
@@ -3791,194 +3716,7 @@ function initGeneralSettingsUI() {
   }
 }
 
-// AI Chatbot UI Interactivity
-function setupAIChatbotUI() {
-  const panel = document.getElementById('ai-chatbot-panel');
-  const triggerBtn = document.getElementById('ai-assistant-toggle-btn');
-  const closeBtn = document.getElementById('ai-close-btn');
-  const pinBtn = document.getElementById('ai-pin-btn');
-  const settingsBtn = document.getElementById('ai-settings-btn');
-  const sendBtn = document.getElementById('ai-chat-send-btn');
-  const clearBtn = document.getElementById('ai-chat-clear-btn');
-  const chatInput = document.getElementById('ai-chat-input');
-  const chatThread = document.getElementById('ai-chat-thread');
-  const resizer = document.getElementById('ai-popover-resizer');
 
-  if (!panel) return;
-
-  let isAIPinned = safeGetStorage('quickrss_ai_pinned', 'true') === 'true';
-
-  function applyPinState() {
-    if (isAIPinned) {
-      panel.style.top = '';
-      panel.style.left = '';
-      panel.style.right = '';
-      panel.style.width = '';
-      panel.style.position = '';
-      panel.style.transform = '';
-      panel.classList.add('pinned');
-      if (pinBtn) {
-        pinBtn.classList.add('active');
-        pinBtn.title = "Unpin / Unlock AI Assistant Window";
-      }
-    } else {
-      panel.style.height = '';
-      panel.style.width = '';
-      panel.style.top = '';
-      panel.style.left = '';
-      panel.style.right = '';
-      panel.style.position = '';
-      panel.style.transform = '';
-      panel.classList.remove('pinned');
-      if (pinBtn) {
-        pinBtn.classList.remove('active');
-        pinBtn.title = "Pin / Lock AI Assistant Window in place";
-      }
-    }
-  }
-
-  // Apply default pinned state on load
-  applyPinState();
-
-  // Toggle Trigger Button
-  if (triggerBtn) {
-    triggerBtn.onclick = (e) => {
-      e.stopPropagation();
-      const isOpening = panel.classList.contains('hidden');
-      panel.classList.toggle('hidden');
-      if (isOpening) {
-        applyPinState();
-      }
-    };
-  }
-
-  // Pin / Lock Window Button
-  if (pinBtn) {
-    pinBtn.onclick = (e) => {
-      e.stopPropagation();
-      isAIPinned = !isAIPinned;
-      safeSetStorage('quickrss_ai_pinned', isAIPinned ? 'true' : 'false');
-      applyPinState();
-      if (isAIPinned) {
-        showToast('📌 AI Assistant pinned inside column below search bar', 'success');
-      } else {
-        showToast('Unpinned AI Assistant window', 'info');
-      }
-    };
-  }
-
-  // Close Button
-  if (closeBtn) {
-    closeBtn.onclick = (e) => {
-      e.stopPropagation();
-      panel.classList.add('hidden');
-    };
-  }
-
-  // Close when clicking outside panel (unless pinned)
-  document.addEventListener('click', (e) => {
-    if (!isAIPinned && !panel.classList.contains('hidden') && !panel.contains(e.target) && triggerBtn && !triggerBtn.contains(e.target)) {
-      panel.classList.add('hidden');
-    }
-  });
-
-  // Draggable Mouse Resizer for Chatbot Popover
-  if (resizer && panel) {
-    let isResizing = false;
-    let startX, startY, startWidth, startHeight;
-
-    resizer.onmousedown = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      isResizing = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startWidth = panel.offsetWidth;
-      startHeight = panel.offsetHeight;
-
-      document.documentElement.addEventListener('mousemove', onMouseMove);
-      document.documentElement.addEventListener('mouseup', onMouseUp);
-    };
-
-    function onMouseMove(e) {
-      if (!isResizing) return;
-      if (panel.classList.contains('pinned')) {
-        const newHeight = Math.max(180, Math.min(window.innerHeight * 0.75, startHeight + (e.clientY - startY)));
-        panel.style.height = `${newHeight}px`;
-      } else {
-        const newWidth = Math.max(280, Math.min(650, startWidth + (e.clientX - startX)));
-        const newHeight = Math.max(220, Math.min(window.innerHeight * 0.85, startHeight + (e.clientY - startY)));
-        panel.style.width = `${newWidth}px`;
-        panel.style.height = `${newHeight}px`;
-      }
-    }
-
-    function onMouseUp() {
-      if (isResizing) {
-        isResizing = false;
-        document.documentElement.removeEventListener('mousemove', onMouseMove);
-        document.documentElement.removeEventListener('mouseup', onMouseUp);
-      }
-    }
-  }
-
-  // Settings Icon click -> Open Settings Modal to AI tab
-  if (settingsBtn) {
-    settingsBtn.onclick = (e) => {
-      e.stopPropagation();
-      openSettings();
-      const aiTab = document.querySelector('.settings-tab[data-tab="ai"]');
-      if (aiTab) aiTab.click();
-    };
-  }
-
-  // Quick Prompt Chips
-  document.querySelectorAll('.quick-prompt-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const promptText = btn.dataset.prompt;
-      if (promptText) {
-        sendUserAIMessage(promptText);
-      }
-    };
-  });
-
-  // Send Action
-  if (sendBtn && chatInput) {
-    sendBtn.onclick = () => {
-      const q = chatInput.value.trim();
-      if (q) {
-        chatInput.value = '';
-        sendUserAIMessage(q);
-      }
-    };
-
-    chatInput.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const q = chatInput.value.trim();
-        if (q) {
-          chatInput.value = '';
-          sendUserAIMessage(q);
-        }
-      }
-    };
-  }
-
-  // Clear Chat Thread
-  if (clearBtn && chatThread) {
-    clearBtn.onclick = () => {
-      chatThread.innerHTML = `
-        <div class="ai-message assistant">
-          <div class="ai-avatar">🤖</div>
-          <div class="ai-msg-content">
-            Thread cleared. How can I help you analyze your RSS news today?
-          </div>
-        </div>
-      `;
-    };
-  }
-}
 
 // Global Deep Link Handler (quickrss://article?id=xxx or quickrss://article?url=yyy)
 window.handleDeepLink = function(urlString) {
@@ -4115,25 +3853,348 @@ function selectArticleByLink(urlOrTitle) {
   }
 }
 
-function handleAICitationClick(url, title) {
-  if (url && (url.startsWith('quickrss://') || url.startsWith('quick-rss://'))) {
-    window.handleDeepLink(url);
-    return;
+function getArticleTimestamp(art) {
+  if (!art || !art.pubDate) return 0;
+  if (typeof art.pubDate === 'number') return art.pubDate;
+  const str = String(art.pubDate).trim();
+  const d = new Date(str);
+  const time = d.getTime();
+  if (!isNaN(time)) return time;
+
+  const lower = str.toLowerCase();
+  const now = new Date();
+  if (lower.startsWith('today')) {
+    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      now.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    }
+    return now.getTime();
   }
-  if (url && url.startsWith('http')) {
-    openInDefaultBrowser(url);
+  if (lower.startsWith('yesterday')) {
+    const yesterday = new Date(now.getTime() - 86400000);
+    const timeMatch = lower.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      yesterday.setHours(parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), 0, 0);
+    }
+    return yesterday.getTime();
   }
-  selectArticleByLink(url || title);
+
+  return 0;
+}
+
+function levenshteinDistance(a, b) {
+  const alen = a.length;
+  const blen = b.length;
+  if (alen === 0) return blen;
+  if (blen === 0) return alen;
+
+  let row = new Array(alen + 1);
+  for (let i = 0; i <= alen; i++) row[i] = i;
+
+  for (let i = 1; i <= blen; i++) {
+    let prev = i;
+    for (let j = 1; j <= alen; j++) {
+      let val;
+      if (b[i - 1] === a[j - 1]) {
+        val = row[j - 1];
+      } else {
+        val = Math.min(row[j - 1] + 1, prev + 1, row[j] + 1);
+      }
+      row[j - 1] = prev;
+      prev = val;
+    }
+    row[alen] = prev;
+  }
+  return row[alen];
+}
+
+function fuzzyMatchTerm(term, text) {
+  if (!text || !term) return false;
+  const lowerTerm = term.toLowerCase();
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes(lowerTerm)) return true;
+  if (lowerTerm.length <= 2) return false;
+
+  const maxDist = lowerTerm.length > 5 ? 2 : 1;
+  const words = lowerText.split(/[^a-z0-9]+/);
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (!w) continue;
+    if (w.startsWith(lowerTerm)) return true;
+    if (Math.abs(w.length - lowerTerm.length) > maxDist) continue;
+    if (levenshteinDistance(lowerTerm, w) <= maxDist) return true;
+  }
+
+  return false;
+}
+
+function extractSearchTermsFromQuery(query) {
+  const stopWords = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+    'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
+    'with', 'this', 'but', 'they', 'have', 'had', 'what', 'when', 'where',
+    'who', 'which', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
+    'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+    'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now', 'article',
+    'articles', 'related', 'about', 'news', 'find', 'show', 'list', 'tell', 'me',
+    'give', 'get', 'latest', 'recent'
+  ]);
+  const words = (query || '').toLowerCase().split(/[^a-z0-9]+/);
+  return words.filter(w => w.length > 2 && !stopWords.has(w));
+}
+
+function setupSearchUI() {
+  const searchInput = document.getElementById('search-input');
+  const searchMatchBadge = document.getElementById('search-match-badge');
+  const searchClearBtn = document.getElementById('search-clear-btn');
+
+  function clearSearchInput() {
+    if (searchInput) searchInput.value = '';
+    if (searchMatchBadge) searchMatchBadge.classList.add('hidden');
+    if (searchClearBtn) searchClearBtn.classList.add('hidden');
+
+    const activeFilterEl = document.querySelector('.filter-item.active');
+    if (activeFilterEl) {
+      fetchAndDisplayArticles(activeFilterEl.dataset.filter);
+    } else if (typeof selectedNodeId !== 'undefined' && selectedNodeId) {
+      const nodePos = findNodePosition(treeData, selectedNodeId);
+      fetchAndDisplayArticles(nodePos ? nodePos.node : 'all');
+    } else {
+      fetchAndDisplayArticles('all');
+    }
+  }
+
+  if (searchClearBtn) {
+    searchClearBtn.onclick = clearSearchInput;
+  }
+
+  if (searchInput) {
+    let searchDebounceTimeout = null;
+
+    searchInput.onkeydown = (e) => {
+      if (e.key === 'Escape') {
+        clearSearchInput();
+      }
+    };
+
+    searchInput.oninput = (e) => {
+      clearTimeout(searchDebounceTimeout);
+      const rawQuery = e.target.value;
+      const query = rawQuery.trim().toLowerCase();
+
+      if (!query) {
+        clearSearchInput();
+        return;
+      }
+
+      if (searchClearBtn) searchClearBtn.classList.remove('hidden');
+
+      searchDebounceTimeout = setTimeout(async () => {
+        const container = document.getElementById('article-list-container');
+        if (container) {
+          container.innerHTML = '<div style="padding:20px; text-align:center; color:#8e8e93;">Searching articles...</div>';
+        }
+
+        const allFeeds = getAllFeedsFromTree(treeData);
+        const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f, true)));
+        const allArticlesPool = articlesLists.flat();
+
+        const seenKeys = new Set();
+        const uniquePool = [];
+        allArticlesPool.forEach(art => {
+          const key = art.id || (art.title + '---' + art.feedTitle);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniquePool.push(art);
+          }
+        });
+
+        uniquePool.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+
+        const terms = extractSearchTermsFromQuery(query);
+
+        const matchedArticles = uniquePool.filter(art => {
+          const titleStr = art.title || '';
+          const summaryStr = art.summary || '';
+          const contentStr = (art.content || art.htmlContent || '').slice(0, 1000);
+          const authorStr = art.author || '';
+          const feedStr = art.feedTitle || '';
+          const combinedText = `${titleStr} ${summaryStr} ${authorStr} ${feedStr} ${contentStr}`;
+
+          const directMatch = combinedText.toLowerCase().includes(query);
+          if (directMatch) return true;
+
+          return terms.length > 0 && terms.every(t => fuzzyMatchTerm(t, combinedText));
+        });
+
+        if (searchMatchBadge) {
+          searchMatchBadge.textContent = `${matchedArticles.length} result${matchedArticles.length === 1 ? '' : 's'}`;
+          searchMatchBadge.classList.remove('hidden');
+        }
+
+        renderArticleList(matchedArticles, `No articles found matching "${escapeHTML(rawQuery)}".`);
+      }, 150);
+    };
+  }
 }
 
 let currentRAGArticles = [];
 
-// Send User Message & Query Selected LLM Provider
+function handleAICitationClick(url, title) {
+  if (url && (url.startsWith('quickrss://') || url.startsWith('quick-rss://'))) {
+    if (typeof window.handleDeepLink === 'function') {
+      window.handleDeepLink(url);
+    }
+    return;
+  }
+  if (url && url.startsWith('http')) {
+    if (typeof openInDefaultBrowser === 'function') {
+      openInDefaultBrowser(url);
+    }
+  }
+  if (typeof selectArticleByLink === 'function') {
+    selectArticleByLink(url || title);
+  }
+}
+
+function setupAIChatbotUI() {
+  const panel = document.getElementById('ai-chatbot-panel');
+  const triggerBtn = document.getElementById('ai-assistant-toggle-btn');
+  const closeBtn = document.getElementById('ai-close-btn');
+  const pinBtn = document.getElementById('ai-pin-btn');
+  const settingsBtn = document.getElementById('ai-settings-btn');
+  const sendBtn = document.getElementById('ai-chat-send-btn');
+  const clearBtn = document.getElementById('ai-chat-clear-btn');
+  const chatInput = document.getElementById('ai-chat-input');
+  const chatThread = document.getElementById('ai-chat-thread');
+
+  if (!panel) return;
+
+  let isAIPinned = safeGetStorage('quickrss_ai_pinned', 'true') === 'true';
+
+  function applyPinState() {
+    if (isAIPinned) {
+      panel.style.top = '';
+      panel.style.left = '';
+      panel.style.right = '';
+      panel.style.width = '';
+      panel.style.position = '';
+      panel.style.transform = '';
+      panel.classList.add('pinned');
+      if (pinBtn) {
+        pinBtn.classList.add('active');
+        pinBtn.title = "Unpin / Unlock AI Assistant Window";
+      }
+    } else {
+      panel.style.height = '';
+      panel.style.width = '';
+      panel.style.top = '';
+      panel.style.left = '';
+      panel.style.right = '';
+      panel.style.position = '';
+      panel.style.transform = '';
+      panel.classList.remove('pinned');
+      if (pinBtn) {
+        pinBtn.classList.remove('active');
+        pinBtn.title = "Pin / Lock AI Assistant Window in place";
+      }
+    }
+  }
+
+  applyPinState();
+
+  if (triggerBtn) {
+    triggerBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isOpening = panel.classList.contains('hidden');
+      panel.classList.toggle('hidden');
+      if (isOpening) {
+        applyPinState();
+      }
+    };
+  }
+
+  if (pinBtn) {
+    pinBtn.onclick = (e) => {
+      e.stopPropagation();
+      isAIPinned = !isAIPinned;
+      safeSetStorage('quickrss_ai_pinned', isAIPinned ? 'true' : 'false');
+      applyPinState();
+      if (isAIPinned) {
+        showToast('📌 AI Assistant pinned inside column below search bar', 'success');
+      } else {
+        showToast('Unpinned AI Assistant window', 'info');
+      }
+    };
+  }
+
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      panel.classList.add('hidden');
+    };
+  }
+
+  if (settingsBtn) {
+    settingsBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (typeof openSettings === 'function') openSettings();
+      const aiTab = document.querySelector('.settings-tab[data-tab="ai"]');
+      if (aiTab) aiTab.click();
+    };
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!isAIPinned && !panel.classList.contains('hidden') && !panel.contains(e.target) && triggerBtn && !triggerBtn.contains(e.target)) {
+      panel.classList.add('hidden');
+    }
+  });
+
+  if (sendBtn && chatInput) {
+    const doSend = () => {
+      const q = chatInput.value.trim();
+      if (!q) return;
+      chatInput.value = '';
+      sendUserAIMessage(q);
+    };
+    sendBtn.onclick = doSend;
+    chatInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doSend();
+      }
+    };
+  }
+
+  if (clearBtn && chatThread) {
+    clearBtn.onclick = () => {
+      chatThread.innerHTML = `
+        <div class="ai-message assistant">
+          <div class="ai-avatar">🤖</div>
+          <div class="ai-msg-content">
+            Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+          </div>
+        </div>
+      `;
+      showToast('Cleared AI Assistant chat history', 'info');
+    };
+  }
+
+  document.querySelectorAll('.quick-prompt-btn').forEach(btn => {
+    btn.onclick = () => {
+      const promptText = btn.dataset.prompt;
+      if (promptText) {
+        sendUserAIMessage(promptText);
+      }
+    };
+  });
+}
+
 async function sendUserAIMessage(userQuery) {
   const thread = document.getElementById('ai-chat-thread');
   if (!thread) return;
 
-  // Append User Message
   const userMsgDiv = document.createElement('div');
   userMsgDiv.className = 'ai-message user';
   userMsgDiv.innerHTML = `
@@ -4142,7 +4203,6 @@ async function sendUserAIMessage(userQuery) {
   `;
   thread.appendChild(userMsgDiv);
 
-  // Append Assistant Loading Indicator
   const assistantMsgDiv = document.createElement('div');
   assistantMsgDiv.className = 'ai-message assistant';
   assistantMsgDiv.innerHTML = `
@@ -4167,7 +4227,6 @@ function formatAIMarkdown(text, articles = []) {
   if (!text) return 'No response generated.';
   let html = escapeHTML(text);
 
-  // 0. Convert deep links [Title](quickrss://...) or [Title](quick-rss://...)
   html = html.replace(/\[([^\]]+)\]\(((?:quickrss|quick-rss):\/\/[^\s\)]+)\)/gi, (match, linkText, url) => {
     const cleanTitle = escapeHTML(linkText);
     const cleanUrl = escapeHTML(url);
@@ -4175,7 +4234,6 @@ function formatAIMarkdown(text, articles = []) {
     return `<a href="#" onclick="window.handleDeepLink('${safeUrl}'); return false;" class="ai-citation-tag" title="Open in Quick RSS">🔗 ${cleanTitle} ↗</a>`;
   });
 
-  // 1. Convert markdown links [Article N: Title](URL) or [Title](URL) into clickable citation tags
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, linkText, url) => {
     const cleanTitle = escapeHTML(linkText);
     const cleanUrl = escapeHTML(url);
@@ -4184,7 +4242,6 @@ function formatAIMarkdown(text, articles = []) {
     return `<a href="#" onclick="handleAICitationClick('${safeUrl}', '${safeTitle}'); return false;" class="ai-citation-tag" title="Open & highlight article">🔗 ${cleanTitle} ↗</a>`;
   });
 
-  // 2. Convert [Article N] citations into clickable tags
   html = html.replace(/\[Article\s*(\d+)\]/gi, (match, numStr) => {
     const idx = parseInt(numStr, 10) - 1;
     if (articles && articles[idx]) {
@@ -4197,34 +4254,13 @@ function formatAIMarkdown(text, articles = []) {
     return match;
   });
 
-  // 3. Bold text
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // 4. Bullet points
   html = html.replace(/^[•\*]\s+(.*)$/gm, '• $1');
-
-  // 5. Line breaks
   html = html.replace(/\n/g, '<br/>');
 
   return html;
 }
 
-function extractSearchTermsFromQuery(query) {
-  const stopWords = new Set([
-    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
-    'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will',
-    'with', 'this', 'but', 'they', 'have', 'had', 'what', 'when', 'where',
-    'who', 'which', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more',
-    'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
-    'so', 'than', 'too', 'very', 'can', 'just', 'should', 'now', 'article',
-    'articles', 'related', 'about', 'news', 'find', 'show', 'list', 'tell', 'me',
-    'give', 'get', 'latest', 'recent'
-  ]);
-  const words = (query || '').toLowerCase().split(/[^a-z0-9]+/);
-  return words.filter(w => w.length > 2 && !stopWords.has(w));
-}
-
-// Gather RSS Context & Query Provider
 async function processAIChatQuery(userQuery) {
   const modelSelect = document.getElementById('ai-model-select');
   const rawModelVal = modelSelect ? modelSelect.value : 'openai:gpt-4o';
@@ -4234,7 +4270,6 @@ async function processAIChatQuery(userQuery) {
 
   const keys = getAIKeys();
 
-  // 1. Gather all unique articles across all feeds in tree & cache
   const allFeeds = typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData) : [];
   const articlesLists = await Promise.all(allFeeds.map(f => getArticlesForFeed(f)));
   const allArticlesPool = articlesLists.flat();
@@ -4249,10 +4284,8 @@ async function processAIChatQuery(userQuery) {
     }
   });
 
-  // Sort pool by pubDate descending
   uniquePool.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
 
-  // 2. Extract query search terms for topic-targeted retrieval
   const queryTerms = extractSearchTermsFromQuery(userQuery);
 
   let candidateArticles = [];
@@ -4269,7 +4302,6 @@ async function processAIChatQuery(userQuery) {
     });
   }
 
-  // 3. Assemble RAG Context: prioritized matches + recent articles up to 50 total
   const finalArticles = [];
   const addedKeys = new Set();
 
@@ -4281,7 +4313,7 @@ async function processAIChatQuery(userQuery) {
     }
   });
 
-  if (loadedArticles && loadedArticles.length > 0) {
+  if (typeof loadedArticles !== 'undefined' && loadedArticles && loadedArticles.length > 0) {
     loadedArticles.forEach(art => {
       if (finalArticles.length < 50) {
         const key = art.id || (art.title + '---' + art.feedTitle);
@@ -4348,7 +4380,6 @@ ${contextSnippet}`;
   return "⚠️ Unknown LLM Provider selected.";
 }
 
-// OpenAI Chat Completions API Handler
 async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -4373,7 +4404,6 @@ async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
   return json.choices?.[0]?.message?.content || 'No output generated from OpenAI.';
 }
 
-// Anthropic Claude Messages API Handler
 async function queryClaude(systemPrompt, userQuery, model, apiKey) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -4399,7 +4429,6 @@ async function queryClaude(systemPrompt, userQuery, model, apiKey) {
   return json.content?.[0]?.text || 'No output generated from Claude.';
 }
 
-// OpenRouter Chat Completions API Handler
 async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -4427,6 +4456,8 @@ async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
 }
 
 
+
+
 function safeGetStorage(key, fallback = null) {
   try {
     return localStorage.getItem(key) ?? fallback;
@@ -4447,6 +4478,850 @@ function safeRemoveStorage(key) {
   } catch (e) {}
 }
 
+// ==========================================
+// ERROR LOGGING & SELF-DIAGNOSIS ENGINE
+// ==========================================
+window.AppDiagnostics = {
+  logs: [],
+  maxLogs: 200,
+
+  log(level, category, message, details = null) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      timeStr: new Date().toLocaleTimeString(),
+      level: level.toLowerCase(), // 'info', 'warn', 'error', 'success'
+      category: category,
+      message: message,
+      details: details ? (typeof details === 'object' ? JSON.stringify(details) : String(details)) : null
+    };
+
+    this.logs.unshift(entry);
+    if (this.logs.length > this.maxLogs) this.logs.pop();
+
+    if (level === 'error') {
+      console.error(`[Diagnostics:${category}] ${message}`, details || '');
+    } else if (level === 'warn') {
+      console.warn(`[Diagnostics:${category}] ${message}`, details || '');
+    } else {
+      console.log(`[Diagnostics:${category}] ${message}`, details || '');
+    }
+
+    this.updateLogUI();
+  },
+
+  updateLogUI() {
+    const container = document.getElementById('diagnostic-logs-list');
+    if (!container) return;
+
+    if (this.logs.length === 0) {
+      container.innerHTML = '<div style="padding:15px; text-align:center; color:#8e8e93; font-style:italic;">No diagnostic logs recorded yet.</div>';
+      return;
+    }
+
+    container.innerHTML = this.logs.slice(0, 50).map(l => `
+      <div class="log-item log-${l.level}">
+        <span class="log-time">[${l.timeStr}]</span>
+        <span class="log-cat">${l.category}</span>:
+        <strong>${l.message}</strong>
+        ${l.details ? `<div style="font-size:10px; color:#8e8e93; margin-top:2px;">${l.details}</div>` : ''}
+      </div>
+    `).join('');
+  }
+};
+
+// Global exception traps
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    if (window.AppDiagnostics) {
+      window.AppDiagnostics.log('error', 'GlobalRuntime', event.message || 'Uncaught Error', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      });
+    }
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    if (window.AppDiagnostics) {
+      window.AppDiagnostics.log('error', 'UnhandledPromise', event.reason?.message || String(event.reason));
+    }
+  });
+}
+
+// Self-Diagnosis Runner
+async function runAppSelfDiagnosis() {
+  const resultsContainer = document.getElementById('diagnostic-results');
+  const autofixBar = document.getElementById('autofix-bar');
+  if (resultsContainer) {
+    resultsContainer.innerHTML = '<div style="color:#007aff; font-weight:600;">🔍 Running self-diagnosis checks across 5 subsystems...</div>';
+  }
+
+  const checks = [];
+  let issuesFound = 0;
+
+  // Check 1: LocalStorage & Data Integrity
+  try {
+    const treeRaw = localStorage.getItem('quickrss_user_tree');
+    if (treeRaw) JSON.parse(treeRaw);
+    checks.push({ status: 'pass', name: 'LocalStorage Tree JSON', desc: 'Subscriptions hierarchy structure is valid.' });
+  } catch (e) {
+    issuesFound++;
+    checks.push({ status: 'fail', name: 'LocalStorage Tree JSON', desc: 'Corrupted tree JSON structure detected in LocalStorage.', fixable: true, fixKey: 'tree' });
+  }
+
+  try {
+    const starredRaw = localStorage.getItem('quickrss_starred_articles');
+    if (starredRaw) JSON.parse(starredRaw);
+    checks.push({ status: 'pass', name: 'LocalStorage Starred Items', desc: 'Starred articles dataset format is valid.' });
+  } catch (e) {
+    issuesFound++;
+    checks.push({ status: 'fail', name: 'LocalStorage Starred Items', desc: 'Corrupted starred articles JSON detected.', fixable: true, fixKey: 'starred' });
+  }
+
+  // Check 2: DOM & UI Controls Binding
+  const criticalSelectors = [
+    '#settings-btn', '#add-feed-btn', '#refresh-feeds-btn',
+    '#search-input', '#ai-assistant-toggle-btn', '#tree-container',
+    '#article-list-container', '#reader-container', '#word-cloud-container'
+  ];
+  const missingElements = criticalSelectors.filter(sel => !document.querySelector(sel));
+  if (missingElements.length === 0) {
+    checks.push({ status: 'pass', name: 'UI Controls & DOM Bindings', desc: 'All 9 core interface controls are mounted and healthy.' });
+  } else {
+    issuesFound++;
+    checks.push({ status: 'fail', name: 'UI Controls & DOM Bindings', desc: `Missing elements: ${missingElements.join(', ')}`, fixable: true, fixKey: 'dom' });
+  }
+
+  // Check 3: WebKit Native Bridge & Capabilities
+  const hasWebKit = Boolean(window.webkit && window.webkit.messageHandlers);
+  if (hasWebKit) {
+    checks.push({ status: 'pass', name: 'WebKit Swift Bridge', desc: 'Native WebKit messageHandlers pipeline active.' });
+  } else {
+    checks.push({ status: 'warn', name: 'WebKit Swift Bridge', desc: 'Running in browser/standalone preview mode (Native bridge bypassed).' });
+  }
+
+  // Check 4: Local MCP Server Reachability
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    const mcpToken = typeof MCP_TOKEN !== 'undefined' ? MCP_TOKEN : '';
+    const mcpRes = await fetch(`http://127.0.0.1:8745/mcp?token=${mcpToken}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (mcpRes.ok || mcpRes.status === 400 || mcpRes.status === 401) {
+      checks.push({ status: 'pass', name: 'Local MCP Server (:8745)', desc: 'MCP HTTP RPC server responding.' });
+    } else {
+      checks.push({ status: 'warn', name: 'Local MCP Server (:8745)', desc: `Server responded with HTTP ${mcpRes.status}` });
+    }
+  } catch (e) {
+    checks.push({ status: 'warn', name: 'Local MCP Server (:8745)', desc: 'MCP server port 8745 offline or pending start.' });
+  }
+
+  // Check 5: Live Feed Data Stream
+  if (typeof loadedArticles !== 'undefined' && Array.isArray(loadedArticles) && loadedArticles.length > 0) {
+    checks.push({ status: 'pass', name: 'Active Article Stream', desc: `Stream healthy with ${loadedArticles.length} active articles loaded.` });
+  } else {
+    issuesFound++;
+    checks.push({ status: 'warn', name: 'Active Article Stream', desc: 'No articles currently in memory pool.', fixable: true, fixKey: 'refresh' });
+  }
+
+  // Render Diagnostic Summary
+  if (resultsContainer) {
+    resultsContainer.innerHTML = checks.map(c => `
+      <div style="margin-bottom:8px; padding:8px 12px; border-radius:8px; background:${c.status === 'pass' ? 'rgba(52,199,89,0.1)' : (c.status === 'fail' ? 'rgba(255,59,48,0.1)' : 'rgba(255,149,0,0.1)')}; display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <span style="font-weight:600; color:${c.status === 'pass' ? '#34c759' : (c.status === 'fail' ? '#ff3b30' : '#ff9500')};">
+            ${c.status === 'pass' ? '✓ PASS' : (c.status === 'fail' ? '❌ FAIL' : '⚠️ WARN')}
+          </span>
+          <span style="font-weight:600; margin-left:8px; color:var(--text-primary);">${c.name}</span>
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${c.desc}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  if (autofixBar) {
+    if (issuesFound > 0) {
+      autofixBar.classList.remove('hidden');
+    } else {
+      autofixBar.classList.add('hidden');
+    }
+  }
+
+  window.AppDiagnostics.log('info', 'Diagnosis', `Completed self-diagnosis check. ${issuesFound} issue(s) flagged.`);
+  return { issuesFound, checks };
+}
+
+// Auto-Recovery & Repair Logic
+async function executeAutoRecovery() {
+  window.AppDiagnostics.log('info', 'AutoFix', 'Initiating automated system recovery...');
+  const autofixBar = document.getElementById('autofix-bar');
+  if (autofixBar) autofixBar.innerHTML = '<div style="color:#007aff; font-weight:600;">🛠️ Running repair scripts...</div>';
+
+  let repairsPerformed = [];
+
+  // 1. Repair Tree JSON if corrupted
+  try {
+    const treeRaw = localStorage.getItem('quickrss_user_tree');
+    if (treeRaw) JSON.parse(treeRaw);
+  } catch (e) {
+    localStorage.removeItem('quickrss_user_tree');
+    if (typeof defaultTree !== 'undefined') {
+      treeData = JSON.parse(JSON.stringify(defaultTree));
+      saveTreeData();
+      repairsPerformed.push('Reset corrupted subscriptions tree to default structure.');
+    }
+  }
+
+  // 2. Repair Starred Articles JSON if corrupted
+  try {
+    const starredRaw = localStorage.getItem('quickrss_starred_articles');
+    if (starredRaw) JSON.parse(starredRaw);
+  } catch (e) {
+    localStorage.setItem('quickrss_starred_articles', JSON.stringify([]));
+    repairsPerformed.push('Re-initialized corrupted starred articles storage.');
+  }
+
+  // 3. Clear transient cache and re-fetch feeds
+  if (typeof feedArticleCache !== 'undefined') {
+    for (const k of Object.keys(feedArticleCache)) delete feedArticleCache[k];
+  }
+  
+  if (typeof renderTree === 'function') renderTree();
+  if (typeof refreshAllFeeds === 'function') await refreshAllFeeds(false);
+  if (typeof renderWordCloud === 'function') renderWordCloud();
+
+  repairsPerformed.push('Flushed transient caches & re-synced feed streams.');
+
+  window.AppDiagnostics.log('success', 'AutoFix', 'Auto-recovery completed successfully!', repairsPerformed);
+
+  if (typeof showToast === 'function') {
+    showToast('✅ Auto-Recovery Complete! System operational.', 'success');
+  }
+
+  // Re-run diagnosis to confirm clean state
+  setTimeout(() => {
+    runAppSelfDiagnosis();
+  }, 500);
+}
+
+// Diagnostics UI Event Setup
+function setupDiagnosticsUI() {
+  const runBtn = document.getElementById('run-diagnostics-btn');
+  const fixBtn = document.getElementById('auto-fix-btn');
+  const resetCacheBtn = document.getElementById('reset-cache-btn');
+  const clearLogsBtn = document.getElementById('clear-logs-btn');
+
+  if (runBtn) runBtn.onclick = () => runAppSelfDiagnosis();
+  if (fixBtn) fixBtn.onclick = () => executeAutoRecovery();
+
+  if (resetCacheBtn) {
+    resetCacheBtn.onclick = () => {
+      if (typeof feedArticleCache !== 'undefined') {
+        for (const k of Object.keys(feedArticleCache)) delete feedArticleCache[k];
+      }
+      if (typeof showToast === 'function') showToast('🧹 Cache cleared successfully.', 'info');
+      refreshAllFeeds(true);
+    };
+  }
+
+  if (clearLogsBtn) {
+    clearLogsBtn.onclick = () => {
+      window.AppDiagnostics.logs = [];
+      window.AppDiagnostics.updateLogUI();
+      if (typeof showToast === 'function') showToast('Cleared diagnostic logs.', 'info');
+    };
+  }
+}
+
+// ==========================================
+// WORD CLOUD VISUALIZATION (BOTTOM LEFT)
+// ==========================================
+// ==========================================
+// RAKE (Rapid Automatic Keyword Extraction) ENGINE
+// ==========================================
+const RAKE_STOP_WORDS = new Set([
+  'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'aren\'t', 'as', 'at',
+  'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 'can\'t', 'cannot', 'could',
+  'couldn\'t', 'did', 'didn\'t', 'do', 'does', 'doesn\'t', 'doing', 'don\'t', 'down', 'during', 'each', 'few', 'for',
+  'from', 'further', 'had', 'hadn\'t', 'has', 'hasn\'t', 'have', 'haven\'t', 'having', 'he', 'he\'d', 'he\'ll', 'he\'s',
+  'her', 'here', 'here\'s', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'how\'s', 'i', 'i\'d', 'i\'ll', 'i\'m',
+  'i\'ve', 'if', 'in', 'into', 'is', 'isn\'t', 'it', 'it\'s', 'its', 'itself', 'let\'s', 'me', 'more', 'most', 'mustn\'t',
+  'my', 'myself', 'no', 'nor', 'not', 'of', 'off', 'on', 'once', 'only', 'or', 'other', 'ought', 'our', 'ours', 'ourselves',
+  'out', 'over', 'own', 'same', 'shan\'t', 'she', 'she\'d', 'she\'ll', 'she\'s', 'should', 'shouldn\'t', 'so', 'some',
+  'such', 'than', 'that', 'that\'s', 'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'there\'s', 'these',
+  'they', 'they\'d', 'they\'ll', 'they\'re', 'they\'ve', 'this', 'those', 'through', 'to', 'too', 'under', 'until', 'up',
+  'very', 'was', 'wasn\'t', 'we', 'we\'d', 'we\'ll', 'we\'re', 'we\'ve', 'were', 'weren\'t', 'what', 'what\'s', 'when',
+  'when\'s', 'where', 'where\'s', 'which', 'while', 'who', 'who\'s', 'whom', 'why', 'why\'s', 'with', 'won\'t', 'would',
+  'wouldn\'t', 'you', 'you\'d', 'you\'ll', 'you\'re', 'you\'ve', 'your', 'yours', 'yourself', 'yourselves', 'http', 'https',
+  'com', 'org', 'net', 'feed', 'rss', 'news', 'blog', 'post', 'posts', 'posted', 'article', 'articles', 'update', 'updates',
+  'updated', 'updating', 'read', 'reading', 'view', 'views', 'full', 'latest', 'tech', 'world', '2026', '2025', '2024',
+  'via', 'using', 'used', 'says', 'said', 'per', 'new', 'one', 'two', 'three', 'first', 'second', 'today', 'yesterday',
+  'make', 'makes', 'making', 'made', 'just', 'like', 'get', 'gets', 'getting', 'got', 'take', 'takes', 'taking', 'took',
+  'way', 'ways', 'well', 'also', 'even', 'can', 'will', 'may', 'could', 'would', 'should', 'might', 'must', 'many', 'much',
+  'more', 'most', 'some', 'such', 'than', 'too', 'very', 'now', 'live', 'add', 'adds', 'adding', 'added', 'release', 'releases',
+  'released', 'releasing', 'security', 'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september',
+  'october', 'november', 'december', 'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
+  'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years', 'monday', 'tuesday', 'wednesday', 'thursday',
+  'friday', 'saturday', 'sunday', 'part', 'parts', 'enough', 'leading', 'show', 'shows', 'shown', 'showing', 'top',
+  'best', 'guide', 'tutorial', 'overview', 'version', 'versions', 'v1', 'v2', 'v3', 'digest', 'edition', 'newsletter',
+  'announces', 'announcing', 'announced', 'announcement', 'launches', 'launching', 'launched', 'unveils', 'unveiling',
+  'unveiled', 'reveals', 'revealing', 'revealed', 'introduces', 'introducing', 'introduced',
+  'excited', 'exciting', 'quite', 'belong', 'else', 'anywhere', 'everywhere', 'somewhere', 'place', 'places',
+  'next', 'previous', 'former', 'later', 'soon', 'et', 'al', 'etal', 'ibid', 'eg', 'ie', 'etc', 'vs', 'versus',
+  'author', 'authors', 'editor', 'editors', 'around', 'called', 'privately', 'unsealed', 'court', 'filings',
+  'practices', 'theft', 'exec', 'broader', 'global', 'community', 'combining', 'formal', 'logic', 'solvers',
+  'joins', 'joining', 'joined', 'hosts', 'hosting', 'hosted', 'spends', 'spending', 'spent', 'talking', 'talk',
+  'means', 'meaning', 'meant', 'really', 'gives', 'gave', 'giving', 'every', 'friend', 'friends', 'rep', 'patio11',
+  'implosion', 'feel', 'feels', 'feeling', 'free', 'actually', 'combines', 'brilliant', 'insight'
+]);
+
+function RAKE_extractCandidatePhrases(text) {
+  if (!text) return [];
+  // Normalize smart quotes and apostrophes to standard ascii single quote
+  text = text.replace(/[\u2018\u2019’`]/g, "'").replace(/[\u201C\u201D“”]/g, '"');
+  // Exclude single quote ' from sentence delimiters so contractions like "don't" or "we're" match stop words
+  const sentenceRegex = /[.!?;\n\t,–—:()\[\]"]/g;
+  const sentences = text.split(sentenceRegex);
+  const candidates = [];
+
+  sentences.forEach(sentence => {
+    const words = sentence.trim().split(/\s+/);
+    let currentPhrase = [];
+
+    words.forEach(word => {
+      const cleanWord = word.replace(/^[^a-zA-Z0-9']+|[^a-zA-Z0-9']+$/g, '').replace(/^'+|'+$/g, '');
+      const lower = cleanWord.toLowerCase();
+
+      // Exclude pure numbers and alphanumeric numbers like 30b, 100k, etc.
+      if (cleanWord.length > 1 && !RAKE_STOP_WORDS.has(lower) && !/^\d+[a-zA-Z]?$/.test(cleanWord)) {
+        currentPhrase.push(cleanWord);
+      } else {
+        if (currentPhrase.length > 0) {
+          RAKE_addPhraseCandidates(currentPhrase, candidates);
+          currentPhrase = [];
+        }
+      }
+    });
+
+    if (currentPhrase.length > 0) {
+      RAKE_addPhraseCandidates(currentPhrase, candidates);
+    }
+  });
+
+  return candidates;
+}
+
+function RAKE_addPhraseCandidates(phraseWords, candidates) {
+  // Enforce strict hard limit: max 3 words per topic phrase
+  if (phraseWords.length <= 3) {
+    candidates.push(phraseWords);
+  } else {
+    // Break longer sequences into 1 to 3 word n-grams to extract focused, punchy topics
+    for (let i = 0; i < phraseWords.length; i++) {
+      for (let len = 1; len <= Math.min(3, phraseWords.length - i); len++) {
+        candidates.push(phraseWords.slice(i, i + len));
+      }
+    }
+  }
+}
+
+function RAKE_calculateScores(candidatePhrases) {
+  const wordFreq = {};
+  const wordDegree = {};
+  const phraseCounts = {};
+  const phraseDisplayMap = {};
+
+  candidatePhrases.forEach(phrase => {
+    if (!phrase || phrase.length === 0 || phrase.length > 3) return;
+    const lowerWords = phrase.map(w => w.toLowerCase());
+    const lowerKey = lowerWords.join(' ');
+
+    if (lowerKey.length < 2 || /^\d+$/.test(lowerKey)) return;
+
+    phraseCounts[lowerKey] = (phraseCounts[lowerKey] || 0) + 1;
+    if (!phraseDisplayMap[lowerKey]) {
+      phraseDisplayMap[lowerKey] = formatPhraseCasing(phrase.join(' '));
+    }
+
+    const degree = lowerWords.length - 1;
+    lowerWords.forEach(word => {
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+      wordDegree[word] = (wordDegree[word] || 0) + degree + 1;
+    });
+  });
+
+  // Base term-frequency word scoring formula:
+  // Combines Term Frequency (wordFreq) and co-occurrence degree (wordDegree/wordFreq)
+  // High frequency words score higher, instead of being penalized by pure degree/freq division
+  const wordScore = {};
+  for (const word of Object.keys(wordFreq)) {
+    const tf = wordFreq[word];
+    const degRatio = wordDegree[word] / tf;
+    wordScore[word] = Math.sqrt(tf) * (1 + 0.35 * degRatio);
+  }
+
+  const phraseScores = {};
+  for (const lowerKey of Object.keys(phraseCounts)) {
+    const words = lowerKey.split(' ');
+    const count = phraseCounts[lowerKey];
+    const wordCount = words.length;
+
+    // Hard reject any phrase with > 3 words
+    if (wordCount > 3) continue;
+
+    // Filter out 3-word phrases that only appear once UNLESS all constituent words are very frequent
+    if (wordCount === 3 && count < 2) {
+      const avgTf = words.reduce((acc, w) => acc + (wordFreq[w] || 0), 0) / 3;
+      if (avgTf < 3) continue;
+    }
+
+    let score = 0;
+    words.forEach(w => {
+      score += wordScore[w] || 0;
+    });
+
+    // Weight by phrase frequency across feed articles so frequent topics dominate
+    score = score * Math.pow(count, 1.15);
+
+    // Topic sweet spot multipliers (1-3 word terms)
+    if (wordCount === 2) score *= 1.35;
+    else if (wordCount === 3) score *= 1.15;
+
+    phraseScores[lowerKey] = score;
+  }
+
+  return { phraseScores, phraseDisplayMap };
+}
+
+function getAllAvailableArticles(limit = 120) {
+  let pool = [];
+  if (typeof loadedArticles !== 'undefined' && Array.isArray(loadedArticles)) {
+    pool = pool.concat(loadedArticles);
+  }
+  if (typeof feedArticleCache !== 'undefined') {
+    Object.values(feedArticleCache).forEach(arr => {
+      if (Array.isArray(arr)) pool = pool.concat(arr);
+    });
+  }
+  if (typeof articleDatabase !== 'undefined') {
+    Object.values(articleDatabase).forEach(arr => {
+      if (Array.isArray(arr)) pool = pool.concat(arr);
+    });
+  }
+  const seen = new Set();
+  const unique = [];
+  for (let i = 0; i < pool.length; i++) {
+    const art = pool[i];
+    if (!art || !art.title) continue;
+    const key = art.id || (art.title + '---' + (art.feedTitle || ''));
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(art);
+      if (limit > 0 && unique.length >= limit) break;
+    }
+  }
+  return unique;
+}
+
+function formatPhraseCasing(str) {
+  if (!str) return '';
+  const acronyms = new Set(['AI', 'GPU', 'CPU', 'LLM', 'API', 'ML', 'RAG', 'SDK', 'OPML', 'RSS', 'UI', 'UX', 'MIT', 'AWS', 'GPT', 'X', 'CEO', 'B2B', 'CTO', 'CFO', 'VP', 'SaaS']);
+  return str.split(/\s+/).map(word => {
+    const upper = word.toUpperCase();
+    if (acronyms.has(upper)) return upper;
+    if (word.length <= 2) return word.toLowerCase();
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(' ');
+}
+
+function topicColorHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const colorIndex = Math.abs(hash) % 6;
+  const palette = [
+    { color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
+    { color: '#007aff', bg: 'rgba(0, 122, 255, 0.14)' },
+    { color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.14)' },
+    { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+    { color: '#ec4899', bg: 'rgba(236, 72, 153, 0.14)' },
+    { color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.14)' }
+  ];
+  return palette[colorIndex];
+}
+
+let wordCloudDebounceTimer = null;
+
+function renderWordCloud() {
+  if (wordCloudDebounceTimer) clearTimeout(wordCloudDebounceTimer);
+  wordCloudDebounceTimer = setTimeout(executeRenderWordCloud, 100);
+}
+
+function executeRenderWordCloud() {
+  const container = document.getElementById('word-cloud-container');
+  if (!container) return;
+
+  try {
+    const sourceArticles = getAllAvailableArticles(120);
+    if (!sourceArticles || sourceArticles.length === 0) {
+      container.innerHTML = '<div class="word-cloud-loading">No active topics available</div>';
+      return;
+    }
+
+    const titlesOnly = safeGetStorage('quickrss_wordcloud_source', 'titles') !== 'all';
+    let allCandidates = [];
+    sourceArticles.forEach(art => {
+      const text = titlesOnly ? (art.title || '') : `${art.title || ''}. ${art.summary || ''}`;
+      const candidates = RAKE_extractCandidatePhrases(text);
+      allCandidates = allCandidates.concat(candidates);
+    });
+
+    const { phraseScores, phraseDisplayMap } = RAKE_calculateScores(allCandidates);
+
+    const sortedKeys = Object.keys(phraseScores)
+      .filter(k => k && k.length >= 2)
+      .sort((a, b) => phraseScores[b] - phraseScores[a]);
+
+    const topAcronyms = new Set(['ai', 'llm', 'gpu', 'cpu', 'ml', 'rag', 'sdk', 'gpt', 'api', 'ui', 'ux', 'rss', 'aws', 'python', 'google', 'apple', 'nvidia', 'claude', 'openai', 'pytorch', 'ceo', 'b2b']);
+    const selectedKeys = [];
+    const usedWordsSet = new Set();
+
+    for (const k of sortedKeys) {
+      if (selectedKeys.length >= 28) break;
+      const words = k.split(' ');
+
+      // Word-overlap & sub-phrase deduplication:
+      // Reject candidate k if its words overlap with ALREADY SELECTED higher-scoring topics.
+      // Prevents stringing together adjacent overlapping 3-word n-grams from the same article title!
+      let hasWordOverlap = false;
+      for (const w of words) {
+        if (!topAcronyms.has(w) && usedWordsSet.has(w)) {
+          hasWordOverlap = true;
+          break;
+        }
+      }
+
+      if (!hasWordOverlap) {
+        selectedKeys.push(k);
+        words.forEach(w => {
+          if (!topAcronyms.has(w)) usedWordsSet.add(w);
+        });
+      }
+    }
+
+    if (selectedKeys.length === 0) {
+      container.innerHTML = '<div class="word-cloud-loading">No topics found</div>';
+      return;
+    }
+
+    const maxScore = phraseScores[selectedKeys[0]];
+    const minScore = phraseScores[selectedKeys[selectedKeys.length - 1]];
+
+    const shuffledKeys = [...selectedKeys].sort(() => Math.random() - 0.5);
+
+    container.innerHTML = '';
+    shuffledKeys.forEach(k => {
+      const score = phraseScores[k];
+      const displayName = phraseDisplayMap[k] || k;
+      const tag = document.createElement('span');
+
+      const ratio = maxScore > minScore ? (score - minScore) / (maxScore - minScore) : 0.5;
+      const fontSize = Math.round(11 + ratio * 8);
+      const fontWeight = ratio >= 0.65 ? 700 : (ratio >= 0.35 ? 600 : 500);
+      const theme = topicColorHash(displayName);
+
+      tag.className = 'word-tag';
+      tag.style.fontSize = `${fontSize}px`;
+      tag.style.fontWeight = fontWeight;
+      tag.style.color = theme.color;
+      tag.style.backgroundColor = theme.bg;
+      tag.textContent = displayName;
+      tag.title = `Score: ${score.toFixed(1)} • Click to search "${displayName}"`;
+
+      tag.onclick = (e) => {
+        e.stopPropagation();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+          searchInput.value = displayName;
+          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+          if (typeof showToast === 'function') {
+            showToast(`Filtered by topic: "${displayName}"`, 'info');
+          }
+        }
+      };
+
+      container.appendChild(tag);
+    });
+  } catch (err) {
+    if (window.AppDiagnostics) {
+      window.AppDiagnostics.log('error', 'WordCloud', 'Error rendering word cloud:', err);
+    }
+    console.error('Error rendering word cloud:', err);
+    container.innerHTML = '<div class="word-cloud-loading">No active topics available</div>';
+  }
+}
+
+function setupWordCloudUI() {
+  const refreshBtn = document.getElementById('refresh-wordcloud-btn');
+  if (refreshBtn) {
+    refreshBtn.onclick = (e) => {
+      e.stopPropagation();
+      renderWordCloud();
+      if (typeof showToast === 'function') showToast('Updated Word Cloud topics', 'info');
+    };
+  }
+
+  // Restore saved height
+  const cloudBox = document.getElementById('word-cloud-container');
+  const savedHeight = safeGetStorage('quickrss_wordcloud_height', null);
+  if (cloudBox && savedHeight) {
+    cloudBox.style.height = `${savedHeight}px`;
+  }
+
+  // Setup click drag vertical resize handler
+  const resizer = document.getElementById('wordcloud-resizer');
+  if (resizer && cloudBox) {
+    let isDragging = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isDragging = true;
+      startY = e.clientY;
+      startHeight = cloudBox.offsetHeight;
+      resizer.classList.add('dragging');
+      document.body.style.cursor = 'ns-resize';
+
+      const onMouseMove = (moveEvt) => {
+        if (!isDragging) return;
+        // Dragging up (dy < 0) increases box height, dragging down decreases
+        const dy = moveEvt.clientY - startY;
+        const newHeight = Math.max(50, Math.min(450, startHeight - dy));
+        cloudBox.style.height = `${newHeight}px`;
+      };
+
+      const onMouseUp = () => {
+        if (isDragging) {
+          isDragging = false;
+          resizer.classList.remove('dragging');
+          document.body.style.cursor = '';
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          safeSetStorage('quickrss_wordcloud_height', cloudBox.offsetHeight);
+        }
+      };
+
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    });
+  }
+}
+
+// ==========================================
+// IN-ARTICLE FIND BAR CONTROLLER (Cmd+F / Ctrl+F)
+// ==========================================
+let currentArticleFindIndex = -1;
+let currentArticleFindMatches = [];
+
+function openArticleFindBar() {
+  const findBar = document.getElementById('article-find-bar');
+  const findInput = document.getElementById('article-find-input');
+  if (!findBar || !findInput) return;
+
+  findBar.classList.remove('hidden');
+  findInput.focus();
+  findInput.select();
+
+  if (findInput.value.trim().length > 0) {
+    performInArticleSearch(findInput.value.trim());
+  }
+}
+
+function closeArticleFindBar() {
+  const findBar = document.getElementById('article-find-bar');
+  if (findBar) findBar.classList.add('hidden');
+  clearInArticleHighlights();
+}
+
+function clearInArticleHighlights() {
+  currentArticleFindIndex = -1;
+  currentArticleFindMatches = [];
+  const counter = document.getElementById('article-find-counter');
+  if (counter) counter.textContent = '0 of 0';
+
+  const readerContainer = document.getElementById('reader-container');
+  if (!readerContainer) return;
+
+  // Clear highlights in reader text view
+  const highlights = readerContainer.querySelectorAll('mark.find-highlight');
+  highlights.forEach(mark => {
+    const parent = mark.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(mark.textContent), mark);
+      parent.normalize();
+    }
+  });
+
+  // Clear highlights in iframe if present
+  const iframe = readerContainer.querySelector('iframe');
+  if (iframe && iframe.contentDocument && iframe.contentDocument.body) {
+    const iframeHighlights = iframe.contentDocument.body.querySelectorAll('mark.find-highlight');
+    iframeHighlights.forEach(mark => {
+      const parent = mark.parentNode;
+      if (parent) {
+        parent.replaceChild(iframe.contentDocument.createTextNode(mark.textContent), mark);
+        parent.normalize();
+      }
+    });
+  }
+}
+
+function performInArticleSearch(query) {
+  clearInArticleHighlights();
+  if (!query || query.trim().length === 0) return;
+
+  const q = query.trim().toLowerCase();
+  const readerContainer = document.getElementById('reader-container');
+  if (!readerContainer) return;
+
+  let targetDoc = document;
+  let targetRoot = readerContainer;
+
+  const iframe = readerContainer.querySelector('iframe');
+  if (iframe && iframe.contentDocument && iframe.contentDocument.body) {
+    targetDoc = iframe.contentDocument;
+    targetRoot = iframe.contentDocument.body;
+  }
+
+  // Walk text nodes and highlight matches
+  const walker = targetDoc.createTreeWalker(targetRoot, NodeFilter.SHOW_TEXT, null, false);
+  const textNodes = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentNode && !['SCRIPT', 'STYLE', 'MARK', 'INPUT', 'TEXTAREA'].includes(node.parentNode.tagName)) {
+      if (node.nodeValue.toLowerCase().includes(q)) {
+        textNodes.push(node);
+      }
+    }
+  }
+
+  const matches = [];
+
+  textNodes.forEach(textNode => {
+    const val = textNode.nodeValue;
+    const lowerVal = val.toLowerCase();
+    let idx = lowerVal.indexOf(q);
+    let lastIdx = 0;
+    const parent = textNode.parentNode;
+    if (!parent) return;
+
+    const frag = targetDoc.createDocumentFragment();
+
+    while (idx !== -1) {
+      if (idx > lastIdx) {
+        frag.appendChild(targetDoc.createTextNode(val.slice(lastIdx, idx)));
+      }
+      const mark = targetDoc.createElement('mark');
+      mark.className = 'find-highlight';
+      mark.textContent = val.slice(idx, idx + q.length);
+      frag.appendChild(mark);
+      matches.push(mark);
+
+      lastIdx = idx + q.length;
+      idx = lowerVal.indexOf(q, lastIdx);
+    }
+
+    if (lastIdx < val.length) {
+      frag.appendChild(targetDoc.createTextNode(val.slice(lastIdx)));
+    }
+
+    parent.replaceChild(frag, textNode);
+  });
+
+  currentArticleFindMatches = matches;
+  currentArticleFindIndex = matches.length > 0 ? 0 : -1;
+  updateArticleFindUI();
+}
+
+function updateArticleFindUI() {
+  const counter = document.getElementById('article-find-counter');
+  const count = currentArticleFindMatches.length;
+
+  if (count === 0) {
+    if (counter) counter.textContent = '0 of 0';
+    return;
+  }
+
+  if (currentArticleFindIndex < 0) currentArticleFindIndex = 0;
+  if (currentArticleFindIndex >= count) currentArticleFindIndex = 0;
+
+  if (counter) counter.textContent = `${currentArticleFindIndex + 1} of ${count}`;
+
+  currentArticleFindMatches.forEach((mark, idx) => {
+    if (idx === currentArticleFindIndex) {
+      mark.classList.add('active-match');
+      if (typeof mark.scrollIntoView === 'function') {
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      mark.classList.remove('active-match');
+    }
+  });
+}
+
+function findNextArticleMatch() {
+  if (currentArticleFindMatches.length === 0) return;
+  currentArticleFindIndex = (currentArticleFindIndex + 1) % currentArticleFindMatches.length;
+  updateArticleFindUI();
+}
+
+function findPrevArticleMatch() {
+  if (currentArticleFindMatches.length === 0) return;
+  currentArticleFindIndex = (currentArticleFindIndex - 1 + currentArticleFindMatches.length) % currentArticleFindMatches.length;
+  updateArticleFindUI();
+}
+
+function setupArticleFindUI() {
+  const findInput = document.getElementById('article-find-input');
+  const closeBtn = document.getElementById('article-find-close');
+  const nextBtn = document.getElementById('article-find-next');
+  const prevBtn = document.getElementById('article-find-prev');
+
+  if (closeBtn) closeBtn.onclick = closeArticleFindBar;
+  if (nextBtn) nextBtn.onclick = findNextArticleMatch;
+  if (prevBtn) prevBtn.onclick = findPrevArticleMatch;
+
+  if (findInput) {
+    findInput.oninput = (e) => {
+      performInArticleSearch(e.target.value);
+    };
+
+    findInput.onkeydown = (e) => {
+      if (e.key === 'Escape') {
+        closeArticleFindBar();
+      } else if (e.key === 'Enter') {
+        if (e.shiftKey) findPrevArticleMatch();
+        else findNextArticleMatch();
+      }
+    };
+  }
+
+  // Global Keydown Trap for Cmd+F / Ctrl+F
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) {
+      const activeId = document.activeElement ? document.activeElement.id : '';
+      if (activeId !== 'search-input') {
+        e.preventDefault();
+        openArticleFindBar();
+      }
+    }
+  });
+}
+
 // Initial Render & Load
 function startApp() {
   renderTree();
@@ -4458,6 +5333,12 @@ function startApp() {
   if (typeof setupSearchUI === 'function') setupSearchUI();
   if (typeof setupAIChatbotUI === 'function') setupAIChatbotUI();
   if (typeof setupAutoRefreshTimer === 'function') setupAutoRefreshTimer();
+  if (typeof setupWordCloudUI === 'function') setupWordCloudUI();
+  if (typeof setupDiagnosticsUI === 'function') setupDiagnosticsUI();
+  if (typeof setupArticleFindUI === 'function') setupArticleFindUI();
+  if (typeof renderWordCloud === 'function') renderWordCloud();
+
+  window.AppDiagnostics.log('info', 'AppLifecycle', 'Quick RSS application initialized successfully.');
 
   // Async background network update after initial UI paint
   setTimeout(() => {

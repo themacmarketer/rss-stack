@@ -4731,6 +4731,26 @@ function setupDiagnosticsUI() {
       if (typeof showToast === 'function') showToast('Cleared diagnostic logs.', 'info');
     };
   }
+
+  const triggerCrashBtn = document.getElementById('trigger-test-crash-btn');
+  if (triggerCrashBtn) {
+    triggerCrashBtn.onclick = () => {
+      if (confirm('Are you sure you want to trigger a test crash? The application will auto-restart immediately and display the crash report modal.')) {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.triggerTestCrash) {
+          window.webkit.messageHandlers.triggerTestCrash.postMessage({});
+        } else {
+          // Fallback for browser preview mode
+          const fakeReport = {
+            timestamp: new Date().toLocaleString(),
+            reason: 'Simulated Native Test Crash (SIGABRT)',
+            details: 'Thread 1: Fatal test crash triggered manually via Health & Diagnostics UI to verify auto-restart and crash recovery popup modal.\n    at executeTestCrash (app.js:4735)'
+          };
+          safeSetStorage('quickrss_last_crash_report', JSON.stringify(fakeReport));
+          showCrashRecoveryModal(fakeReport);
+        }
+      }
+    };
+  }
 }
 
 // ==========================================
@@ -5016,6 +5036,8 @@ function executeRenderWordCloud() {
       return;
     }
 
+    recordWordCloudSnapshot(selectedKeys, phraseScores, phraseDisplayMap);
+
     const maxScore = phraseScores[selectedKeys[0]];
     const minScore = phraseScores[selectedKeys[selectedKeys.length - 1]];
 
@@ -5060,6 +5082,48 @@ function executeRenderWordCloud() {
     }
     console.error('Error rendering word cloud:', err);
     container.innerHTML = '<div class="word-cloud-loading">No active topics available</div>';
+  }
+}
+
+function recordWordCloudSnapshot(selectedKeys, phraseScores, phraseDisplayMap) {
+  if (!selectedKeys || selectedKeys.length === 0) return;
+  try {
+    const rawHistory = safeGetStorage('quickrss_wordcloud_history', null);
+    let history = [];
+    if (rawHistory) {
+      try { history = JSON.parse(rawHistory); } catch (e) {}
+    }
+    if (!Array.isArray(history)) history = [];
+
+    const now = Date.now();
+    const dateStr = new Date().toLocaleString();
+    const snapshotTerms = selectedKeys.map(k => ({
+      term: k,
+      displayName: phraseDisplayMap[k] || k,
+      frequency: parseFloat((phraseScores[k] || 1).toFixed(2))
+    }));
+
+    if (history.length > 0 && (now - history[history.length - 1].timestamp) < 60000) {
+      history[history.length - 1] = {
+        timestamp: now,
+        dateStr: dateStr,
+        terms: snapshotTerms
+      };
+    } else {
+      history.push({
+        timestamp: now,
+        dateStr: dateStr,
+        terms: snapshotTerms
+      });
+    }
+
+    if (history.length > 100) {
+      history = history.slice(history.length - 100);
+    }
+
+    safeSetStorage('quickrss_wordcloud_history', JSON.stringify(history));
+  } catch (err) {
+    console.error('Failed to save wordcloud history:', err);
   }
 }
 
@@ -5128,11 +5192,9 @@ let currentArticleFindIndex = -1;
 let currentArticleFindMatches = [];
 
 function openArticleFindBar() {
-  const findBar = document.getElementById('article-find-bar');
   const findInput = document.getElementById('article-find-input');
-  if (!findBar || !findInput) return;
+  if (!findInput) return;
 
-  findBar.classList.remove('hidden');
   findInput.focus();
   findInput.select();
 
@@ -5142,8 +5204,11 @@ function openArticleFindBar() {
 }
 
 function closeArticleFindBar() {
-  const findBar = document.getElementById('article-find-bar');
-  if (findBar) findBar.classList.add('hidden');
+  const findInput = document.getElementById('article-find-input');
+  if (findInput) {
+    findInput.value = '';
+    findInput.blur();
+  }
   clearInArticleHighlights();
 }
 
@@ -5322,6 +5387,280 @@ function setupArticleFindUI() {
   });
 }
 
+// ==========================================
+// CRASH RECOVERY & DIAGNOSTICS POP-UP MODAL
+// ==========================================
+function checkAndDisplayCrashReport() {
+  let report = window.__LAST_CRASH_REPORT__;
+  if (!report) {
+    const raw = safeGetStorage('quickrss_last_crash_report', null);
+    if (raw) {
+      try { report = JSON.parse(raw); } catch (e) {}
+    }
+  }
+
+  if (report && (report.reason || report.details)) {
+    showCrashRecoveryModal(report);
+    try { localStorage.removeItem('quickrss_last_crash_report'); } catch (e) {}
+    delete window.__LAST_CRASH_REPORT__;
+  }
+}
+
+function showCrashRecoveryModal(report) {
+  const modal = document.getElementById('crash-modal');
+  if (!modal) return;
+
+  const reasonEl = document.getElementById('crash-modal-reason');
+  const timeEl = document.getElementById('crash-modal-time');
+  const detailsEl = document.getElementById('crash-modal-details');
+  const closeBtn = document.getElementById('close-crash-modal-btn');
+  const dismissBtn = document.getElementById('dismiss-crash-modal-btn');
+  const copyBtn = document.getElementById('copy-crash-details-btn');
+
+  if (reasonEl) reasonEl.textContent = report.reason || 'Unknown Fatal Exception';
+  if (timeEl) timeEl.textContent = report.timestamp || new Date().toLocaleString();
+  if (detailsEl) detailsEl.textContent = report.details || 'No call stack trace available.';
+
+  modal.classList.remove('hidden');
+
+  const closeModal = () => modal.classList.add('hidden');
+
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (dismissBtn) dismissBtn.onclick = closeModal;
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      const summaryText = `[Quick RSS Crash Report]\nTimestamp: ${report.timestamp || ''}\nReason: ${report.reason || ''}\nDetails:\n${report.details || ''}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(summaryText).then(() => {
+          if (typeof showToast === 'function') showToast('Copied crash report to clipboard!', 'success');
+        }).catch(() => {
+          if (typeof showToast === 'function') showToast('Report copied to clipboard!', 'info');
+        });
+      }
+    };
+  }
+}
+
+// ==========================================
+// EMERGING TOPICS & TREND ANALYSIS CONTROLLER
+// ==========================================
+function setupEmergingTopicsUI() {
+  const btn = document.getElementById('emerging-topics-btn');
+  const modal = document.getElementById('emerging-topics-modal');
+  const closeBtn = document.getElementById('close-emerging-modal-btn');
+  const closeFooterBtn = document.getElementById('close-emerging-modal-footer-btn');
+  const sortSelect = document.getElementById('emerging-sort-select');
+  const clearBtn = document.getElementById('clear-emerging-history-btn');
+
+  if (btn) {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      openEmergingTopicsModal();
+    };
+  }
+
+  const closeModal = () => modal && modal.classList.add('hidden');
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (closeFooterBtn) closeFooterBtn.onclick = closeModal;
+
+  const timeBtns = document.querySelectorAll('.emerging-time-btn');
+  timeBtns.forEach(b => {
+    b.onclick = () => {
+      timeBtns.forEach(tb => tb.classList.remove('active'));
+      b.classList.add('active');
+      renderEmergingTopicsModal();
+    };
+  });
+
+  if (sortSelect) {
+    sortSelect.onchange = () => renderEmergingTopicsModal();
+  }
+
+  if (clearBtn) {
+    clearBtn.onclick = () => {
+      if (confirm('Clear all historical keyword trend data?')) {
+        try { localStorage.removeItem('quickrss_wordcloud_history'); } catch(e){}
+        if (typeof showToast === 'function') showToast('Cleared keyword trend history.', 'info');
+        renderEmergingTopicsModal();
+      }
+    };
+  }
+}
+
+function openEmergingTopicsModal() {
+  const modal = document.getElementById('emerging-topics-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  renderEmergingTopicsModal();
+}
+
+function renderEmergingTopicsModal() {
+  const tableBody = document.getElementById('emerging-topics-table-body');
+  const statSnapshots = document.getElementById('stat-total-snapshots');
+  const statUnique = document.getElementById('stat-unique-terms');
+  const statSurging = document.getElementById('stat-surging-count');
+  if (!tableBody) return;
+
+  const rawHistory = safeGetStorage('quickrss_wordcloud_history', null);
+  let history = [];
+  if (rawHistory) {
+    try { history = JSON.parse(rawHistory); } catch (e) {}
+  }
+  if (!Array.isArray(history)) history = [];
+
+  if (statSnapshots) statSnapshots.textContent = history.length;
+
+  if (history.length === 0) {
+    const currentContainer = document.getElementById('word-cloud-container');
+    const tags = currentContainer ? currentContainer.querySelectorAll('.word-tag') : [];
+    if (tags.length > 0) {
+      const initialTerms = Array.from(tags).map(t => ({
+        term: t.textContent.toLowerCase(),
+        displayName: t.textContent,
+        frequency: 10
+      }));
+      history = [{
+        timestamp: Date.now(),
+        dateStr: new Date().toLocaleString(),
+        terms: initialTerms
+      }];
+      safeSetStorage('quickrss_wordcloud_history', JSON.stringify(history));
+    }
+  }
+
+  const activeTimeBtn = document.querySelector('.emerging-time-btn.active');
+  const timeframe = activeTimeBtn ? activeTimeBtn.getAttribute('data-time') : '24h';
+  const now = Date.now();
+  let cutoff = 0;
+  if (timeframe === '24h') cutoff = now - (24 * 3600 * 1000);
+  else if (timeframe === '7d') cutoff = now - (7 * 24 * 3600 * 1000);
+
+  const filteredHistory = history.filter(s => s.timestamp >= cutoff);
+
+  if (filteredHistory.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-muted);">No keyword snapshots recorded in the selected timeframe yet.</td></tr>`;
+    if (statUnique) statUnique.textContent = '0';
+    if (statSurging) statSurging.textContent = '0';
+    return;
+  }
+
+  const latestSnapshot = filteredHistory[filteredHistory.length - 1];
+  const baselineSnapshots = filteredHistory.slice(0, Math.max(1, filteredHistory.length - 1));
+
+  const currentTermMap = new Map();
+  latestSnapshot.terms.forEach(t => {
+    currentTermMap.set(t.term, t);
+  });
+
+  const baselineTermMap = new Map();
+  baselineSnapshots.forEach(snap => {
+    snap.terms.forEach(t => {
+      if (!baselineTermMap.has(t.term)) {
+        baselineTermMap.set(t.term, { displayName: t.displayName, frequencies: [], firstSeen: snap.timestamp });
+      }
+      baselineTermMap.get(t.term).frequencies.push(t.frequency);
+    });
+  });
+
+  const allKnownTerms = new Set([...currentTermMap.keys(), ...baselineTermMap.keys()]);
+  if (statUnique) statUnique.textContent = allKnownTerms.size;
+
+  const emergingResults = [];
+  let surgingCount = 0;
+
+  currentTermMap.forEach((currObj, termKey) => {
+    const baselineData = baselineTermMap.get(termKey);
+    let baselineScore = 0;
+    let isNew = false;
+    let firstSeen = latestSnapshot.timestamp;
+
+    if (!baselineData || baselineData.frequencies.length === 0) {
+      isNew = true;
+      baselineScore = 0;
+    } else {
+      firstSeen = baselineData.firstSeen;
+      const sum = baselineData.frequencies.reduce((a, b) => a + b, 0);
+      baselineScore = sum / baselineData.frequencies.length;
+    }
+
+    const currentScore = currObj.frequency;
+    const delta = currentScore - baselineScore;
+    const growthPercent = baselineScore > 0 ? Math.round(((currentScore - baselineScore) / baselineScore) * 100) : null;
+
+    let badgeHtml = '';
+    if (isNew) {
+      badgeHtml = `<span style="background: rgba(236,72,153,0.18); color: #ec4899; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">🆕 NEWLY EMERGING</span>`;
+      surgingCount++;
+    } else if (growthPercent >= 50) {
+      badgeHtml = `<span style="background: rgba(16,185,129,0.18); color: #10b981; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">🚀 SURGING (+${growthPercent}%)</span>`;
+      surgingCount++;
+    } else if (growthPercent >= 10) {
+      badgeHtml = `<span style="background: rgba(59,130,246,0.18); color: #3b82f6; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">📈 RISING (+${growthPercent}%)</span>`;
+    } else {
+      badgeHtml = `<span style="background: rgba(255,255,255,0.08); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">📊 STABLE</span>`;
+    }
+
+    emergingResults.push({
+      termKey,
+      displayName: currObj.displayName,
+      currentScore,
+      baselineScore,
+      delta,
+      growthPercent: growthPercent || 999,
+      isNew,
+      firstSeen,
+      badgeHtml
+    });
+  });
+
+  if (statSurging) statSurging.textContent = surgingCount;
+
+  const sortOption = document.getElementById('emerging-sort-select')?.value || 'growth';
+  if (sortOption === 'new') {
+    emergingResults.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) || b.currentScore - a.currentScore);
+  } else if (sortOption === 'frequency') {
+    emergingResults.sort((a, b) => b.currentScore - a.currentScore);
+  } else {
+    emergingResults.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) || b.delta - a.delta || b.growthPercent - a.growthPercent);
+  }
+
+  tableBody.innerHTML = '';
+  emergingResults.forEach(res => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border-color, rgba(255,255,255,0.06))';
+    const firstSeenDateStr = new Date(res.firstSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    tr.innerHTML = `
+      <td style="padding: 10px 12px; font-weight: 600; color: var(--text-primary);">${escapeHTML(res.displayName)}</td>
+      <td style="padding: 10px 12px; font-family: monospace; color: #3b82f6; font-weight: 600;">${res.currentScore.toFixed(1)}</td>
+      <td style="padding: 10px 12px; font-family: monospace; color: var(--text-muted);">${res.baselineScore > 0 ? res.baselineScore.toFixed(1) : '—'}</td>
+      <td style="padding: 10px 12px;">${res.badgeHtml}</td>
+      <td style="padding: 10px 12px; color: var(--text-muted); font-size: 11px;">${firstSeenDateStr}</td>
+      <td style="padding: 10px 12px; text-align: right;">
+        <button class="btn-sm emerging-filter-btn" style="padding: 3px 8px;" data-term="${escapeHTML(res.displayName)}">🔍 Filter Articles</button>
+      </td>
+    `;
+
+    const filterBtn = tr.querySelector('.emerging-filter-btn');
+    if (filterBtn) {
+      filterBtn.onclick = () => {
+        const modal = document.getElementById('emerging-topics-modal');
+        if (modal) modal.classList.add('hidden');
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+          searchInput.value = res.displayName;
+          searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+          if (typeof showToast === 'function') {
+            showToast(`Filtered by emerging topic: "${res.displayName}"`, 'info');
+          }
+        }
+      };
+    }
+
+    tableBody.appendChild(tr);
+  });
+}
+
 // Initial Render & Load
 function startApp() {
   renderTree();
@@ -5334,9 +5673,11 @@ function startApp() {
   if (typeof setupAIChatbotUI === 'function') setupAIChatbotUI();
   if (typeof setupAutoRefreshTimer === 'function') setupAutoRefreshTimer();
   if (typeof setupWordCloudUI === 'function') setupWordCloudUI();
+  if (typeof setupEmergingTopicsUI === 'function') setupEmergingTopicsUI();
   if (typeof setupDiagnosticsUI === 'function') setupDiagnosticsUI();
   if (typeof setupArticleFindUI === 'function') setupArticleFindUI();
   if (typeof renderWordCloud === 'function') renderWordCloud();
+  if (typeof checkAndDisplayCrashReport === 'function') checkAndDisplayCrashReport();
 
   window.AppDiagnostics.log('info', 'AppLifecycle', 'Quick RSS application initialized successfully.');
 

@@ -1960,46 +1960,42 @@ html[data-theme="dark"] .toast-notification {
 /* ==========================================================================
    In-Article Search / Find Bar (Cmd+F / Ctrl+F)
    ========================================================================== */
-.article-find-bar {
-  position: absolute;
-  top: 54px;
-  right: 20px;
-  z-index: 900;
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.15));
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
-  padding: 6px 10px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  animation: findBarSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes findBarSlideDown {
-  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.find-bar-inner {
+.integrated-find-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  padding: 3px 8px;
+  max-width: 260px;
+  flex: 1;
+  min-width: 140px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-app-region: no-drag;
 }
 
-.find-bar-inner input {
+.integrated-find-bar:focus-within {
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.integrated-find-bar input {
   border: none;
   background: transparent;
   outline: none;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
-  width: 170px;
+  width: 100%;
+  min-width: 60px;
 }
 
 .find-counter {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--text-muted, #8e8e93);
   font-weight: 500;
-  padding: 0 4px;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 0 2px;
   white-space: nowrap;
 }
 

@@ -11,6 +11,98 @@ func safeJSString(_ str: String) -> String {
     return "\"\""
 }
 
+class CrashManager {
+    static let shared = CrashManager()
+    
+    private var crashLogURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("QuickRSS", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("crash_report.json")
+    }
+
+    func setupCrashHandlers() {
+        // Handle Swift / Obj-C uncaught exceptions
+        NSSetUncaughtExceptionHandler { exception in
+            let stack = exception.callStackSymbols.joined(separator: "\n")
+            CrashManager.shared.handleFatalCrash(
+                reason: "Uncaught NSException: \(exception.name.rawValue) - \(exception.reason ?? "No details")",
+                details: stack
+            )
+        }
+        
+        // Handle C/POSIX signals (SIGSEGV, SIGBUS, SIGABRT, SIGFPE, SIGILL)
+        let signals = [SIGSEGV, SIGBUS, SIGABRT, SIGFPE, SIGILL]
+        for sig in signals {
+            signal(sig) { signalNumber in
+                let sigName: String
+                switch signalNumber {
+                case SIGSEGV: sigName = "SIGSEGV (Segmentation Fault)"
+                case SIGBUS: sigName = "SIGBUS (Bus Error)"
+                case SIGABRT: sigName = "SIGABRT (Abort Signal)"
+                case SIGFPE: sigName = "SIGFPE (Floating Point Exception)"
+                case SIGILL: sigName = "SIGILL (Illegal Instruction)"
+                default: sigName = "Signal \(signalNumber)"
+                }
+                let stack = Thread.callStackSymbols.joined(separator: "\n")
+                CrashManager.shared.handleFatalCrash(
+                    reason: "Native Process Crash: \(sigName)",
+                    details: stack
+                )
+            }
+        }
+    }
+
+    func handleFatalCrash(reason: String, details: String) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateStr = formatter.string(from: Date())
+        
+        let crashData: [String: Any] = [
+            "timestamp": dateStr,
+            "reason": reason,
+            "details": details,
+            "autoRestarted": true
+        ]
+        
+        if let data = try? JSONSerialization.data(withJSONObject: crashData, options: [.prettyPrinted]) {
+            try? data.write(to: crashLogURL)
+            UserDefaults.standard.set(String(data: data, encoding: .utf8), forKey: "quickrss_last_crash_report")
+            UserDefaults.standard.synchronize()
+        }
+        
+        relaunchApp()
+        exit(1)
+    }
+
+    func relaunchApp() {
+        let bundlePath = Bundle.main.bundlePath
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = ["-n", bundlePath]
+        task.launch()
+    }
+
+    func getPendingCrashReport() -> [String: Any]? {
+        if let jsonStr = UserDefaults.standard.string(forKey: "quickrss_last_crash_report"),
+           let data = jsonStr.data(using: .utf8),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dict
+        }
+        if let data = try? Data(contentsOf: crashLogURL),
+           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dict
+        }
+        return nil
+    }
+
+    func clearCrashReport() {
+        UserDefaults.standard.removeObject(forKey: "quickrss_last_crash_report")
+        UserDefaults.standard.synchronize()
+        try? FileManager.default.removeItem(at: crashLogURL)
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
@@ -61,6 +153,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        CrashManager.shared.setupCrashHandlers()
         setupMenuBar()
         
         let windowMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -92,6 +185,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "saveReadArticles")
         config.userContentController.add(self, name: "saveUserTree")
         config.userContentController.add(self, name: "consoleLog")
+        config.userContentController.add(self, name: "reportCrash")
+        config.userContentController.add(self, name: "triggerTestCrash")
 
         // Inject stored UserDefault states and global JS error handler into WKWebView at DocumentStart
         var initScript = """
@@ -137,6 +232,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         }
         if let treeJson = UserDefaults.standard.string(forKey: "quickrss_user_tree") {
             initScript += "try { localStorage.setItem('quickrss_user_tree', \(safeJSString(treeJson))); } catch(e){}\n"
+        }
+        if let crashReport = CrashManager.shared.getPendingCrashReport(),
+           let data = try? JSONSerialization.data(withJSONObject: crashReport, options: []),
+           let jsonStr = String(data: data, encoding: .utf8) {
+            initScript += "window.__LAST_CRASH_REPORT__ = \(jsonStr);\n"
+            initScript += "try { localStorage.setItem('quickrss_last_crash_report', \(safeJSString(jsonStr))); } catch(e){}\n"
+            CrashManager.shared.clearCrashReport()
         }
         
         if !initScript.isEmpty {
@@ -198,6 +300,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             if let stack = dict["stack"] as? String, !stack.isEmpty {
                 print("   Stack:\n", stack)
             }
+        } else if message.name == "reportCrash", let dict = message.body as? [String: Any] {
+            let reason = dict["reason"] as? String ?? "Web View Fatal Script Error"
+            let details = dict["details"] as? String ?? "No stack trace provided"
+            CrashManager.shared.handleFatalCrash(reason: reason, details: details)
+        } else if message.name == "triggerTestCrash" {
+            let reason = "Simulated Test Crash (SIGABRT)"
+            let details = "Thread 1: Fatal test crash triggered manually via Health & Diagnostics UI to verify auto-restart and crash recovery popup modal."
+            CrashManager.shared.handleFatalCrash(reason: reason, details: details)
         } else if message.name == "mcpResponse", let dict = message.body as? [String: Any], let requestId = dict["requestId"] as? String, let result = dict["result"] as? String {
             mcpServer?.handleMCPResponse(requestId: requestId, result: result)
         } else if message.name == "setXAuthToken", let token = message.body as? String {

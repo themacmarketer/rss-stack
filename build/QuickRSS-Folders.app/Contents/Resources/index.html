@@ -123,7 +123,10 @@
         <div class="wordcloud-resizer" id="wordcloud-resizer" title="Drag up/down to adjust Word Cloud height"></div>
         <div class="section-title word-cloud-header">
           <span>🔥 Trending Topics</span>
-          <button id="refresh-wordcloud-btn" class="word-cloud-refresh-btn" title="Refresh Trending Topics">🔄</button>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button id="emerging-topics-btn" class="word-cloud-refresh-btn" title="Analyze Emerging Terms & Trends Over Time">📈</button>
+            <button id="refresh-wordcloud-btn" class="word-cloud-refresh-btn" title="Refresh Trending Topics">🔄</button>
+          </div>
         </div>
         <div id="word-cloud-container" class="word-cloud-box">
           <div class="word-cloud-loading">Analyzing headlines...</div>
@@ -234,45 +237,43 @@
     <!-- COLUMN RESIZER 2 -->
     <div class="resizer" id="resizer-2"></div>
 
-    <!-- COLUMN 3: Article Reader Pane -->
-    <div class="reader-column">
-      <!-- Floating In-Article Find Bar (Cmd+F / Ctrl+F) -->
-      <div id="article-find-bar" class="article-find-bar hidden">
-        <div class="find-bar-inner">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="7" cy="7" r="4.5"/>
-            <line x1="10.5" y1="10.5" x2="14.5" y2="14.5"/>
-          </svg>
-          <input type="text" id="article-find-input" placeholder="Find in article (Cmd+F)...">
-          <span id="article-find-counter" class="find-counter">0 of 0</span>
-          <button id="article-find-prev" class="find-nav-btn" title="Previous match (Shift+Enter)">▲</button>
-          <button id="article-find-next" class="find-nav-btn" title="Next match (Enter)">▼</button>
-          <button id="article-find-close" class="find-close-btn" title="Close (Esc)">✕</button>
-        </div>
-      </div>
-
       <div class="reader-header">
-        <div class="reader-view-mode-toggle">
-          <button id="toggle-view-html" class="view-mode-btn active" title="Full HTML Web View (Default)">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="8" cy="8" r="6.5"/>
-              <line x1="1.5" y1="8" x2="14.5" y2="8"/>
-              <path d="M8 1.5C9.8 3.5 10.8 5.7 10.8 8c0 2.3-1 4.5-2.8 6.5M8 1.5C6.2 3.5 5.2 5.7 5.2 8c0 2.3 1 4.5 2.8 6.5"/>
+        <div class="reader-header-left" style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; -webkit-app-region: no-drag;">
+          <div class="reader-view-mode-toggle">
+            <button id="toggle-view-html" class="view-mode-btn active" title="Full HTML Web View (Default)">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="8" cy="8" r="6.5"/>
+                <line x1="1.5" y1="8" x2="14.5" y2="8"/>
+                <path d="M8 1.5C9.8 3.5 10.8 5.7 10.8 8c0 2.3-1 4.5-2.8 6.5M8 1.5C6.2 3.5 5.2 5.7 5.2 8c0 2.3 1 4.5 2.8 6.5"/>
+              </svg>
+              <span>HTML Web View</span>
+            </button>
+            <button id="toggle-view-text" class="view-mode-btn" title="Clean Reader Text View">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 1.5h10a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 13V3A1.5 1.5 0 0 1 3 1.5z"/>
+                <line x1="4.5" y1="5" x2="11.5" y2="5"/>
+                <line x1="4.5" y1="8" x2="11.5" y2="8"/>
+                <line x1="4.5" y1="11" x2="8.5" y2="11"/>
+              </svg>
+              <span>Reader Text</span>
+            </button>
+          </div>
+
+          <!-- Integrated In-Article Find Bar (Cmd+F / Ctrl+F) -->
+          <div id="article-find-bar" class="integrated-find-bar">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6; flex-shrink: 0;">
+              <circle cx="7" cy="7" r="4.5"/>
+              <line x1="10.5" y1="10.5" x2="14.5" y2="14.5"/>
             </svg>
-            <span>HTML Web View</span>
-          </button>
-          <button id="toggle-view-text" class="view-mode-btn" title="Clean Reader Text View">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 1.5h10a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 13V3A1.5 1.5 0 0 1 3 1.5z"/>
-              <line x1="4.5" y1="5" x2="11.5" y2="5"/>
-              <line x1="4.5" y1="8" x2="11.5" y2="8"/>
-              <line x1="4.5" y1="11" x2="8.5" y2="11"/>
-            </svg>
-            <span>Reader Text</span>
-          </button>
+            <input type="text" id="article-find-input" placeholder="Find in article (Cmd+F)..." autocomplete="off" spellcheck="false">
+            <span id="article-find-counter" class="find-counter">0 of 0</span>
+            <button id="article-find-prev" class="find-nav-btn" title="Previous match (Shift+Enter)">▲</button>
+            <button id="article-find-next" class="find-nav-btn" title="Next match (Enter)">▼</button>
+            <button id="article-find-close" class="find-close-btn" title="Clear Search (Esc)">✕</button>
+          </div>
         </div>
 
-        <div class="reader-actions">
+        <div class="reader-actions" style="-webkit-app-region: no-drag;">
           <button id="star-btn" class="btn-icon" title="Star Article">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
               <path d="M8 .5l2.25 4.55 5.02.73-3.63 3.54.86 5.01L8 12.05l-4.5 2.28.86-5.01-3.63-3.54 5.02-.73L8 .5z"/>
@@ -524,7 +525,10 @@
             <div class="setting-block" style="margin-top:16px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <label style="font-weight:600; font-size:13px; margin:0;">📋 Live Diagnostics & Error Log</label>
-                <button class="btn-sm" id="clear-logs-btn">Clear Logs</button>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn-sm" id="trigger-test-crash-btn" style="color:#ef4444; border-color:rgba(239,68,68,0.3);">💥 Test Crash & Auto-Restart</button>
+                  <button class="btn-sm" id="clear-logs-btn">Clear Logs</button>
+                </div>
               </div>
               <div id="live-error-log-box" class="code-box" style="max-height:160px; overflow-y:auto; font-family:monospace; font-size:11px; color:#a0a0a0; line-height:1.4;">No errors logged in current session.</div>
             </div>
@@ -667,6 +671,119 @@
       <div class="modal-footer">
         <button class="btn-secondary" id="cancel-subfolder-btn">Cancel</button>
         <button class="btn-primary" id="confirm-subfolder-btn">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Emerging Topics & Keyword Trends Analysis Modal -->
+  <div id="emerging-topics-modal" class="modal-overlay hidden" style="z-index: 9998;">
+    <div class="modal-card" style="max-width: 820px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+        <div class="modal-title-with-icon">
+          <span style="font-size: 20px;">📈</span>
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Emerging Topics & Keyword Trends</h3>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Track keyword term frequencies, growth velocity, and new emerging topics over time</div>
+          </div>
+        </div>
+        <button class="close-modal-btn" id="close-emerging-modal-btn" title="Close">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Controls & Filter Bar -->
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: var(--bg-tertiary, #1e1e2e); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Timeframe:</span>
+            <button class="btn-sm emerging-time-btn active" data-time="24h">Last 24 Hours</button>
+            <button class="btn-sm emerging-time-btn" data-time="7d">Last 7 Days</button>
+            <button class="btn-sm emerging-time-btn" data-time="all">All History</button>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Sort By:</span>
+            <select id="emerging-sort-select" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 11px;">
+              <option value="growth" selected>🚀 Fastest Growing / Surging</option>
+              <option value="new">🆕 Newly Emerging First</option>
+              <option value="frequency">📊 Highest Frequency Count</option>
+            </select>
+            <button class="btn-sm" id="clear-emerging-history-btn" title="Clear historical snapshot data" style="color: #ef4444; border-color: rgba(239,68,68,0.3);">🗑️ Clear History</button>
+          </div>
+        </div>
+
+        <!-- Summary Cards Bar -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+          <div style="background: var(--bg-tertiary, #1e1e2d); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Snapshots Recorded</div>
+            <div id="stat-total-snapshots" style="font-size: 18px; font-weight: 700; color: #3b82f6; margin-top: 2px;">0</div>
+          </div>
+          <div style="background: var(--bg-tertiary, #1e1e2d); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Unique Keywords Tracked</div>
+            <div id="stat-unique-terms" style="font-size: 18px; font-weight: 700; color: #10b981; margin-top: 2px;">0</div>
+          </div>
+          <div style="background: var(--bg-tertiary, #1e1e2d); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Newly Surging Topics</div>
+            <div id="stat-surging-count" style="font-size: 18px; font-weight: 700; color: #ec4899; margin-top: 2px;">0</div>
+          </div>
+        </div>
+
+        <!-- Emerging Topics Table -->
+        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-primary);">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+            <thead>
+              <tr style="background: var(--bg-tertiary, #181825); border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; text-transform: uppercase;">
+                <th style="padding: 8px 12px;">Keyword Term</th>
+                <th style="padding: 8px 12px;">Current Score</th>
+                <th style="padding: 8px 12px;">Baseline Score</th>
+                <th style="padding: 8px 12px;">Growth & Status</th>
+                <th style="padding: 8px 12px;">First Recorded</th>
+                <th style="padding: 8px 12px; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="emerging-topics-table-body">
+              <!-- Dynamic rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding: 10px 20px; justify-content: flex-end;">
+        <button class="btn-secondary" id="close-emerging-modal-footer-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto-Restart & Crash Report Modal -->
+  <div id="crash-modal" class="modal-overlay hidden" style="z-index: 9999;">
+    <div class="modal-card dialog-card" style="max-width: 580px; width: 90%;">
+      <div class="modal-header">
+        <div class="modal-title-with-icon">
+          <span class="alert-header-icon danger">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 2.25L1.5 13.5h13L8 2.25z"/>
+              <line x1="8" y1="6.5" x2="8" y2="9.5"/>
+              <line x1="8" y1="11.5" x2="8" y2="11.5"/>
+            </svg>
+          </span>
+          <h3>Quick RSS Auto-Restarted After a Crash</h3>
+        </div>
+        <button class="close-modal-btn" id="close-crash-modal-btn" title="Close">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="gap: 12px; display: flex; flex-direction: column; padding: 16px 20px;">
+        <p style="font-size: 13px; color: var(--text-primary); line-height: 1.5; margin: 0;">
+          Quick RSS encountered a critical error and was automatically restarted to prevent data loss. Below is the diagnostic report detailing what caused the crash:
+        </p>
+        <div style="background: var(--bg-tertiary, #1e1e2e); border: 1px solid var(--border-color, rgba(0,0,0,0.12)); border-radius: 8px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted, #8e8e93); margin-bottom: 8px; font-family: SFMono-Regular, Menlo, Monaco, monospace; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
+            <span><strong style="color: #ef4444;">CRASH REASON:</strong> <span id="crash-modal-reason">Native Signal SIGSEGV</span></span>
+            <span id="crash-modal-time">2026-09-19 11:35:00</span>
+          </div>
+          <pre id="crash-modal-details" style="font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; color: #f87171; background: transparent; padding: 0; margin: 0; overflow-x: auto; overflow-y: auto; max-height: 200px; white-space: pre-wrap; word-break: break-all; line-height: 1.45;"></pre>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button class="btn-secondary" id="copy-crash-details-btn" title="Copy report to clipboard">📋 Copy Crash Details</button>
+        <button class="btn-primary" id="dismiss-crash-modal-btn">Dismiss & Continue</button>
       </div>
     </div>
   </div>

@@ -4515,11 +4515,12 @@ async function performNativeFetch(url, options = {}) {
 }
 
 async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
-  const res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
+  let tokenToUse = apiKey || getOpenAIOAuthToken();
+  let res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Authorization': `Bearer ${tokenToUse}`
     },
     body: JSON.stringify({
       model: model || 'gpt-4o',
@@ -4530,9 +4531,38 @@ async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
       max_tokens: 1024
     })
   });
+
+  // If initial token failed with 401 or token_expired, try fallback to stored API key (sk-...) if available
+  if (!res.ok && res.status === 401) {
+    const backupKey = getAIKeys().openai;
+    if (backupKey && backupKey !== tokenToUse) {
+      tokenToUse = backupKey;
+      res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenToUse}`
+        },
+        body: JSON.stringify({
+          model: model || 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userQuery }
+          ],
+          max_tokens: 1024
+        })
+      });
+    }
+  }
+
   if (!res.ok) {
     const errJson = await res.json().catch(() => ({}));
-    throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+    const rawMsg = errJson.error?.message || `HTTP ${res.status}`;
+    if (res.status === 401 || rawMsg.toLowerCase().includes('expired') || rawMsg.toLowerCase().includes('token') || rawMsg.toLowerCase().includes('api key')) {
+      safeRemoveStorage('quickrss_openai_oauth_token');
+      throw new Error(`Authentication token or API key is expired or invalid. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI API key or re-authenticate via ChatGPT.`);
+    }
+    throw new Error(rawMsg);
   }
   const json = await res.json();
   return json.choices?.[0]?.message?.content || 'No output generated from OpenAI.';
@@ -4926,13 +4956,19 @@ const RAKE_STOP_WORDS = new Set([
   'practices', 'theft', 'exec', 'broader', 'global', 'community', 'combining', 'formal', 'logic', 'solvers',
   'joins', 'joining', 'joined', 'hosts', 'hosting', 'hosted', 'spends', 'spending', 'spent', 'talking', 'talk',
   'means', 'meaning', 'meant', 'really', 'gives', 'gave', 'giving', 'every', 'friend', 'friends', 'rep', 'patio11',
-  'implosion', 'feel', 'feels', 'feeling', 'free', 'actually', 'combines', 'brilliant', 'insight'
+  'implosion', 'feel', 'feels', 'feeling', 'free', 'actually', 'combines', 'brilliant', 'insight',
+  'diy', 'tested', 'testing', 'test', 'tests', 'style', 'based', 'type', 'mode', 'kind', 'thingy', 'tbh', 'imho', 'imo',
+  'seems', 'seemed', 'fine', 'tuned', 'fine-tuned', 'exact', 'same', 'optimized', 'optimization', 'pour', 'near', 'instant',
+  'uses', 'built', 'building', 'build', 'builds', 'trying', 'tried', 'try', 'looking', 'looked', 'look', 'looks',
+  'finding', 'found', 'find', 'finds', 'seeing', 'seen', 'see', 'sees'
 ]);
 
 function RAKE_extractCandidatePhrases(text) {
   if (!text) return [];
   // Normalize smart quotes and apostrophes to standard ascii single quote
   text = text.replace(/[\u2018\u2019’`]/g, "'").replace(/[\u201C\u201D“”]/g, '"');
+  // Replace hyphens and slashes between letters with spaces (e.g. Jev-style -> Jev style, web-dev -> web dev)
+  text = text.replace(/([a-zA-Z0-9])[\-\/]([a-zA-Z0-9])/g, '$1 $2');
   // Exclude single quote ' from sentence delimiters so contractions like "don't" or "we're" match stop words
   const sentenceRegex = /[.!?;\n\t,–—:()\[\]"]/g;
   const sentences = text.split(sentenceRegex);
@@ -5118,7 +5154,7 @@ function executeRenderWordCloud() {
   if (!container) return;
 
   try {
-    const sourceArticles = getAllAvailableArticles(120);
+    const sourceArticles = getAllAvailableArticles(1000);
     if (!sourceArticles || sourceArticles.length === 0) {
       container.innerHTML = '<div class="word-cloud-loading">No active topics available</div>';
       return;
@@ -5147,13 +5183,14 @@ function executeRenderWordCloud() {
       const words = k.split(' ');
 
       // Word-overlap & sub-phrase deduplication:
-      // Reject candidate k if its words overlap with ALREADY SELECTED higher-scoring topics.
-      // Prevents stringing together adjacent overlapping 3-word n-grams from the same article title!
+      // Allow single-word standalone topics if they appear frequently even if previously referenced in a multi-word n-gram
       let hasWordOverlap = false;
-      for (const w of words) {
-        if (!topAcronyms.has(w) && usedWordsSet.has(w)) {
-          hasWordOverlap = true;
-          break;
+      if (words.length > 1 || (phraseScores[k] || 0) < 5) {
+        for (const w of words) {
+          if (!topAcronyms.has(w) && usedWordsSet.has(w)) {
+            hasWordOverlap = true;
+            break;
+          }
         }
       }
 

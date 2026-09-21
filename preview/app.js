@@ -5083,21 +5083,34 @@ function RAKE_calculateScores(candidatePhrases) {
   return { phraseScores, phraseDisplayMap };
 }
 
-function getAllAvailableArticles(limit = 120) {
+function getAllAvailableArticles(limit = 5000) {
   let pool = [];
+
   if (typeof loadedArticles !== 'undefined' && Array.isArray(loadedArticles)) {
     pool = pool.concat(loadedArticles);
   }
-  if (typeof feedArticleCache !== 'undefined') {
+  if (typeof feedArticleCache !== 'undefined' && feedArticleCache) {
     Object.values(feedArticleCache).forEach(arr => {
       if (Array.isArray(arr)) pool = pool.concat(arr);
     });
   }
-  if (typeof articleDatabase !== 'undefined') {
+  if (typeof getAllFeedsFromTree === 'function' && typeof treeData !== 'undefined' && treeData) {
+    const allFeeds = getAllFeedsFromTree(treeData);
+    allFeeds.forEach(feed => {
+      const cacheKey = feed.url || feed.id || feed.name;
+      if (typeof feedArticleCache !== 'undefined' && feedArticleCache[cacheKey] && Array.isArray(feedArticleCache[cacheKey])) {
+        pool = pool.concat(feedArticleCache[cacheKey]);
+      } else if (typeof articleDatabase !== 'undefined' && articleDatabase[feed.name] && Array.isArray(articleDatabase[feed.name])) {
+        pool = pool.concat(articleDatabase[feed.name]);
+      }
+    });
+  }
+  if (typeof articleDatabase !== 'undefined' && articleDatabase) {
     Object.values(articleDatabase).forEach(arr => {
       if (Array.isArray(arr)) pool = pool.concat(arr);
     });
   }
+
   const seen = new Set();
   const unique = [];
   for (let i = 0; i < pool.length; i++) {
@@ -5107,8 +5120,18 @@ function getAllAvailableArticles(limit = 120) {
     if (!seen.has(key)) {
       seen.add(key);
       unique.push(art);
-      if (limit > 0 && unique.length >= limit) break;
     }
+  }
+
+  // Sort ALL articles by publication date/timestamp descending (newest first)
+  if (typeof getArticleTimestamp === 'function') {
+    unique.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+  } else {
+    unique.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+  }
+
+  if (limit > 0 && unique.length > limit) {
+    return unique.slice(0, limit);
   }
   return unique;
 }
@@ -5154,7 +5177,7 @@ function executeRenderWordCloud() {
   if (!container) return;
 
   try {
-    const sourceArticles = getAllAvailableArticles(1000);
+    const sourceArticles = getAllAvailableArticles(5000);
     if (!sourceArticles || sourceArticles.length === 0) {
       container.innerHTML = '<div class="word-cloud-loading">No active topics available</div>';
       return;
@@ -5183,9 +5206,10 @@ function executeRenderWordCloud() {
       const words = k.split(' ');
 
       // Word-overlap & sub-phrase deduplication:
-      // Allow single-word standalone topics if they appear frequently even if previously referenced in a multi-word n-gram
+      // Single-word topics (e.g. "Jev", "Qwen", "Llama") represent core standalone keywords.
+      // Do NOT block single-word topics due to overlap with multi-word phrases!
       let hasWordOverlap = false;
-      if (words.length > 1 || (phraseScores[k] || 0) < 5) {
+      if (words.length > 1) {
         for (const w of words) {
           if (!topAcronyms.has(w) && usedWordsSet.has(w)) {
             hasWordOverlap = true;

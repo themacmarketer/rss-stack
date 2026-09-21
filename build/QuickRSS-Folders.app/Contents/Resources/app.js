@@ -4136,6 +4136,14 @@ function setupAIChatbotUI() {
     };
   }
 
+  const newChatBtn = document.getElementById('ai-new-chat-btn');
+  if (newChatBtn) {
+    newChatBtn.onclick = (e) => {
+      e.stopPropagation();
+      startNewAIChatSession();
+    };
+  }
+
   if (settingsBtn) {
     settingsBtn.onclick = (e) => {
       e.stopPropagation();
@@ -4189,6 +4197,23 @@ function setupAIChatbotUI() {
       }
     };
   });
+}
+
+function startNewAIChatSession() {
+  const thread = document.getElementById('ai-chat-thread');
+  if (thread) {
+    thread.innerHTML = `
+      <div class="ai-message assistant">
+        <div class="ai-avatar">🤖</div>
+        <div class="ai-msg-content">
+          Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+        </div>
+      </div>
+    `;
+  }
+  const input = document.getElementById('ai-chat-input');
+  if (input) input.value = '';
+  if (typeof showToast === 'function') showToast('Started a new AI chat session.', 'info');
 }
 
 async function sendUserAIMessage(userQuery) {
@@ -4438,8 +4463,59 @@ ${contextSnippet}`;
   return "⚠️ Unknown LLM Provider selected.";
 }
 
+const nativeHTTPCallbacks = new Map();
+
+if (typeof window !== 'undefined') {
+  window.onNativeHTTPCompleted = function(requestId, status, responseText, errorMsg) {
+    if (nativeHTTPCallbacks.has(requestId)) {
+      const { resolve, reject } = nativeHTTPCallbacks.get(requestId);
+      nativeHTTPCallbacks.delete(requestId);
+      if (errorMsg && !status) {
+        reject(new Error(errorMsg));
+      } else {
+        resolve({
+          ok: status >= 200 && status < 300,
+          status: status,
+          text: async () => responseText || '',
+          json: async () => JSON.parse(responseText || '{}')
+        });
+      }
+    }
+  };
+}
+
+async function performNativeFetch(url, options = {}) {
+  if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeHTTPRequest) {
+    return new Promise((resolve, reject) => {
+      const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      nativeHTTPCallbacks.set(requestId, { resolve, reject });
+
+      const headers = options.headers || {};
+      const method = options.method || 'GET';
+      const body = options.body || null;
+
+      window.webkit.messageHandlers.nativeHTTPRequest.postMessage({
+        requestId,
+        url,
+        method,
+        headers,
+        body
+      });
+
+      setTimeout(() => {
+        if (nativeHTTPCallbacks.has(requestId)) {
+          nativeHTTPCallbacks.delete(requestId);
+          reject(new Error('Native request timed out after 35 seconds'));
+        }
+      }, 35000);
+    });
+  }
+
+  return fetch(url, options);
+}
+
 async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -4463,7 +4539,7 @@ async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
 }
 
 async function queryClaude(systemPrompt, userQuery, model, apiKey) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await performNativeFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -4488,7 +4564,7 @@ async function queryClaude(systemPrompt, userQuery, model, apiKey) {
 }
 
 async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await performNativeFetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -5507,9 +5583,9 @@ function showCrashRecoveryModal(report) {
   }
 }
 
-// ==========================================
-// EMERGING TOPICS & TREND ANALYSIS CONTROLLER
-// ==========================================
+let emergingTopicsCurrentPage = 1;
+const EMERGING_TOPICS_PAGE_SIZE = 10;
+
 function setupEmergingTopicsUI() {
   const btn = document.getElementById('emerging-topics-btn');
   const modal = document.getElementById('emerging-topics-modal');
@@ -5517,6 +5593,9 @@ function setupEmergingTopicsUI() {
   const closeFooterBtn = document.getElementById('close-emerging-modal-footer-btn');
   const sortSelect = document.getElementById('emerging-sort-select');
   const clearBtn = document.getElementById('clear-emerging-history-btn');
+  const searchInput = document.getElementById('emerging-search-input');
+  const prevBtn = document.getElementById('emerging-prev-page-btn');
+  const nextBtn = document.getElementById('emerging-next-page-btn');
 
   if (btn) {
     btn.onclick = (e) => {
@@ -5534,12 +5613,39 @@ function setupEmergingTopicsUI() {
     b.onclick = () => {
       timeBtns.forEach(tb => tb.classList.remove('active'));
       b.classList.add('active');
+      emergingTopicsCurrentPage = 1;
       renderEmergingTopicsModal();
     };
   });
 
   if (sortSelect) {
-    sortSelect.onchange = () => renderEmergingTopicsModal();
+    sortSelect.onchange = () => {
+      emergingTopicsCurrentPage = 1;
+      renderEmergingTopicsModal();
+    };
+  }
+
+  if (searchInput) {
+    searchInput.oninput = () => {
+      emergingTopicsCurrentPage = 1;
+      renderEmergingTopicsModal();
+    };
+  }
+
+  if (prevBtn) {
+    prevBtn.onclick = () => {
+      if (emergingTopicsCurrentPage > 1) {
+        emergingTopicsCurrentPage--;
+        renderEmergingTopicsModal();
+      }
+    };
+  }
+
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      emergingTopicsCurrentPage++;
+      renderEmergingTopicsModal();
+    };
   }
 
   if (clearBtn) {
@@ -5547,6 +5653,7 @@ function setupEmergingTopicsUI() {
       if (confirm('Clear all historical keyword trend data?')) {
         try { localStorage.removeItem('quickrss_wordcloud_history'); } catch(e){}
         if (typeof showToast === 'function') showToast('Cleared keyword trend history.', 'info');
+        emergingTopicsCurrentPage = 1;
         renderEmergingTopicsModal();
       }
     };
@@ -5556,6 +5663,7 @@ function setupEmergingTopicsUI() {
 function openEmergingTopicsModal() {
   const modal = document.getElementById('emerging-topics-modal');
   if (!modal) return;
+  emergingTopicsCurrentPage = 1;
   modal.classList.remove('hidden');
   renderEmergingTopicsModal();
 }
@@ -5565,6 +5673,10 @@ function renderEmergingTopicsModal() {
   const statSnapshots = document.getElementById('stat-total-snapshots');
   const statUnique = document.getElementById('stat-unique-terms');
   const statSurging = document.getElementById('stat-surging-count');
+  const pageInfo = document.getElementById('emerging-page-info');
+  const pageNum = document.getElementById('emerging-page-number');
+  const prevBtn = document.getElementById('emerging-prev-page-btn');
+  const nextBtn = document.getElementById('emerging-next-page-btn');
   if (!tableBody) return;
 
   const rawHistory = safeGetStorage('quickrss_wordcloud_history', null);
@@ -5607,6 +5719,10 @@ function renderEmergingTopicsModal() {
     tableBody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-muted);">No keyword snapshots recorded in the selected timeframe yet.</td></tr>`;
     if (statUnique) statUnique.textContent = '0';
     if (statSurging) statSurging.textContent = '0';
+    if (pageInfo) pageInfo.textContent = 'Showing 0 of 0 keywords';
+    if (pageNum) pageNum.textContent = 'Page 1 of 1';
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
     return;
   }
 
@@ -5631,7 +5747,7 @@ function renderEmergingTopicsModal() {
   const allKnownTerms = new Set([...currentTermMap.keys(), ...baselineTermMap.keys()]);
   if (statUnique) statUnique.textContent = allKnownTerms.size;
 
-  const emergingResults = [];
+  let emergingResults = [];
   let surgingCount = 0;
 
   currentTermMap.forEach((currObj, termKey) => {
@@ -5681,6 +5797,12 @@ function renderEmergingTopicsModal() {
 
   if (statSurging) statSurging.textContent = surgingCount;
 
+  // Filter by search query
+  const searchVal = (document.getElementById('emerging-search-input')?.value || '').trim().toLowerCase();
+  if (searchVal.length > 0) {
+    emergingResults = emergingResults.filter(r => r.displayName.toLowerCase().includes(searchVal) || r.termKey.toLowerCase().includes(searchVal));
+  }
+
   const sortOption = document.getElementById('emerging-sort-select')?.value || 'growth';
   if (sortOption === 'new') {
     emergingResults.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) || b.currentScore - a.currentScore);
@@ -5690,8 +5812,28 @@ function renderEmergingTopicsModal() {
     emergingResults.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) || b.delta - a.delta || b.growthPercent - a.growthPercent);
   }
 
+  // Pagination calculation
+  const totalCount = emergingResults.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / EMERGING_TOPICS_PAGE_SIZE));
+  if (emergingTopicsCurrentPage > totalPages) emergingTopicsCurrentPage = totalPages;
+  if (emergingTopicsCurrentPage < 1) emergingTopicsCurrentPage = 1;
+
+  const startIdx = (emergingTopicsCurrentPage - 1) * EMERGING_TOPICS_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + EMERGING_TOPICS_PAGE_SIZE, totalCount);
+  const pagedResults = emergingResults.slice(startIdx, endIdx);
+
+  if (pageInfo) pageInfo.textContent = totalCount > 0 ? `Showing ${startIdx + 1}–${endIdx} of ${totalCount} keywords` : 'Showing 0 of 0 keywords';
+  if (pageNum) pageNum.textContent = `Page ${emergingTopicsCurrentPage} of ${totalPages}`;
+  if (prevBtn) prevBtn.disabled = emergingTopicsCurrentPage <= 1;
+  if (nextBtn) nextBtn.disabled = emergingTopicsCurrentPage >= totalPages;
+
+  if (pagedResults.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-muted);">No keywords match "${escapeHTML(searchVal)}".</td></tr>`;
+    return;
+  }
+
   tableBody.innerHTML = '';
-  emergingResults.forEach(res => {
+  pagedResults.forEach(res => {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--border-color, rgba(255,255,255,0.06))';
     const firstSeenDateStr = new Date(res.firstSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

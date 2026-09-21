@@ -187,6 +187,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "consoleLog")
         config.userContentController.add(self, name: "reportCrash")
         config.userContentController.add(self, name: "triggerTestCrash")
+        config.userContentController.add(self, name: "nativeHTTPRequest")
 
         // Inject stored UserDefault states and global JS error handler into WKWebView at DocumentStart
         var initScript = """
@@ -379,6 +380,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                     jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched(\(safeJSString(requestId)), null, \(safeJSString("HTTP \(httpStatus)"))); }"
                 } else if let data = data, let htmlString = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) {
                     jsCode = "if (window.onNativeURLFetched) { window.onNativeURLFetched(\(safeJSString(requestId)), \(safeJSString(htmlString)), null); }"
+                }
+                
+                if !jsCode.isEmpty {
+                    DispatchQueue.main.async {
+                        self.webView.evaluateJavaScript(jsCode, completionHandler: nil)
+                    }
+                }
+            }
+            task.resume()
+        } else if message.name == "nativeHTTPRequest", let dict = message.body as? [String: Any],
+                  let urlString = dict["url"] as? String,
+                  let requestId = dict["requestId"] as? String,
+                  let url = URL(string: urlString) {
+            
+            let method = dict["method"] as? String ?? "GET"
+            let headers = dict["headers"] as? [String: String] ?? [:]
+            let bodyStr = dict["body"] as? String
+            
+            var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 35.0)
+            request.httpMethod = method
+            for (key, val) in headers {
+                request.setValue(val, forHTTPHeaderField: key)
+            }
+            if let bodyStr = bodyStr {
+                request.httpBody = bodyStr.data(using: .utf8)
+            }
+            
+            let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+                guard let self = self else { return }
+                let httpStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
+                var jsCode = ""
+                
+                if let error = error {
+                    let errDesc = safeJSString(error.localizedDescription)
+                    jsCode = "if (window.onNativeHTTPCompleted) { window.onNativeHTTPCompleted(\(safeJSString(requestId)), \(httpStatus), null, \(errDesc)); }"
+                } else {
+                    let responseText = data.flatMap { String(data: $0, encoding: .utf8) ?? String(data: $0, encoding: .ascii) } ?? ""
+                    jsCode = "if (window.onNativeHTTPCompleted) { window.onNativeHTTPCompleted(\(safeJSString(requestId)), \(httpStatus), \(safeJSString(responseText)), null); }"
                 }
                 
                 if !jsCode.isEmpty {

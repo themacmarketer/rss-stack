@@ -202,6 +202,7 @@
                 <option value="openrouter:deepseek/deepseek-chat">OpenRouter — DeepSeek Chat</option>
               </optgroup>
             </select>
+            <button id="ai-new-chat-btn" class="ai-btn-icon" title="Start a New AI Chat Session">➕</button>
             <button id="ai-pin-btn" class="ai-btn-icon" title="Pin / Lock AI Assistant Window in place">📌</button>
             <button id="ai-settings-btn" class="ai-btn-icon" title="Configure AI API Keys & Auth">⚙️</button>
             <button id="ai-close-btn" class="ai-btn-icon" title="Close AI Assistant">✕</button>
@@ -695,6 +696,10 @@
       <div class="modal-body" style="padding: 16px 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
         <!-- Controls & Filter Bar -->
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: var(--bg-tertiary, #1e1e2e); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+          <div style="display: flex; gap: 6px; align-items: center; flex: 1; min-width: 180px;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">🔍 Search:</span>
+            <input type="text" id="emerging-search-input" placeholder="Filter keyword terms..." style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 10px; font-size: 11.5px; width: 100%; outline: none;">
+          </div>
           <div style="display: flex; gap: 6px; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Timeframe:</span>
             <button class="btn-sm emerging-time-btn active" data-time="24h">Last 24 Hours</button>
@@ -728,8 +733,8 @@
           </div>
         </div>
 
-        <!-- Emerging Topics Table -->
-        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-primary);">
+        <!-- Emerging Topics Table with Pagination Footer -->
+        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-primary); display: flex; flex-direction: column;">
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
             <thead>
               <tr style="background: var(--bg-tertiary, #181825); border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; text-transform: uppercase;">
@@ -745,6 +750,14 @@
               <!-- Dynamic rows -->
             </tbody>
           </table>
+          <div id="emerging-pagination-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--bg-tertiary, #181825); border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted);">
+            <span id="emerging-page-info">Showing 1-10 of 0 keywords</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="btn-sm" id="emerging-prev-page-btn" disabled style="padding: 3px 8px;">◄ Prev</button>
+              <span id="emerging-page-number" style="font-weight: 600; color: var(--text-primary); padding: 0 4px;">Page 1 of 1</span>
+              <button class="btn-sm" id="emerging-next-page-btn" disabled style="padding: 3px 8px;">Next ►</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding: 10px 20px; justify-content: flex-end;">

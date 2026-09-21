@@ -1382,48 +1382,56 @@ body {
   border-color: #5fa038;
 }
 
-.ai-chatbot-popover {
-  position: absolute;
-  top: 74px;
-  left: 8px;
-  z-index: 1200;
-  width: 380px;
-  height: 420px;
-  min-width: 320px;
-  max-width: 650px;
-  min-height: 220px;
-  max-height: 82vh;
-  background: var(--bg-reader);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--border-color);
+/* ==========================================================================
+   COLUMN 4: DEDICATED AI ASSISTANT PANE (folo-inspired)
+   ========================================================================== */
+.ai-column {
+  width: 340px;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100vh;
   overflow: hidden;
-  resize: both;
-  animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+
+.ai-column.collapsed {
+  display: none !important;
+}
+
+#resizer-3.collapsed {
+  display: none !important;
+}
+
+.ai-context-pill-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(112, 182, 67, 0.08);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   -webkit-app-region: no-drag;
 }
 
-.ai-chatbot-popover.pinned {
-  position: relative !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 100% !important;
-  height: 340px;
-  min-height: 200px;
-  max-height: 55vh;
-  border-radius: 0 !important;
-  border: none !important;
-  border-bottom: 2px solid #70b643 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
-  flex-shrink: 0 !important;
-  z-index: 10 !important;
-  resize: vertical !important;
+.ai-context-pill-bar .pill-label {
+  font-weight: 700;
+  color: var(--accent-folder);
+  flex-shrink: 0;
 }
 
-.ai-chatbot-popover.hidden {
-  display: none !important;
+.ai-context-pill-bar .pill-title {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .ai-citation-link {

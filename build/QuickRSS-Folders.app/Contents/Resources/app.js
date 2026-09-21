@@ -2224,6 +2224,17 @@ function selectArticle(art, cardEl) {
     else starBtn.classList.remove('starred');
   }
 
+  const contextTitleEl = document.getElementById('ai-context-title-text');
+  if (contextTitleEl) {
+    if (art && art.title) {
+      contextTitleEl.textContent = `"${art.title}" (${art.feedTitle || 'Feed'})`;
+      contextTitleEl.title = art.title;
+    } else {
+      contextTitleEl.textContent = 'Select an article to attach content';
+      contextTitleEl.title = '';
+    }
+  }
+
   renderReaderBody();
 }
 
@@ -2573,17 +2584,20 @@ if (settingsModal) {
   };
 }
 
-// Global Keyboard Shortcuts: Cmd+, (Preferences) & ESC (Close Preferences & Modals)
+// Global Keyboard Shortcuts: Cmd+, (Preferences), Cmd+Shift+A / Cmd+J (Toggle AI Column 4), & ESC
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === ',') {
     e.preventDefault();
     openSettings();
   }
+  if ((e.metaKey || e.ctrlKey) && ((e.shiftKey && (e.key === 'a' || e.key === 'A')) || e.key === 'j' || e.key === 'J')) {
+    e.preventDefault();
+    const triggerBtn = document.getElementById('ai-assistant-toggle-btn');
+    if (triggerBtn) triggerBtn.click();
+  }
   if (e.key === 'Escape' || e.key === 'Esc') {
     closeSettings();
     document.querySelectorAll('.modal-overlay').forEach(modal => modal.classList.add('hidden'));
-    const aiPanel = document.getElementById('ai-chatbot-panel');
-    if (aiPanel) aiPanel.classList.add('hidden');
   }
 });
 
@@ -3124,8 +3138,10 @@ if (confirmDeleteFolderBtn) {
 function setupColumnResizers() {
   const sidebar = document.querySelector('.sidebar');
   const articleColumn = document.querySelector('.article-list-column');
+  const aiColumn = document.getElementById('ai-column');
   const resizer1 = document.getElementById('resizer-1');
   const resizer2 = document.getElementById('resizer-2');
+  const resizer3 = document.getElementById('resizer-3');
 
   if (!resizer1 || !resizer2) return;
 
@@ -3139,6 +3155,13 @@ function setupColumnResizers() {
 
   let isResizing1 = false;
   let isResizing2 = false;
+  let isResizing3 = false;
+
+  // Restore saved AI Column width
+  if (aiColumn) {
+    const savedAIWidth = safeGetStorage('quickrss_ai_column_width', 340);
+    if (savedAIWidth) aiColumn.style.width = `${savedAIWidth}px`;
+  }
 
   // Resizer 1: Sidebar Width
   resizer1.addEventListener('mousedown', (e) => {
@@ -3156,6 +3179,16 @@ function setupColumnResizers() {
     document.body.style.userSelect = 'none';
   });
 
+  // Resizer 3: AI Assistant Column 4 Width
+  if (resizer3 && aiColumn) {
+    resizer3.addEventListener('mousedown', (e) => {
+      isResizing3 = true;
+      resizer3.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+  }
+
   document.addEventListener('mousemove', (e) => {
     if (isResizing1) {
       const newWidth = Math.max(160, Math.min(480, e.clientX));
@@ -3165,15 +3198,22 @@ function setupColumnResizers() {
       const sidebarWidth = sidebar.getBoundingClientRect().width;
       const newWidth = Math.max(220, Math.min(650, e.clientX - sidebarWidth));
       articleColumn.style.width = `${newWidth}px`;
+    } else if (isResizing3 && aiColumn) {
+      const windowWidth = window.innerWidth;
+      const newWidth = Math.max(260, Math.min(650, windowWidth - e.clientX));
+      aiColumn.style.width = `${newWidth}px`;
+      safeSetStorage('quickrss_ai_column_width', newWidth);
     }
   });
 
   document.addEventListener('mouseup', () => {
-    if (isResizing1 || isResizing2) {
+    if (isResizing1 || isResizing2 || isResizing3) {
       isResizing1 = false;
       isResizing2 = false;
+      isResizing3 = false;
       resizer1.classList.remove('dragging');
       resizer2.classList.remove('dragging');
+      if (resizer3) resizer3.classList.remove('dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       checkCompact();
@@ -4059,72 +4099,44 @@ function handleAICitationClick(url, title) {
 }
 
 function setupAIChatbotUI() {
-  const panel = document.getElementById('ai-chatbot-panel');
+  const aiColumn = document.getElementById('ai-column');
+  const resizer3 = document.getElementById('resizer-3');
   const triggerBtn = document.getElementById('ai-assistant-toggle-btn');
   const closeBtn = document.getElementById('ai-close-btn');
-  const pinBtn = document.getElementById('ai-pin-btn');
   const settingsBtn = document.getElementById('ai-settings-btn');
   const sendBtn = document.getElementById('ai-chat-send-btn');
   const clearBtn = document.getElementById('ai-chat-clear-btn');
   const chatInput = document.getElementById('ai-chat-input');
   const chatThread = document.getElementById('ai-chat-thread');
 
-  if (!panel) return;
+  if (!aiColumn) return;
 
-  let isAIPinned = safeGetStorage('quickrss_ai_pinned', 'true') === 'true';
+  let isAIColumnVisible = safeGetStorage('quickrss_ai_column_visible', 'true') === 'true';
 
-  function applyPinState() {
-    if (isAIPinned) {
-      panel.style.top = '';
-      panel.style.left = '';
-      panel.style.right = '';
-      panel.style.width = '';
-      panel.style.position = '';
-      panel.style.transform = '';
-      panel.classList.add('pinned');
-      if (pinBtn) {
-        pinBtn.classList.add('active');
-        pinBtn.title = "Unpin / Unlock AI Assistant Window";
-      }
+  function applyAIColumnState() {
+    if (isAIColumnVisible) {
+      aiColumn.classList.remove('collapsed');
+      if (resizer3) resizer3.classList.remove('collapsed');
+      if (triggerBtn) triggerBtn.classList.add('active');
     } else {
-      panel.style.height = '';
-      panel.style.width = '';
-      panel.style.top = '';
-      panel.style.left = '';
-      panel.style.right = '';
-      panel.style.position = '';
-      panel.style.transform = '';
-      panel.classList.remove('pinned');
-      if (pinBtn) {
-        pinBtn.classList.remove('active');
-        pinBtn.title = "Pin / Lock AI Assistant Window in place";
-      }
+      aiColumn.classList.add('collapsed');
+      if (resizer3) resizer3.classList.add('collapsed');
+      if (triggerBtn) triggerBtn.classList.remove('active');
     }
   }
 
-  applyPinState();
+  applyAIColumnState();
 
   if (triggerBtn) {
     triggerBtn.onclick = (e) => {
       e.stopPropagation();
-      const isOpening = panel.classList.contains('hidden');
-      panel.classList.toggle('hidden');
-      if (isOpening) {
-        applyPinState();
-      }
-    };
-  }
-
-  if (pinBtn) {
-    pinBtn.onclick = (e) => {
-      e.stopPropagation();
-      isAIPinned = !isAIPinned;
-      safeSetStorage('quickrss_ai_pinned', isAIPinned ? 'true' : 'false');
-      applyPinState();
-      if (isAIPinned) {
-        showToast('📌 AI Assistant pinned inside column below search bar', 'success');
+      isAIColumnVisible = !isAIColumnVisible;
+      safeSetStorage('quickrss_ai_column_visible', isAIColumnVisible ? 'true' : 'false');
+      applyAIColumnState();
+      if (isAIColumnVisible) {
+        showToast('🤖 AI Assistant column expanded', 'info');
       } else {
-        showToast('Unpinned AI Assistant window', 'info');
+        showToast('Collapsed AI Assistant column', 'info');
       }
     };
   }
@@ -4132,7 +4144,9 @@ function setupAIChatbotUI() {
   if (closeBtn) {
     closeBtn.onclick = (e) => {
       e.stopPropagation();
-      panel.classList.add('hidden');
+      isAIColumnVisible = false;
+      safeSetStorage('quickrss_ai_column_visible', 'false');
+      applyAIColumnState();
     };
   }
 
@@ -4152,12 +4166,6 @@ function setupAIChatbotUI() {
       if (aiTab) aiTab.click();
     };
   }
-
-  document.addEventListener('click', (e) => {
-    if (!isAIPinned && !panel.classList.contains('hidden') && !panel.contains(e.target) && triggerBtn && !triggerBtn.contains(e.target)) {
-      panel.classList.add('hidden');
-    }
-  });
 
   if (sendBtn && chatInput) {
     const doSend = () => {
@@ -4419,13 +4427,29 @@ Trending Topic Formulation & Filtering Rules:
     contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
   });
 
-  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context and Trending Topics data provided below. Be concise and informative.
+  let activeArticleSnippet = '';
+  if (typeof currentArticle !== 'undefined' && currentArticle && currentArticle.title) {
+    activeArticleSnippet = `
+📌 CURRENTLY ACTIVE SELECTED ARTICLE IN READER PANE:
+Title: "${currentArticle.title}"
+Feed: ${currentArticle.feedTitle || 'N/A'}
+Date: ${currentArticle.pubDate || 'N/A'}
+Author: ${currentArticle.author || 'N/A'}
+URL: ${currentArticle.link || 'N/A'}
+Summary / Content: ${currentArticle.summary || currentArticle.content || 'N/A'}
+`;
+  }
+
+  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context, currently active selected article, and Trending Topics data provided below. Be concise and informative.
 
 CITATION & TOPIC AGGREGATION RULES:
 1. When answering queries about trending topics, news overviews, or specific subject searches: ALWAYS group and aggregate related articles under overarching topic headings or clear bullet points.
-2. For questions regarding why a specific phrase is or isn't featured in TRENDING TOPICS: compare the phrase against the active featured keywords list, RAKE scores, and title candidate extraction rules.
-3. For each topic/point, cite ALL relevant supporting articles from the provided context (e.g., [Article 1: Title](URL), [Article 3: Title](URL)). Do NOT restrict a topic to only a single citation if multiple articles discuss or relate to that topic.
-4. Use markdown links for citations in the format [Article N: Title](URL) or [Article N](URL).
+2. If the user asks to summarize, analyze, or explain "the active article" or "this article", prioritize the CURRENTLY ACTIVE SELECTED ARTICLE content provided below.
+3. For questions regarding why a specific phrase is or isn't featured in TRENDING TOPICS: compare the phrase against the active featured keywords list, RAKE scores, and title candidate extraction rules.
+4. For each topic/point, cite ALL relevant supporting articles from the provided context (e.g., [Article 1: Title](URL), [Article 3: Title](URL)). Do NOT restrict a topic to only a single citation if multiple articles discuss or relate to that topic.
+5. Use markdown links for citations in the format [Article N: Title](URL) or [Article N](URL).
+
+${activeArticleSnippet}
 
 ${trendingSnippet}
 
@@ -5083,21 +5107,34 @@ function RAKE_calculateScores(candidatePhrases) {
   return { phraseScores, phraseDisplayMap };
 }
 
-function getAllAvailableArticles(limit = 120) {
+function getAllAvailableArticles(limit = 5000) {
   let pool = [];
+
   if (typeof loadedArticles !== 'undefined' && Array.isArray(loadedArticles)) {
     pool = pool.concat(loadedArticles);
   }
-  if (typeof feedArticleCache !== 'undefined') {
+  if (typeof feedArticleCache !== 'undefined' && feedArticleCache) {
     Object.values(feedArticleCache).forEach(arr => {
       if (Array.isArray(arr)) pool = pool.concat(arr);
     });
   }
-  if (typeof articleDatabase !== 'undefined') {
+  if (typeof getAllFeedsFromTree === 'function' && typeof treeData !== 'undefined' && treeData) {
+    const allFeeds = getAllFeedsFromTree(treeData);
+    allFeeds.forEach(feed => {
+      const cacheKey = feed.url || feed.id || feed.name;
+      if (typeof feedArticleCache !== 'undefined' && feedArticleCache[cacheKey] && Array.isArray(feedArticleCache[cacheKey])) {
+        pool = pool.concat(feedArticleCache[cacheKey]);
+      } else if (typeof articleDatabase !== 'undefined' && articleDatabase[feed.name] && Array.isArray(articleDatabase[feed.name])) {
+        pool = pool.concat(articleDatabase[feed.name]);
+      }
+    });
+  }
+  if (typeof articleDatabase !== 'undefined' && articleDatabase) {
     Object.values(articleDatabase).forEach(arr => {
       if (Array.isArray(arr)) pool = pool.concat(arr);
     });
   }
+
   const seen = new Set();
   const unique = [];
   for (let i = 0; i < pool.length; i++) {
@@ -5107,8 +5144,18 @@ function getAllAvailableArticles(limit = 120) {
     if (!seen.has(key)) {
       seen.add(key);
       unique.push(art);
-      if (limit > 0 && unique.length >= limit) break;
     }
+  }
+
+  // Sort ALL articles by publication date/timestamp descending (newest first)
+  if (typeof getArticleTimestamp === 'function') {
+    unique.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
+  } else {
+    unique.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0));
+  }
+
+  if (limit > 0 && unique.length > limit) {
+    return unique.slice(0, limit);
   }
   return unique;
 }
@@ -5154,7 +5201,7 @@ function executeRenderWordCloud() {
   if (!container) return;
 
   try {
-    const sourceArticles = getAllAvailableArticles(1000);
+    const sourceArticles = getAllAvailableArticles(5000);
     if (!sourceArticles || sourceArticles.length === 0) {
       container.innerHTML = '<div class="word-cloud-loading">No active topics available</div>';
       return;
@@ -5183,9 +5230,10 @@ function executeRenderWordCloud() {
       const words = k.split(' ');
 
       // Word-overlap & sub-phrase deduplication:
-      // Allow single-word standalone topics if they appear frequently even if previously referenced in a multi-word n-gram
+      // Single-word topics (e.g. "Jev", "Qwen", "Llama") represent core standalone keywords.
+      // Do NOT block single-word topics due to overlap with multi-word phrases!
       let hasWordOverlap = false;
-      if (words.length > 1 || (phraseScores[k] || 0) < 5) {
+      if (words.length > 1) {
         for (const w of words) {
           if (!topAcronyms.has(w) && usedWordsSet.has(w)) {
             hasWordOverlap = true;

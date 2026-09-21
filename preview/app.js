@@ -4338,17 +4338,71 @@ async function processAIChatQuery(userQuery) {
   finalArticles.sort((a, b) => getArticleTimestamp(b) - getArticleTimestamp(a));
   currentRAGArticles = finalArticles;
 
+  // Build TRENDING TOPICS & KEYWORD CLOUD Context
+  let trendingSnippet = '\n🔥 CURRENT TRENDING TOPICS & KEYWORD CLOUD DATA:\n';
+  const currentCloud = window.__CURRENT_WORD_CLOUD_DATA__;
+  if (currentCloud && currentCloud.selectedKeys && currentCloud.selectedKeys.length > 0) {
+    trendingSnippet += `Active Featured Keyword Topics (Ranked by RAKE Frequency Score across ${currentCloud.totalArticles || 120} recent article titles):\n`;
+    currentCloud.selectedKeys.forEach((k, idx) => {
+      const disp = currentCloud.phraseDisplayMap[k] || k;
+      const score = currentCloud.phraseScores[k] ? currentCloud.phraseScores[k].toFixed(1) : 'N/A';
+      trendingSnippet += `  ${idx + 1}. "${disp}" (Score: ${score})\n`;
+    });
+  } else {
+    const cloudBox = document.getElementById('word-cloud-container');
+    const tags = cloudBox ? cloudBox.querySelectorAll('.word-tag') : [];
+    if (tags.length > 0) {
+      trendingSnippet += 'Active Featured Keyword Topics:\n';
+      tags.forEach((t, idx) => {
+        trendingSnippet += `  ${idx + 1}. "${t.textContent}" (${t.title || ''})\n`;
+      });
+    } else {
+      trendingSnippet += 'No active trending topics generated yet.\n';
+    }
+  }
+
+  try {
+    const rawHist = safeGetStorage('quickrss_wordcloud_history', null);
+    if (rawHist) {
+      const history = JSON.parse(rawHist);
+      if (Array.isArray(history) && history.length > 1) {
+        const latestSnap = history[history.length - 1];
+        const baselineSnaps = history.slice(0, history.length - 1);
+        const baselineTerms = new Set();
+        baselineSnaps.forEach(s => s.terms.forEach(t => baselineTerms.add(t.term)));
+
+        const newlyEmerging = latestSnap.terms.filter(t => !baselineTerms.has(t.term)).map(t => t.displayName);
+        if (newlyEmerging.length > 0) {
+          trendingSnippet += `Newly Emerging Keyword Topics (First seen in recent snapshot): ${newlyEmerging.slice(0, 10).join(', ')}\n`;
+        }
+      }
+    }
+  } catch (e) {}
+
+  trendingSnippet += `
+Trending Topic Formulation & Filtering Rules:
+- Topics are generated exclusively from candidate phrases in article titles using RAKE (Rapid Automatic Keyword Extraction).
+- Common generic stop words ("learning", "updated", "live", "add", "september", "security releases", etc.) are automatically excluded.
+- Phrases must be 5 words or less.
+- Phrases are scored based on word frequency and degree in candidate titles.
+- Sub-phrase deduplication prevents redundant n-gram overlaps.
+- A term/phrase must be present in recent article headlines and score high enough relative to other candidate phrases to be featured in the Trending Topics cloud.
+`;
+
   let contextSnippet = 'Here are the relevant RSS news articles currently available in Quick RSS:\n';
   finalArticles.forEach((art, idx) => {
     contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
   });
 
-  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context provided below. Be concise and informative.
+  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context and Trending Topics data provided below. Be concise and informative.
 
 CITATION & TOPIC AGGREGATION RULES:
 1. When answering queries about trending topics, news overviews, or specific subject searches: ALWAYS group and aggregate related articles under overarching topic headings or clear bullet points.
-2. For each topic/point, cite ALL relevant supporting articles from the provided context (e.g., [Article 1: Title](URL), [Article 3: Title](URL)). Do NOT restrict a topic to only a single citation if multiple articles discuss or relate to that topic.
-3. Use markdown links for citations in the format [Article N: Title](URL) or [Article N](URL).
+2. For questions regarding why a specific phrase is or isn't featured in TRENDING TOPICS: compare the phrase against the active featured keywords list, RAKE scores, and title candidate extraction rules.
+3. For each topic/point, cite ALL relevant supporting articles from the provided context (e.g., [Article 1: Title](URL), [Article 3: Title](URL)). Do NOT restrict a topic to only a single citation if multiple articles discuss or relate to that topic.
+4. Use markdown links for citations in the format [Article N: Title](URL) or [Article N](URL).
+
+${trendingSnippet}
 
 ${contextSnippet}`;
 
@@ -4356,13 +4410,13 @@ ${contextSnippet}`;
     if (provider === 'openai') {
       const token = getOpenAIOAuthToken();
       if (!token) {
-        return "⚠️ OpenAI OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant and click 'Login with OpenAI (OAuth)' to authenticate.";
+        return "⚠️ OpenAI API Key / OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI key or connect via OAuth.";
       }
       return await queryOpenAI(systemPrompt, userQuery, modelName, token);
     } else if (provider === 'claude') {
       const token = getClaudeOAuthToken();
       if (!token) {
-        return "⚠️ Claude OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant and click 'Login with Claude (OAuth)' to authenticate.";
+        return "⚠️ Claude API Key / OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your Claude key.";
       }
       return await queryClaude(systemPrompt, userQuery, modelName, token);
     } else if (provider === 'openrouter') {
@@ -4374,7 +4428,11 @@ ${contextSnippet}`;
       return await queryOpenRouter(systemPrompt, userQuery, actualModel, apiKey);
     }
   } catch (err) {
-    return `❌ AI API Error: ${err.message || err.toString()}`;
+    const errMsg = err.message || err.toString();
+    if (errMsg.includes('Load failed') || errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+      return `❌ AI API Error (Network / CORS Load Failed):\n• If using Claude/Anthropic directly, browser client calls may be restricted by CORS. Please switch your AI Model dropdown to OpenRouter (e.g. "OpenRouter — Claude 3.5 Sonnet").\n• If using OpenAI or OpenRouter, please verify your API Key / Session Token in Preferences ⚙️ -> AI Assistant.`;
+    }
+    return `❌ AI API Error: ${errMsg}`;
   }
 
   return "⚠️ Unknown LLM Provider selected.";
@@ -5037,6 +5095,14 @@ function executeRenderWordCloud() {
     }
 
     recordWordCloudSnapshot(selectedKeys, phraseScores, phraseDisplayMap);
+
+    window.__CURRENT_WORD_CLOUD_DATA__ = {
+      selectedKeys: selectedKeys,
+      phraseScores: phraseScores,
+      phraseDisplayMap: phraseDisplayMap,
+      totalArticles: sourceArticles ? sourceArticles.length : 0,
+      timestamp: Date.now()
+    };
 
     const maxScore = phraseScores[selectedKeys[0]];
     const minScore = phraseScores[selectedKeys[selectedKeys.length - 1]];

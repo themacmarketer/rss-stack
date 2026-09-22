@@ -3410,6 +3410,7 @@ if (exportOpmlBtn) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showOPMLStatus('✅ Subscriptions exported to quickrss_subscriptions.opml', 'success');
+    }
   };
 }
 
@@ -3549,6 +3550,9 @@ function extractOAuthCode(rawInput) {
       if (match) return match[1];
     }
   }
+  return trimmed;
+}
+
 async function tryAutoFetchChatGPTToken() {
   try {
     if (typeof performNativeFetch === 'function') {
@@ -3608,29 +3612,15 @@ function handleSaveChatGPTToken(token, sourceMsg) {
   }
 }
 
-let tokenCheckPollTimer = null;
 function startTokenAutoCheckPoll() {
-  if (tokenCheckPollTimer) clearInterval(tokenCheckPollTimer);
-  let attempts = 0;
-  const maxAttempts = 25;
-
   const checkFn = async () => {
-    attempts++;
     const token = await tryAutoFetchChatGPTToken() || await detectTokenFromClipboard();
     if (token) {
-      if (tokenCheckPollTimer) clearInterval(tokenCheckPollTimer);
-      tokenCheckPollTimer = null;
       window.removeEventListener('focus', checkFn);
       handleSaveChatGPTToken(token, '✓ ChatGPT Session Token auto-detected & inserted!');
-    } else if (attempts >= maxAttempts) {
-      if (tokenCheckPollTimer) clearInterval(tokenCheckPollTimer);
-      tokenCheckPollTimer = null;
-      window.removeEventListener('focus', checkFn);
     }
   };
-
-  tokenCheckPollTimer = setInterval(checkFn, 2000);
-  window.addEventListener('focus', checkFn, { once: false });
+  window.addEventListener('focus', checkFn, { once: true });
 }
 
 // Load AI credentials & ChatGPT session token into Settings UI
@@ -4622,6 +4612,9 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
       userQuery = `Explain ${subQuery ? `"${subQuery}"` : 'the main concepts'} in plain English based on current news articles.`;
     }
   }
+
+  const modelSelect = document.getElementById('ai-model-select');
+  const rawModelVal = modelSelect ? modelSelect.value : 'openai:gpt-4o';
   const parts = rawModelVal.split(':');
   const provider = parts[0];
   const modelName = parts.slice(1).join(':');

@@ -3410,6 +3410,18 @@ if (exportOpmlBtn) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showOPMLStatus('✅ Subscriptions exported to quickrss_subscriptions.opml', 'success');
+  };
+}
+
+const restoreDefaultFeedsBtn = document.getElementById('restore-default-feeds-btn');
+if (restoreDefaultFeedsBtn) {
+  restoreDefaultFeedsBtn.onclick = () => {
+    if (confirm('Are you sure you want to restore default subscriptions? This will reload all default RSS feeds & folders.')) {
+      treeData = JSON.parse(JSON.stringify(defaultTreeData));
+      saveTreeData();
+      if (typeof renderTree === 'function') renderTree();
+      if (typeof refreshAllFeeds === 'function') refreshAllFeeds(true);
+      if (typeof showToast === 'function') showToast('✅ Restored default RSS feeds & folder tree!', 'success');
     }
   };
 }
@@ -5160,16 +5172,21 @@ async function executeAutoRecovery() {
 
   let repairsPerformed = [];
 
-  // 1. Repair Tree JSON if corrupted
+  // 1. Repair Tree JSON if corrupted or empty
   try {
     const treeRaw = localStorage.getItem('quickrss_user_tree');
-    if (treeRaw) JSON.parse(treeRaw);
+    if (treeRaw) {
+      const parsed = JSON.parse(treeRaw);
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Empty tree array');
+    } else {
+      throw new Error('No tree stored');
+    }
   } catch (e) {
     localStorage.removeItem('quickrss_user_tree');
-    if (typeof defaultTree !== 'undefined') {
-      treeData = JSON.parse(JSON.stringify(defaultTree));
+    if (typeof defaultTreeData !== 'undefined') {
+      treeData = JSON.parse(JSON.stringify(defaultTreeData));
       saveTreeData();
-      repairsPerformed.push('Reset corrupted subscriptions tree to default structure.');
+      repairsPerformed.push('Reset corrupted/empty subscriptions tree to default structure.');
     }
   }
 

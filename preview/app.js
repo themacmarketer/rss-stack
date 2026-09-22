@@ -4664,21 +4664,6 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
     }
   });
 
-function cleanTextForPrompt(str, maxLen = 300) {
-  if (!str) return '';
-  let text = String(str)
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (maxLen && text.length > maxLen) {
-    text = text.slice(0, maxLen) + '...';
-  }
-  return text;
-}
-
   if (typeof loadedArticles !== 'undefined' && loadedArticles && loadedArticles.length > 0) {
     loadedArticles.forEach(art => {
       if (finalArticles.length < 12) {
@@ -4878,8 +4863,98 @@ async function performNativeFetch(url, options = {}) {
   return fetch(url, options);
 }
 
+function cleanTextForPrompt(str, maxLen = 300) {
+  if (!str) return '';
+  let text = String(str)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (maxLen && text.length > maxLen) {
+    text = text.slice(0, maxLen) + '...';
+  }
+  return text;
+}
+
+async function queryChatGPTBackend(systemPrompt, userQuery, model, token) {
+  const uuid = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+  const parentUuid = '00000000-0000-0000-0000-000000000000';
+
+  const fullPrompt = `${cleanTextForPrompt(systemPrompt, 12000)}\n\nUSER QUERY:\n${cleanTextForPrompt(userQuery, 3000)}`;
+
+  const res = await performNativeFetch('https://chatgpt.com/backend-api/conversation', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      action: 'next',
+      messages: [
+        {
+          id: uuid,
+          author: { role: 'user' },
+          content: { content_type: 'text', parts: [fullPrompt] }
+        }
+      ],
+      model: model || 'gpt-4o',
+      parent_message_id: parentUuid
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    let errJson = {};
+    try { errJson = JSON.parse(errText); } catch(e) {}
+    const rawMsg = errJson.detail?.message || errJson.error?.message || `HTTP ${res.status}`;
+    if (res.status === 401 || res.status === 403) {
+      safeRemoveStorage('quickrss_openai_oauth_token');
+      throw new Error(`ChatGPT session token expired (HTTP ${res.status}). Please re-authenticate in Preferences > AI Assistant.`);
+    }
+    throw new Error(rawMsg || `ChatGPT Session API Error (HTTP ${res.status})`);
+  }
+
+  const responseText = await res.text();
+  const lines = responseText.split('\n');
+  let finalParts = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+      try {
+        const json = JSON.parse(line.slice(6));
+        const parts = json.message?.content?.parts;
+        if (parts && parts.length > 0) {
+          finalParts = parts;
+          break;
+        }
+      } catch(e) {}
+    }
+  }
+
+  if (finalParts.length > 0) {
+    return finalParts.join('\n');
+  }
+
+  return responseText || 'No response received from ChatGPT session.';
+}
+
 async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
   let tokenToUse = apiKey || getOpenAIOAuthToken();
+  if (!tokenToUse) {
+    throw new Error("No OpenAI API key or ChatGPT session token found.");
+  }
+
+  // Handle ChatGPT Web session token (starts with eyJ) vs standard OpenAI API key (starts with sk-)
+  if (tokenToUse.startsWith('eyJ')) {
+    try {
+      return await queryChatGPTBackend(systemPrompt, userQuery, model, tokenToUse);
+    } catch (e) {
+      console.log('ChatGPT Web Backend query failed, trying standard API completions:', e);
+    }
+  }
+
   let res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -4889,8 +4964,8 @@ async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
     body: JSON.stringify({
       model: model || 'gpt-4o',
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userQuery }
+        { role: 'system', content: cleanTextForPrompt(systemPrompt, 15000) },
+        { role: 'user', content: cleanTextForPrompt(userQuery, 4000) }
       ],
       max_tokens: 1024
     })

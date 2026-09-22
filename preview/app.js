@@ -4664,9 +4664,24 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
     }
   });
 
+function cleanTextForPrompt(str, maxLen = 300) {
+  if (!str) return '';
+  let text = String(str)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (maxLen && text.length > maxLen) {
+    text = text.slice(0, maxLen) + '...';
+  }
+  return text;
+}
+
   if (typeof loadedArticles !== 'undefined' && loadedArticles && loadedArticles.length > 0) {
     loadedArticles.forEach(art => {
-      if (finalArticles.length < 50) {
+      if (finalArticles.length < 12) {
         const key = art.id || (art.title + '---' + art.feedTitle);
         if (!addedKeys.has(key)) {
           addedKeys.add(key);
@@ -4677,7 +4692,7 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
   }
 
   uniquePool.forEach(art => {
-    if (finalArticles.length < 50) {
+    if (finalArticles.length < 12) {
       const key = art.id || (art.title + '---' + art.feedTitle);
       if (!addedKeys.has(key)) {
         addedKeys.add(key);
@@ -4695,7 +4710,7 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
   if (currentCloud && currentCloud.selectedKeys && currentCloud.selectedKeys.length > 0) {
     trendingSnippet += `Active Featured Keyword Topics (Ranked by RAKE Frequency Score across ${currentCloud.totalArticles || 120} recent article titles):\n`;
     currentCloud.selectedKeys.forEach((k, idx) => {
-      const disp = currentCloud.phraseDisplayMap[k] || k;
+      const disp = cleanTextForPrompt(currentCloud.phraseDisplayMap[k] || k, 60);
       const score = currentCloud.phraseScores[k] ? currentCloud.phraseScores[k].toFixed(1) : 'N/A';
       trendingSnippet += `  ${idx + 1}. "${disp}" (Score: ${score})\n`;
     });
@@ -4705,7 +4720,7 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
     if (tags.length > 0) {
       trendingSnippet += 'Active Featured Keyword Topics:\n';
       tags.forEach((t, idx) => {
-        trendingSnippet += `  ${idx + 1}. "${t.textContent}" (${t.title || ''})\n`;
+        trendingSnippet += `  ${idx + 1}. "${cleanTextForPrompt(t.textContent, 60)}"\n`;
       });
     } else {
       trendingSnippet += 'No active trending topics generated yet.\n';
@@ -4722,7 +4737,7 @@ Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
         const baselineTerms = new Set();
         baselineSnaps.forEach(s => s.terms.forEach(t => baselineTerms.add(t.term)));
 
-        const newlyEmerging = latestSnap.terms.filter(t => !baselineTerms.has(t.term)).map(t => t.displayName);
+        const newlyEmerging = latestSnap.terms.filter(t => !baselineTerms.has(t.term)).map(t => cleanTextForPrompt(t.displayName, 50));
         if (newlyEmerging.length > 0) {
           trendingSnippet += `Newly Emerging Keyword Topics (First seen in recent snapshot): ${newlyEmerging.slice(0, 10).join(', ')}\n`;
         }
@@ -4742,19 +4757,26 @@ Trending Topic Formulation & Filtering Rules:
 
   let contextSnippet = 'Here are the relevant RSS news articles currently available in Quick RSS:\n';
   finalArticles.forEach((art, idx) => {
-    contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
+    const cTitle = cleanTextForPrompt(art.title, 150);
+    const cFeed = cleanTextForPrompt(art.feedTitle, 60);
+    const cSummary = cleanTextForPrompt(art.summary || art.content, 250);
+    const cUrl = (art.link || '').trim();
+    contextSnippet += `\n[Article ${idx + 1}] Title: "${cTitle}" | Feed: ${cFeed} | Date: ${art.pubDate || 'N/A'}\nSummary: ${cSummary || 'N/A'}\nURL: ${cUrl}\n`;
   });
 
   let activeArticleSnippet = '';
   if (typeof currentArticle !== 'undefined' && currentArticle && currentArticle.title) {
+    const cActTitle = cleanTextForPrompt(currentArticle.title, 200);
+    const cActFeed = cleanTextForPrompt(currentArticle.feedTitle, 80);
+    const cActContent = cleanTextForPrompt(currentArticle.summary || currentArticle.content || currentArticle.htmlContent, 1500);
     activeArticleSnippet = `
 📌 CURRENTLY ACTIVE SELECTED ARTICLE IN READER PANE:
-Title: "${currentArticle.title}"
-Feed: ${currentArticle.feedTitle || 'N/A'}
+Title: "${cActTitle}"
+Feed: ${cActFeed}
 Date: ${currentArticle.pubDate || 'N/A'}
-Author: ${currentArticle.author || 'N/A'}
-URL: ${currentArticle.link || 'N/A'}
-Summary / Content: ${currentArticle.summary || currentArticle.content || 'N/A'}
+Author: ${cleanTextForPrompt(currentArticle.author, 50) || 'N/A'}
+URL: ${(currentArticle.link || '').trim()}
+Summary / Content: ${cActContent || 'N/A'}
 `;
   }
 

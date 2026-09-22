@@ -2069,6 +2069,129 @@ mark.find-highlight.active-match {
   color: #34c759;
 }
 
+/* ==========================================================================
+   AI ASSISTANT ENHANCEMENTS: THINKING ANIMATION & SLASH MENU (folo-inspired)
+   ========================================================================== */
+
+/* Thinking State Container */
+.ai-message.assistant.thinking-state .ai-msg-content {
+  background: linear-gradient(135deg, rgba(112, 182, 67, 0.08), rgba(0, 122, 255, 0.08));
+  border: 1px solid rgba(112, 182, 67, 0.25);
+  padding: 10px 14px;
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinking-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(112, 182, 67, 0.2);
+  border-top-color: #70b643;
+  border-radius: 50%;
+  animation: thinkingSpin 0.75s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+@keyframes thinkingSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.thinking-title {
+  font-weight: 700;
+  font-size: 12px;
+  background: linear-gradient(90deg, #70b643, #007aff, #70b643);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinkingShimmer 2s linear infinite;
+}
+
+@keyframes thinkingShimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.thinking-subtext {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+/* Slash Command Autocomplete Menu */
+.ai-input-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.ai-slash-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 6px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1000;
+  padding: 4px;
+}
+
+.ai-slash-menu.hidden {
+  display: none !important;
+}
+
+.slash-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.slash-item:hover, .slash-item.selected {
+  background: var(--bg-item-hover);
+}
+
+.slash-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.slash-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.slash-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-folder);
+}
+
+.slash-desc {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
 
 
 

@@ -3537,7 +3537,88 @@ function extractOAuthCode(rawInput) {
       if (match) return match[1];
     }
   }
-  return trimmed;
+async function tryAutoFetchChatGPTToken() {
+  try {
+    if (typeof performNativeFetch === 'function') {
+      const res = await performNativeFetch('https://chatgpt.com/api/auth/session', 'GET');
+      if (res && (res.status === 200 || res.status === 0) && res.data) {
+        let dataObj = null;
+        if (typeof res.data === 'string') {
+          try { dataObj = JSON.parse(res.data); } catch(e) {}
+        } else if (typeof res.data === 'object') {
+          dataObj = res.data;
+        }
+        if (dataObj && dataObj.accessToken) {
+          return dataObj.accessToken;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Native auto fetch session error:', e);
+  }
+  return null;
+}
+
+async function detectTokenFromClipboard() {
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const trimmed = text.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.accessToken) return parsed.accessToken;
+          } catch(e) {}
+        }
+        const match = trimmed.match(/"accessToken"\s*:\s*"([^"]+)"/);
+        if (match && match[1]) return match[1];
+
+        if (trimmed.startsWith('eyJ') && trimmed.includes('.') && trimmed.length > 80) {
+          return trimmed;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Clipboard read error:', e);
+  }
+  return null;
+}
+
+function handleSaveChatGPTToken(token, sourceMsg) {
+  const inputOpenAI = document.getElementById('ai-token-openai');
+  if (inputOpenAI) inputOpenAI.value = token;
+  safeSetStorage('quickrss_openai_oauth_token', token);
+  saveAIKeys({ openai: token });
+  updateOAuthStatusUI();
+  if (typeof showToast === 'function') {
+    showToast(sourceMsg || '✓ ChatGPT Session Token saved successfully!', 'success');
+  }
+}
+
+let tokenCheckPollTimer = null;
+function startTokenAutoCheckPoll() {
+  if (tokenCheckPollTimer) clearInterval(tokenCheckPollTimer);
+  let attempts = 0;
+  const maxAttempts = 25;
+
+  const checkFn = async () => {
+    attempts++;
+    const token = await tryAutoFetchChatGPTToken() || await detectTokenFromClipboard();
+    if (token) {
+      if (tokenCheckPollTimer) clearInterval(tokenCheckPollTimer);
+      tokenCheckPollTimer = null;
+      window.removeEventListener('focus', checkFn);
+      handleSaveChatGPTToken(token, '✓ ChatGPT Session Token auto-detected & inserted!');
+    } else if (attempts >= maxAttempts) {
+      if (tokenCheckPollTimer) clearInterval(tokenCheckPollTimer);
+      tokenCheckPollTimer = null;
+      window.removeEventListener('focus', checkFn);
+    }
+  };
+
+  tokenCheckPollTimer = setInterval(checkFn, 2000);
+  window.addEventListener('focus', checkFn, { once: false });
 }
 
 // Load AI credentials & ChatGPT session token into Settings UI
@@ -3563,11 +3644,51 @@ function initAISettingsUI() {
 
   updateOAuthStatusUI();
 
-  // 1-Click ChatGPT Session Endpoint Handler
+  // 1-Click ChatGPT Session Endpoint & Token Auto-Detect Handlers
   if (openaiSessionBtn) {
-    openaiSessionBtn.onclick = () => {
+    openaiSessionBtn.onclick = async () => {
+      const originalText = openaiSessionBtn.innerHTML;
+      openaiSessionBtn.innerHTML = '<span>⚡ Auto-fetching token...</span>';
+
+      // Attempt 1: Direct native HTTP fetch
+      const nativeToken = await tryAutoFetchChatGPTToken();
+      if (nativeToken) {
+        openaiSessionBtn.innerHTML = originalText;
+        handleSaveChatGPTToken(nativeToken, '✓ ChatGPT Session Token automatically fetched & saved!');
+        return;
+      }
+
+      // Attempt 2: Clipboard auto-detect
+      const clipToken = await detectTokenFromClipboard();
+      if (clipToken) {
+        openaiSessionBtn.innerHTML = originalText;
+        handleSaveChatGPTToken(clipToken, '✓ ChatGPT Session Token detected from clipboard & saved!');
+        return;
+      }
+
+      // Attempt 3: Open browser and start focus auto-check poll
+      openaiSessionBtn.innerHTML = originalText;
       openInDefaultBrowser('https://chatgpt.com/api/auth/session');
-      showToast('Opened ChatGPT Session page! Copy the "accessToken" value and paste below.', 'info');
+      showToast('Opened ChatGPT Session page. Copy session JSON or return to QuickRSS to auto-insert token!', 'info');
+
+      startTokenAutoCheckPoll();
+    };
+  }
+
+  const openaiPasteBtn = document.getElementById('openai-paste-btn');
+  if (openaiPasteBtn) {
+    openaiPasteBtn.onclick = async () => {
+      const clipToken = await detectTokenFromClipboard();
+      if (clipToken) {
+        handleSaveChatGPTToken(clipToken, '✓ ChatGPT Session Token detected from clipboard & inserted!');
+      } else {
+        const inputVal = (document.getElementById('ai-token-openai')?.value || '').trim();
+        if (inputVal) {
+          handleSaveChatGPTToken(inputVal, '✓ OpenAI Token saved!');
+        } else {
+          showToast('No token found in clipboard. Please copy token from ChatGPT session page.', 'warning');
+        }
+      }
     };
   }
 
@@ -4108,6 +4229,7 @@ function setupAIChatbotUI() {
   const clearBtn = document.getElementById('ai-chat-clear-btn');
   const chatInput = document.getElementById('ai-chat-input');
   const chatThread = document.getElementById('ai-chat-thread');
+  const slashMenu = document.getElementById('ai-slash-menu');
 
   if (!aiColumn) return;
 
@@ -4167,19 +4289,115 @@ function setupAIChatbotUI() {
     };
   }
 
+  // Slash Command Menu & Input Interactions
+  if (chatInput && slashMenu) {
+    let activeSlashIndex = -1;
+
+    const hideSlashMenu = () => {
+      slashMenu.classList.add('hidden');
+      activeSlashIndex = -1;
+      slashMenu.querySelectorAll('.slash-item').forEach(item => item.classList.remove('selected'));
+    };
+
+    const updateSlashMenuSelection = (items) => {
+      items.forEach((item, idx) => {
+        if (idx === activeSlashIndex) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    };
+
+    chatInput.oninput = () => {
+      const val = chatInput.value;
+      if (val.startsWith('/')) {
+        const filter = val.slice(1).toLowerCase();
+        const items = slashMenu.querySelectorAll('.slash-item');
+        let visibleCount = 0;
+        items.forEach(item => {
+          const cmd = item.dataset.cmd || '';
+          if (cmd.toLowerCase().includes(filter)) {
+            item.style.display = 'flex';
+            visibleCount++;
+          } else {
+            item.style.display = 'none';
+          }
+        });
+        if (visibleCount > 0) {
+          slashMenu.classList.remove('hidden');
+        } else {
+          hideSlashMenu();
+        }
+      } else {
+        hideSlashMenu();
+      }
+    };
+
+    chatInput.onkeydown = (e) => {
+      if (!slashMenu.classList.contains('hidden')) {
+        const visibleItems = Array.from(slashMenu.querySelectorAll('.slash-item')).filter(i => i.style.display !== 'none');
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeSlashIndex = (activeSlashIndex + 1) % visibleItems.length;
+          updateSlashMenuSelection(visibleItems);
+          return;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeSlashIndex = (activeSlashIndex - 1 + visibleItems.length) % visibleItems.length;
+          updateSlashMenuSelection(visibleItems);
+          return;
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+          if (activeSlashIndex >= 0 && visibleItems[activeSlashIndex]) {
+            e.preventDefault();
+            const cmd = visibleItems[activeSlashIndex].dataset.cmd;
+            chatInput.value = cmd + ' ';
+            hideSlashMenu();
+            chatInput.focus();
+            return;
+          }
+        } else if (e.key === 'Escape') {
+          hideSlashMenu();
+          return;
+        }
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        hideSlashMenu();
+        const q = chatInput.value.trim();
+        if (!q) return;
+        chatInput.value = '';
+        sendUserAIMessage(q);
+      }
+    };
+
+    slashMenu.querySelectorAll('.slash-item').forEach(item => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const cmd = item.dataset.cmd;
+        chatInput.value = cmd + ' ';
+        hideSlashMenu();
+        chatInput.focus();
+      };
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!aiColumn.contains(e.target)) {
+        hideSlashMenu();
+      }
+    });
+  }
+
   if (sendBtn && chatInput) {
-    const doSend = () => {
+    sendBtn.onclick = () => {
+      const slashMenu = document.getElementById('ai-slash-menu');
+      if (slashMenu) slashMenu.classList.add('hidden');
       const q = chatInput.value.trim();
       if (!q) return;
       chatInput.value = '';
       sendUserAIMessage(q);
-    };
-    sendBtn.onclick = doSend;
-    chatInput.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        doSend();
-      }
     };
   }
 
@@ -4189,7 +4407,7 @@ function setupAIChatbotUI() {
         <div class="ai-message assistant">
           <div class="ai-avatar">🤖</div>
           <div class="ai-msg-content">
-            Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+            Hello! I'm your AI News Assistant. Type <code>/</code> for slash commands or ask me anything about your feeds!
           </div>
         </div>
       `;
@@ -4214,7 +4432,7 @@ function startNewAIChatSession() {
       <div class="ai-message assistant">
         <div class="ai-avatar">🤖</div>
         <div class="ai-msg-content">
-          Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+          Hello! I'm your AI News Assistant. Type <code>/</code> for slash commands or ask me anything about your feeds!
         </div>
       </div>
     `;
@@ -4236,18 +4454,24 @@ async function sendUserAIMessage(userQuery) {
   `;
   thread.appendChild(userMsgDiv);
 
+  // Folo-inspired Animated Thinking State
   const assistantMsgDiv = document.createElement('div');
-  assistantMsgDiv.className = 'ai-message assistant';
+  assistantMsgDiv.className = 'ai-message assistant thinking-state';
   assistantMsgDiv.innerHTML = `
     <div class="ai-avatar">🤖</div>
-    <div class="ai-msg-content">
-      <span style="color:#8e8e93;">⏳ Analyzing news articles & querying LLM...</span>
+    <div class="ai-msg-content thinking-content">
+      <div class="thinking-header">
+        <span class="thinking-spinner"></span>
+        <span class="thinking-title">Thinking…</span>
+      </div>
+      <div class="thinking-subtext">Analyzing articles, ranking context & generating answer</div>
     </div>
   `;
   thread.appendChild(assistantMsgDiv);
   thread.scrollTop = thread.scrollHeight;
 
   const responseText = await processAIChatQuery(userQuery);
+  assistantMsgDiv.classList.remove('thinking-state');
   assistantMsgDiv.querySelector('.ai-msg-content').innerHTML = formatAIMarkdown(responseText, currentRAGArticles);
   thread.scrollTop = thread.scrollHeight;
 }
@@ -4295,8 +4519,97 @@ function formatAIMarkdown(text, articles = []) {
 }
 
 async function processAIChatQuery(userQuery) {
-  const modelSelect = document.getElementById('ai-model-select');
-  const rawModelVal = modelSelect ? modelSelect.value : 'openai:gpt-4o';
+  const trimmedQuery = userQuery.trim();
+  const lowerQuery = trimmedQuery.toLowerCase();
+
+  // Helper to get currently active article context
+  function getActiveArticleContext() {
+    if (typeof loadedArticles !== 'undefined' && loadedArticles && typeof currentArticleIndex !== 'undefined' && currentArticleIndex >= 0 && loadedArticles[currentArticleIndex]) {
+      return loadedArticles[currentArticleIndex];
+    }
+    return null;
+  }
+
+  // Slash Command 1: /help
+  if (lowerQuery === '/help' || lowerQuery === 'help') {
+    return `🤖 **Quick RSS AI Assistant Commands**
+
+You can type slash commands or ask freeform questions:
+
+- **/summarize**: Summarize active article or top articles in 3 key takeaways with citations.
+- **/recommend**: Suggest top RSS feeds & sources matching your reading context.
+- **/trending**: Deep dive into current Trending Topics & emerging word cloud terms.
+- **/explain**: Explain complex technical terms or entities in the active article.
+- **/help**: Display this command help menu.
+
+💡 *Tip: Toggle the AI Assistant anytime using \`Cmd+Shift+A\` or \`Cmd+J\`!*`;
+  }
+
+  // Slash Command 2: /summarize
+  if (lowerQuery.startsWith('/summarize') || lowerQuery.startsWith('/summary')) {
+    const activeArt = getActiveArticleContext();
+    if (activeArt) {
+      userQuery = `Summarize the following active article in detail:
+Title: "${activeArt.title || ''}"
+Feed: ${activeArt.feedTitle || ''}
+Content: ${(activeArt.content || activeArt.summary || '').slice(0, 3000)}
+
+Please format your response with:
+1. 📌 **Executive Summary** (2-3 sentences)
+2. 🔑 **Key Takeaways** (3-4 bullet points)
+3. 💬 **Important Quotes & Facts**
+4. 🌐 **Context & Implications**`;
+    } else {
+      userQuery = `Summarize the top 5 newest articles currently loaded in the feed view. Provide an Executive Summary and 3 Key Takeaways per article.`;
+    }
+  }
+
+  // Slash Command 3: /recommend
+  if (lowerQuery.startsWith('/recommend')) {
+    const allFeeds = typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData) : [];
+    const feedTitles = allFeeds.map(f => f.title).filter(Boolean);
+    const activeArt = getActiveArticleContext();
+
+    userQuery = `The user is using Quick RSS reader and is currently subscribed to these RSS feeds:
+${feedTitles.join(', ')}
+
+${activeArt ? `They are currently reading an article titled "${activeArt.title}" from feed "${activeArt.feedTitle}".` : ''}
+
+Based on their feed subscriptions and reading interests, recommend 5-7 high-quality RSS feeds, tech blogs, YouTube channels, or newsletters they should add to Quick RSS.
+For each recommendation, provide:
+1. **Feed Name**
+2. **Category / Topic**
+3. **Suggested RSS Feed URL** (e.g. https://example.com/rss)
+4. **Why it's recommended** (1 sentence)`;
+  }
+
+  // Slash Command 4: /trending
+  if (lowerQuery.startsWith('/trending') || lowerQuery.startsWith('/trends')) {
+    const trendingTopics = window.currentTrendingTopics || [];
+    const topTerms = trendingTopics.slice(0, 10).map(t => `"${t.word}" (${t.count} articles)`).join(', ');
+
+    userQuery = `The following top terms are currently trending in the user's RSS reader word cloud:
+${topTerms || 'Jev, AI, OpenAI, Apple, Tech, Security, Cloud, Market'}
+
+Analyze these emerging trends and explain:
+1. 🔥 **Top Emerging Topics**
+2. 📰 **Why these keywords are spiking**
+3. 💡 **Key takeaway for the reader**
+Reference specific relevant articles from the candidate news articles.`;
+  }
+
+  // Slash Command 5: /explain
+  if (lowerQuery.startsWith('/explain')) {
+    const activeArt = getActiveArticleContext();
+    const subQuery = trimmedQuery.slice(8).trim();
+    if (activeArt) {
+      userQuery = `Explain ${subQuery ? `"${subQuery}"` : 'the key concepts, technical terms, and entities'} in the following article:
+Title: "${activeArt.title}"
+Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
+    } else {
+      userQuery = `Explain ${subQuery ? `"${subQuery}"` : 'the main concepts'} in plain English based on current news articles.`;
+    }
+  }
   const parts = rawModelVal.split(':');
   const provider = parts[0];
   const modelName = parts.slice(1).join(':');

@@ -6313,49 +6313,75 @@ function renderEmergingTopicsModal() {
   let emergingResults = [];
   let surgingCount = 0;
 
-  currentTermMap.forEach((currObj, termKey) => {
+  allKnownTerms.forEach(termKey => {
+    const currObj = currentTermMap.get(termKey);
     const baselineData = baselineTermMap.get(termKey);
     let baselineScore = 0;
     let isNew = false;
     let firstSeen = latestSnapshot.timestamp;
+    let displayName = termKey;
 
-    if (!baselineData || baselineData.frequencies.length === 0) {
-      isNew = true;
-      baselineScore = 0;
-    } else {
+    if (baselineData && baselineData.frequencies.length > 0) {
       firstSeen = baselineData.firstSeen;
+      displayName = baselineData.displayName || termKey;
       const sum = baselineData.frequencies.reduce((a, b) => a + b, 0);
       baselineScore = sum / baselineData.frequencies.length;
     }
 
-    const currentScore = currObj.frequency;
-    const delta = currentScore - baselineScore;
-    const growthPercent = baselineScore > 0 ? Math.round(((currentScore - baselineScore) / baselineScore) * 100) : null;
+    if (currObj) {
+      displayName = currObj.displayName || displayName;
+      const currentScore = currObj.frequency;
+      const delta = currentScore - baselineScore;
+      const growthPercent = baselineScore > 0 ? Math.round(((currentScore - baselineScore) / baselineScore) * 100) : null;
 
-    let badgeHtml = '';
-    if (isNew) {
-      badgeHtml = `<span style="background: rgba(236,72,153,0.18); color: #ec4899; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">🆕 NEWLY EMERGING</span>`;
-      surgingCount++;
-    } else if (growthPercent >= 50) {
-      badgeHtml = `<span style="background: rgba(16,185,129,0.18); color: #10b981; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">🚀 SURGING (+${growthPercent}%)</span>`;
-      surgingCount++;
-    } else if (growthPercent >= 10) {
-      badgeHtml = `<span style="background: rgba(59,130,246,0.18); color: #3b82f6; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">📈 RISING (+${growthPercent}%)</span>`;
+      if (!baselineData || baselineData.frequencies.length === 0) {
+        isNew = true;
+      }
+
+      let badgeHtml = '';
+      if (isNew) {
+        badgeHtml = `<span style="background: rgba(236,72,153,0.18); color: #ec4899; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">🆕 NEWLY EMERGING</span>`;
+        surgingCount++;
+      } else if (growthPercent >= 50) {
+        badgeHtml = `<span style="background: rgba(16,185,129,0.18); color: #10b981; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">🚀 SURGING (+${growthPercent}%)</span>`;
+        surgingCount++;
+      } else if (growthPercent >= 10) {
+        badgeHtml = `<span style="background: rgba(59,130,246,0.18); color: #3b82f6; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">📈 RISING (+${growthPercent}%)</span>`;
+      } else {
+        badgeHtml = `<span style="background: var(--bg-item-active); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500;">📊 STABLE</span>`;
+      }
+
+      emergingResults.push({
+        termKey,
+        displayName,
+        currentScore,
+        baselineScore,
+        delta,
+        growthPercent: growthPercent !== null ? growthPercent : 999,
+        isNew,
+        firstSeen,
+        badgeHtml,
+        isActive: true
+      });
     } else {
-      badgeHtml = `<span style="background: var(--bg-item-active); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500;">📊 STABLE</span>`;
-    }
+      // Historical term from baseline that dropped out of the latest cloud
+      const currentScore = 0;
+      const delta = -baselineScore;
+      const badgeHtml = `<span style="background: var(--bg-item-hover); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">💤 INACTIVE</span>`;
 
-    emergingResults.push({
-      termKey,
-      displayName: currObj.displayName,
-      currentScore,
-      baselineScore,
-      delta,
-      growthPercent: growthPercent || 999,
-      isNew,
-      firstSeen,
-      badgeHtml
-    });
+      emergingResults.push({
+        termKey,
+        displayName,
+        currentScore,
+        baselineScore,
+        delta,
+        growthPercent: -100,
+        isNew: false,
+        firstSeen,
+        badgeHtml,
+        isActive: false
+      });
+    }
   });
 
   if (statSurging) statSurging.textContent = surgingCount;
@@ -6370,7 +6396,7 @@ function renderEmergingTopicsModal() {
   if (sortOption === 'new') {
     emergingResults.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) || b.currentScore - a.currentScore);
   } else if (sortOption === 'frequency') {
-    emergingResults.sort((a, b) => b.currentScore - a.currentScore);
+    emergingResults.sort((a, b) => b.currentScore - a.currentScore || b.baselineScore - a.baselineScore);
   } else {
     emergingResults.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0) || b.delta - a.delta || b.growthPercent - a.growthPercent);
   }
@@ -6403,7 +6429,7 @@ function renderEmergingTopicsModal() {
 
     tr.innerHTML = `
       <td style="padding: 10px 12px; font-weight: 600; color: var(--text-primary);">${escapeHTML(res.displayName)}</td>
-      <td style="padding: 10px 12px; font-family: monospace; color: #3b82f6; font-weight: 600;">${res.currentScore.toFixed(1)}</td>
+      <td style="padding: 10px 12px; font-family: monospace; color: #3b82f6; font-weight: 600;">${res.currentScore > 0 ? res.currentScore.toFixed(1) : '<span style="color: var(--text-muted);">—</span>'}</td>
       <td style="padding: 10px 12px; font-family: monospace; color: var(--text-secondary);">${res.baselineScore > 0 ? res.baselineScore.toFixed(1) : '—'}</td>
       <td style="padding: 10px 12px;">${res.badgeHtml}</td>
       <td style="padding: 10px 12px; color: var(--text-secondary); font-size: 11px;">${firstSeenDateStr}</td>

@@ -739,12 +739,12 @@
 
   <!-- Emerging Topics & Keyword Trends Analysis Modal -->
   <div id="emerging-topics-modal" class="modal-overlay hidden" style="z-index: 9998;">
-    <div class="modal-card" style="max-width: 820px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
-      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+    <div class="modal-card emerging-topics-card">
+      <div class="emerging-modal-header">
         <div class="modal-title-with-icon">
           <span style="font-size: 20px;">📈</span>
           <div>
-            <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Emerging Topics & Keyword Trends</h3>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 600;">Emerging Topics & Keyword Trends</h3>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Track keyword term frequencies, growth velocity, and new emerging topics over time</div>
           </div>
         </div>
@@ -752,22 +752,22 @@
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
         </button>
       </div>
-      <div class="modal-body" style="padding: 16px 20px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+      <div class="emerging-modal-body">
         <!-- Controls & Filter Bar -->
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: var(--bg-tertiary, #1e1e2e); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
-          <div style="display: flex; gap: 6px; align-items: center; flex: 1; min-width: 180px;">
-            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">🔍 Search:</span>
-            <input type="text" id="emerging-search-input" placeholder="Filter keyword terms..." style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 10px; font-size: 11.5px; width: 100%; outline: none;">
+        <div class="emerging-controls-bar">
+          <div style="display: flex; gap: 8px; align-items: center; flex: 1; min-width: 180px;">
+            <span style="font-size: 11.5px; color: var(--text-secondary); font-weight: 600; white-space: nowrap;">🔍 Search:</span>
+            <input type="text" id="emerging-search-input" class="emerging-search-input" placeholder="Filter keyword terms..." autocomplete="off">
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Timeframe:</span>
+            <span style="font-size: 11.5px; color: var(--text-secondary); font-weight: 600;">Timeframe:</span>
             <button class="btn-sm emerging-time-btn active" data-time="24h">Last 24 Hours</button>
             <button class="btn-sm emerging-time-btn" data-time="7d">Last 7 Days</button>
             <button class="btn-sm emerging-time-btn" data-time="all">All History</button>
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Sort By:</span>
-            <select id="emerging-sort-select" style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; font-size: 11px;">
+            <span style="font-size: 11.5px; color: var(--text-secondary); font-weight: 600;">Sort By:</span>
+            <select id="emerging-sort-select" class="emerging-sort-select">
               <option value="growth" selected>🚀 Fastest Growing / Surging</option>
               <option value="new">🆕 Newly Emerging First</option>
               <option value="frequency">📊 Highest Frequency Count</option>
@@ -777,49 +777,51 @@
         </div>
 
         <!-- Summary Cards Bar -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-          <div style="background: var(--bg-tertiary, #1e1e2d); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Snapshots Recorded</div>
-            <div id="stat-total-snapshots" style="font-size: 18px; font-weight: 700; color: #3b82f6; margin-top: 2px;">0</div>
+        <div class="emerging-summary-grid">
+          <div class="emerging-summary-card">
+            <div class="emerging-summary-label">Snapshots Recorded</div>
+            <div id="stat-total-snapshots" class="emerging-summary-val" style="color: #3b82f6;">0</div>
           </div>
-          <div style="background: var(--bg-tertiary, #1e1e2d); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Unique Keywords Tracked</div>
-            <div id="stat-unique-terms" style="font-size: 18px; font-weight: 700; color: #10b981; margin-top: 2px;">0</div>
+          <div class="emerging-summary-card">
+            <div class="emerging-summary-label">Unique Keywords Tracked</div>
+            <div id="stat-unique-terms" class="emerging-summary-val" style="color: #10b981;">0</div>
           </div>
-          <div style="background: var(--bg-tertiary, #1e1e2d); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Newly Surging Topics</div>
-            <div id="stat-surging-count" style="font-size: 18px; font-weight: 700; color: #ec4899; margin-top: 2px;">0</div>
+          <div class="emerging-summary-card">
+            <div class="emerging-summary-label">Newly Surging Topics</div>
+            <div id="stat-surging-count" class="emerging-summary-val" style="color: #ec4899;">0</div>
           </div>
         </div>
 
-        <!-- Emerging Topics Table with Pagination Footer -->
-        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-primary); display: flex; flex-direction: column;">
-          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
-            <thead>
-              <tr style="background: var(--bg-tertiary, #181825); border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; text-transform: uppercase;">
-                <th style="padding: 8px 12px;">Keyword Term</th>
-                <th style="padding: 8px 12px;">Current Score</th>
-                <th style="padding: 8px 12px;">Baseline Score</th>
-                <th style="padding: 8px 12px;">Growth & Status</th>
-                <th style="padding: 8px 12px;">First Recorded</th>
-                <th style="padding: 8px 12px; text-align: right;">Action</th>
-              </tr>
-            </thead>
-            <tbody id="emerging-topics-table-body">
-              <!-- Dynamic rows -->
-            </tbody>
-          </table>
-          <div id="emerging-pagination-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--bg-tertiary, #181825); border-top: 1px solid var(--border-color); font-size: 11px; color: var(--text-muted);">
+        <!-- Emerging Topics Table with Pinned Pagination Footer -->
+        <div class="emerging-table-container">
+          <div class="emerging-table-scroll">
+            <table class="emerging-table">
+              <thead>
+                <tr>
+                  <th>Keyword Term</th>
+                  <th>Current Score</th>
+                  <th>Baseline Score</th>
+                  <th>Growth & Status</th>
+                  <th>First Recorded</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="emerging-topics-table-body">
+                <!-- Dynamic rows -->
+              </tbody>
+            </table>
+          </div>
+          <div id="emerging-pagination-bar" class="emerging-pagination-bar">
             <span id="emerging-page-info">Showing 1-10 of 0 keywords</span>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <button class="btn-sm" id="emerging-prev-page-btn" disabled style="padding: 3px 8px;">◄ Prev</button>
-              <span id="emerging-page-number" style="font-weight: 600; color: var(--text-primary); padding: 0 4px;">Page 1 of 1</span>
-              <button class="btn-sm" id="emerging-next-page-btn" disabled style="padding: 3px 8px;">Next ►</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn-sm" id="emerging-prev-page-btn" disabled style="padding: 4px 10px;">◄ Prev</button>
+              <span id="emerging-page-number" class="emerging-page-number">Page 1 of 1</span>
+              <button class="btn-sm" id="emerging-next-page-btn" disabled style="padding: 4px 10px;">Next ►</button>
             </div>
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="border-top: 1px solid var(--border-color); padding: 10px 20px; justify-content: flex-end;">
+      <div class="emerging-modal-footer">
         <button class="btn-secondary" id="close-emerging-modal-footer-btn">Close</button>
       </div>
     </div>

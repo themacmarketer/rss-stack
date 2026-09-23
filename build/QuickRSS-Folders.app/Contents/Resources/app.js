@@ -6342,7 +6342,7 @@ function renderEmergingTopicsModal() {
     } else if (growthPercent >= 10) {
       badgeHtml = `<span style="background: rgba(59,130,246,0.18); color: #3b82f6; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 11px;">📈 RISING (+${growthPercent}%)</span>`;
     } else {
-      badgeHtml = `<span style="background: rgba(255,255,255,0.08); color: var(--text-muted); padding: 2px 6px; border-radius: 4px; font-size: 11px;">📊 STABLE</span>`;
+      badgeHtml = `<span style="background: var(--bg-item-active); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500;">📊 STABLE</span>`;
     }
 
     emergingResults.push({
@@ -6391,22 +6391,22 @@ function renderEmergingTopicsModal() {
   if (nextBtn) nextBtn.disabled = emergingTopicsCurrentPage >= totalPages;
 
   if (pagedResults.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-muted);">No keywords match "${escapeHTML(searchVal)}".</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-secondary);">No keywords match "${escapeHTML(searchVal)}".</td></tr>`;
     return;
   }
 
   tableBody.innerHTML = '';
   pagedResults.forEach(res => {
     const tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid var(--border-color, rgba(255,255,255,0.06))';
+    tr.style.borderBottom = '1px solid var(--border-color)';
     const firstSeenDateStr = new Date(res.firstSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     tr.innerHTML = `
       <td style="padding: 10px 12px; font-weight: 600; color: var(--text-primary);">${escapeHTML(res.displayName)}</td>
       <td style="padding: 10px 12px; font-family: monospace; color: #3b82f6; font-weight: 600;">${res.currentScore.toFixed(1)}</td>
-      <td style="padding: 10px 12px; font-family: monospace; color: var(--text-muted);">${res.baselineScore > 0 ? res.baselineScore.toFixed(1) : '—'}</td>
+      <td style="padding: 10px 12px; font-family: monospace; color: var(--text-secondary);">${res.baselineScore > 0 ? res.baselineScore.toFixed(1) : '—'}</td>
       <td style="padding: 10px 12px;">${res.badgeHtml}</td>
-      <td style="padding: 10px 12px; color: var(--text-muted); font-size: 11px;">${firstSeenDateStr}</td>
+      <td style="padding: 10px 12px; color: var(--text-secondary); font-size: 11px;">${firstSeenDateStr}</td>
       <td style="padding: 10px 12px; text-align: right;">
         <button class="btn-sm emerging-filter-btn" style="padding: 3px 8px;" data-term="${escapeHTML(res.displayName)}">🔍 Filter Articles</button>
       </td>

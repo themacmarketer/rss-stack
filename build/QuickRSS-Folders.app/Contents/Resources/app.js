@@ -863,6 +863,123 @@ let contextNodeId = null;
 let draggedNodeId = null;
 
 // Native MCP Tool Execution Bridge
+function findFolderByName(nodes, folderName) {
+  if (!folderName || !nodes) return null;
+  const target = String(folderName).trim().toLowerCase();
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.type === 'folder' && n.name && n.name.trim().toLowerCase() === target) {
+      return n;
+    }
+    if (n.children && n.children.length > 0) {
+      const found = findFolderByName(n.children, folderName);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+async function fetchFullWebpageContent(url) {
+  let targetUrl = url;
+  if (!targetUrl || targetUrl === 'active' || targetUrl === 'current') {
+    if (typeof currentArticle !== 'undefined' && currentArticle && currentArticle.link) {
+      targetUrl = currentArticle.link;
+    }
+  }
+  if (!targetUrl || !targetUrl.startsWith('http')) {
+    throw new Error('Valid HTTP/HTTPS URL required for web scraping');
+  }
+
+  const res = await performNativeFetch(targetUrl, {
+    method: 'GET',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 QuickRSS/1.0',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch webpage (HTTP ${res.status})`);
+  }
+
+  const html = await res.text();
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Strip noise elements
+  const noiseSelectors = [
+    'script', 'style', 'noscript', 'iframe', 'svg', 'canvas',
+    'nav', 'header', 'footer', 'aside',
+    '.nav', '.navbar', '.menu', '.sidebar', '.footer', '.header',
+    '.ad', '.advertisement', '.social-share', '.comments', '#comments',
+    '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]', '[aria-hidden="true"]'
+  ];
+  noiseSelectors.forEach(sel => {
+    try {
+      doc.querySelectorAll(sel).forEach(el => el.remove());
+    } catch (e) {}
+  });
+
+  // Extract title
+  const pageTitle = doc.querySelector('title')?.textContent?.trim() || 
+                    doc.querySelector('h1')?.textContent?.trim() || '';
+
+  // Find main content container
+  const contentSelectors = [
+    'article', '[itemprop="articleBody"]', '.article-body', '.story-body', 
+    '.post-content', '.entry-content', 'main', '#main-content', '.content'
+  ];
+
+  let mainEl = null;
+  for (const sel of contentSelectors) {
+    const candidate = doc.querySelector(sel);
+    if (candidate && candidate.textContent.trim().length > 200) {
+      mainEl = candidate;
+      break;
+    }
+  }
+
+  let extractedText = '';
+  if (mainEl) {
+    const blocks = mainEl.querySelectorAll('p, h1, h2, h3, h4, blockquote, li');
+    if (blocks.length > 0) {
+      extractedText = Array.from(blocks)
+        .map(b => b.textContent.trim())
+        .filter(t => t.length > 20)
+        .join('\n\n');
+    } else {
+      extractedText = mainEl.textContent.trim();
+    }
+  } else {
+    const ps = doc.querySelectorAll('p');
+    extractedText = Array.from(ps)
+      .map(p => p.textContent.trim())
+      .filter(t => t.length > 30)
+      .join('\n\n');
+    if (!extractedText || extractedText.length < 150) {
+      extractedText = doc.body?.textContent?.trim() || '';
+    }
+  }
+
+  extractedText = extractedText
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n\n')
+    .trim();
+
+  const maxLen = 6000;
+  if (extractedText.length > maxLen) {
+    extractedText = extractedText.slice(0, maxLen) + '\n\n[Content truncated for length...]';
+  }
+
+  return {
+    success: true,
+    url: targetUrl,
+    title: pageTitle,
+    length: extractedText.length,
+    content: extractedText
+  };
+}
+
 function formatArticleForMCP(art) {
   if (!art) return null;
   const artId = art.id || art.link || '';
@@ -951,8 +1068,8 @@ window.executeMCPTool = async function(name, args = {}) {
       return treeData;
     }
 
-    if (name === 'add_folder') {
-      const folderName = args.name;
+    if (name === 'add_folder' || name === 'create_folder') {
+      const folderName = args.name || args.folder_name;
       if (!folderName) return { error: 'Missing folder name' };
       const parentId = args.parent_id || 'root';
       const newFolder = {
@@ -1018,9 +1135,16 @@ window.executeMCPTool = async function(name, args = {}) {
     }
 
     if (name === 'delete_folder') {
-      const folderId = args.id;
-      if (!folderId) return { error: 'Missing folder ID' };
-      const pos = findNodePosition(treeData, folderId);
+      let folderId = args.id || args.name_or_id || args.name;
+      if (!folderId) return { error: 'Missing folder ID or name' };
+      let pos = findNodePosition(treeData, folderId);
+      if (!pos || pos.node.type !== 'folder') {
+        const found = findFolderByName(treeData, folderId);
+        if (found) {
+          folderId = found.id;
+          pos = findNodePosition(treeData, folderId);
+        }
+      }
       if (!pos) return { error: `Folder '${folderId}' not found` };
 
       removeNodeById(treeData, folderId);
@@ -1029,10 +1153,26 @@ window.executeMCPTool = async function(name, args = {}) {
       return { success: true, id: folderId };
     }
 
-    if (name === 'add_feed') {
+    if (name === 'add_feed' || name === 'add_rss_feed') {
       const url = args.url;
-      const title = args.title || url;
-      const folderId = args.folder_id || args.folderId || 'root';
+      const title = args.title || args.name || url;
+      let folderId = args.folder_id || args.folderId || 'root';
+      if (args.folder_name && folderId === 'root') {
+        const found = findFolderByName(treeData, args.folder_name);
+        if (found) {
+          folderId = found.id;
+        } else {
+          const newF = {
+            id: `f-mcp-${Date.now()}`,
+            type: 'folder',
+            name: args.folder_name,
+            expanded: true,
+            children: []
+          };
+          treeData.unshift(newF);
+          folderId = newF.id;
+        }
+      }
       if (!url) return { error: 'Missing feed URL' };
 
       const newFeed = {
@@ -1104,8 +1244,8 @@ window.executeMCPTool = async function(name, args = {}) {
       return { success: true, feed: pos.node };
     }
 
-    if (name === 'delete_feed') {
-      const target = args.id || args.feed_id || args.url || args.title;
+    if (name === 'delete_feed' || name === 'delete_rss_feed') {
+      const target = args.id || args.feed_id || args.url || args.title || args.title_or_url;
       if (!target) return { error: 'Missing feed id, url, or title' };
       
       const targetLower = String(target).trim().toLowerCase();
@@ -1149,56 +1289,118 @@ window.executeMCPTool = async function(name, args = {}) {
       return pool.map(formatArticleForMCP);
     }
 
-    if (name === 'mark_read') {
+    if (name === 'mark_read' || name === 'mark_article_read') {
       const id = args.id;
-      const target = loadedArticles.find(a => a.id === id || a.link === id);
+      let target = null;
+      if (!id || id === 'active' || id === 'current') {
+        target = currentArticle;
+      } else {
+        target = loadedArticles && loadedArticles.find(a => a.id === id || a.link === id);
+        if (!target && currentArticle && (currentArticle.id === id || currentArticle.link === id)) {
+          target = currentArticle;
+        }
+      }
       if (target) {
         setArticleRead(target);
-      } else {
+        const dot = document.getElementById(`dot-${target.id}`);
+        if (dot) dot.remove();
+        return { success: true, id: target.id, title: target.title };
+      } else if (id) {
         const readSet = getReadArticleIdsFromStorage();
         readSet.add(id);
         saveReadArticleIdsToStorage(readSet);
         updateBadges();
+        return { success: true, id: id };
       }
-      return { success: true, id: id };
+      return { success: false, error: 'No article specified to mark read' };
     }
 
-    if (name === 'star') {
+    if (name === 'star' || name === 'star_article') {
       const id = args.id;
-      let target = loadedArticles.find(a => a.id === id || a.link === id);
+      let target = null;
+      if (!id || id === 'active' || id === 'current') {
+        target = currentArticle;
+      } else {
+        target = loadedArticles && loadedArticles.find(a => a.id === id || a.link === id);
+        if (!target && currentArticle && (currentArticle.id === id || currentArticle.link === id || currentArticle.title === id)) {
+          target = currentArticle;
+        }
+      }
       if (target) {
         setArticleStarred(target, true);
-        renderArticleList(loadedArticles);
+        if (typeof renderArticleList === 'function' && loadedArticles) {
+          renderArticleList(loadedArticles);
+        }
+        const starBtn = document.getElementById('star-btn');
+        if (starBtn && currentArticle && getArticleKey(currentArticle) === getArticleKey(target)) {
+          starBtn.classList.add('starred');
+        }
+        showToast(`Starred "${(target.title || '').slice(0, 30)}..."`, 'success');
+        return { success: true, id: target.id, title: target.title };
       }
-      return { success: true, id: id };
+      return { success: false, error: 'Article not found to star' };
     }
 
-    if (name === 'unstar') {
+    if (name === 'unstar' || name === 'unstar_article') {
       const id = args.id;
-      let target = loadedArticles.find(a => a.id === id || a.link === id);
+      let target = null;
+      if (!id || id === 'active' || id === 'current') {
+        target = currentArticle;
+      } else {
+        target = loadedArticles && loadedArticles.find(a => a.id === id || a.link === id);
+        if (!target && currentArticle && (currentArticle.id === id || currentArticle.link === id || currentArticle.title === id)) {
+          target = currentArticle;
+        }
+      }
       if (target) {
         setArticleStarred(target, false);
-        renderArticleList(loadedArticles);
+        if (typeof renderArticleList === 'function' && loadedArticles) {
+          renderArticleList(loadedArticles);
+        }
+        const starBtn = document.getElementById('star-btn');
+        if (starBtn && currentArticle && getArticleKey(currentArticle) === getArticleKey(target)) {
+          starBtn.classList.remove('starred');
+        }
+        showToast(`Unstarred "${(target.title || '').slice(0, 30)}..."`, 'info');
+        return { success: true, id: target.id, title: target.title };
       }
-      return { success: true, id: id };
+      return { success: false, error: 'Article not found to unstar' };
     }
 
-    if (name === 'star_all') {
-      loadedArticles.forEach(a => setArticleStarred(a, true));
-      renderArticleList(loadedArticles);
-      return { success: true, count: loadedArticles.length };
+    if (name === 'star_all' || name === 'star_all_articles') {
+      if (loadedArticles && loadedArticles.length > 0) {
+        loadedArticles.forEach(a => setArticleStarred(a, true));
+        renderArticleList(loadedArticles);
+        const starBtn = document.getElementById('star-btn');
+        if (starBtn && currentArticle) starBtn.classList.add('starred');
+        showToast(`Starred all ${loadedArticles.length} articles`, 'success');
+        return { success: true, count: loadedArticles.length };
+      }
+      return { success: false, error: 'No articles currently loaded' };
     }
 
-    if (name === 'unstar_all') {
-      loadedArticles.forEach(a => setArticleStarred(a, false));
-      renderArticleList(loadedArticles);
-      return { success: true, count: loadedArticles.length };
+    if (name === 'unstar_all' || name === 'unstar_all_articles') {
+      if (loadedArticles && loadedArticles.length > 0) {
+        loadedArticles.forEach(a => setArticleStarred(a, false));
+        renderArticleList(loadedArticles);
+        const starBtn = document.getElementById('star-btn');
+        if (starBtn && currentArticle) starBtn.classList.remove('starred');
+        showToast(`Unstarred all ${loadedArticles.length} articles`, 'info');
+        return { success: true, count: loadedArticles.length };
+      }
+      return { success: false, error: 'No articles currently loaded' };
     }
 
     if (name === 'get_starred_articles') {
       return getStarredArticlesFromStorage().map(formatArticleForMCP);
     }
 
+    if (name === 'fetch_full_webpage' || name === 'scrape_webpage') {
+      const url = args.url || (currentArticle ? currentArticle.link : null);
+      if (!url) return { error: 'No URL provided and no active article selected' };
+      const scrapeResult = await fetchFullWebpageContent(url);
+      return scrapeResult;
+    }
 
     if (name === 'chat_with_news') {
       const query = args.query || args.prompt || '';
@@ -2646,6 +2848,9 @@ document.querySelectorAll('.settings-tab').forEach(tab => {
     tab.classList.add('active');
     const pane = document.getElementById(`pane-${tab.dataset.tab}`);
     if (pane) pane.classList.add('active');
+    if (tab.dataset.tab === 'mcp' && typeof renderExternalMCPServersList === 'function') {
+      renderExternalMCPServersList();
+    }
   };
 });
 
@@ -2715,6 +2920,226 @@ if (testMCPBtn) {
   testMCPBtn.onclick = () => {
     checkMCPStatus();
   };
+}
+
+// ==========================================
+// OUTBOUND MCP CLIENT & EXTERNAL SERVERS
+// ==========================================
+const EXTERNAL_MCP_SERVERS_KEY = 'quickrss_external_mcp_servers';
+
+function getExternalMCPServers() {
+  try {
+    const raw = localStorage.getItem(EXTERNAL_MCP_SERVERS_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return list;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveExternalMCPServers(servers) {
+  try {
+    localStorage.setItem(EXTERNAL_MCP_SERVERS_KEY, JSON.stringify(servers));
+  } catch (e) {}
+}
+
+async function discoverExternalMCPTools(server) {
+  if (!server || !server.url) return [];
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (server.token) headers['Authorization'] = `Bearer ${server.token}`;
+    const res = await performNativeFetch(server.url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'tools/list',
+        params: {}
+      })
+    });
+    if (!res.ok) {
+      console.warn(`External MCP server ${server.name} returned HTTP ${res.status}`);
+      return [];
+    }
+    const json = await res.json();
+    const tools = json.result?.tools || [];
+    return tools;
+  } catch (err) {
+    console.warn(`Failed to discover tools for external MCP server ${server.name}:`, err);
+    return [];
+  }
+}
+
+async function callExternalMCPTool(server, toolName, args = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (server.token) headers['Authorization'] = `Bearer ${server.token}`;
+  const res = await performNativeFetch(server.url, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: args
+      }
+    })
+  });
+  if (!res.ok) {
+    throw new Error(`External MCP Server HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(json.error.message || JSON.stringify(json.error));
+  }
+  return json.result;
+}
+
+function renderExternalMCPServersList() {
+  const container = document.getElementById('external-mcp-list');
+  if (!container) return;
+
+  const servers = getExternalMCPServers();
+  if (servers.length === 0) {
+    container.innerHTML = `
+      <div style="font-size: 11.5px; color: var(--text-secondary); padding: 8px 0; font-style: italic;">
+        No external MCP servers connected yet. Add one below to extend the AI Assistant with external tools!
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = '';
+  servers.forEach(server => {
+    const card = document.createElement('div');
+    card.className = 'mcp-server-card';
+    const toolCount = Array.isArray(server.cachedTools) ? server.cachedTools.length : 0;
+    const isOnline = server.status === 'connected' || toolCount > 0;
+
+    card.innerHTML = `
+      <div class="mcp-server-info">
+        <div class="mcp-server-name">
+          <span>${escapeHTML(server.name)}</span>
+          <span class="mcp-tools-badge ${isOnline ? '' : 'disconnected'}">
+            ${isOnline ? `● ${toolCount} Tools Available` : '● Disconnected'}
+          </span>
+        </div>
+        <div class="mcp-server-url" title="${escapeHTML(server.url)}">${escapeHTML(server.url)}</div>
+      </div>
+      <div class="mcp-server-actions">
+        <input type="checkbox" ${server.enabled ? 'checked' : ''} title="Enable/disable server tools" class="mcp-server-toggle" data-id="${server.id}" />
+        <button class="mcp-del-btn" data-id="${server.id}" title="Remove server">✕</button>
+      </div>
+    `;
+
+    const toggle = card.querySelector('.mcp-server-toggle');
+    if (toggle) {
+      toggle.onchange = (e) => {
+        server.enabled = e.target.checked;
+        saveExternalMCPServers(servers);
+        showToast(`${server.name} tools ${server.enabled ? 'enabled' : 'disabled'}`, 'info');
+      };
+    }
+
+    const delBtn = card.querySelector('.mcp-del-btn');
+    if (delBtn) {
+      delBtn.onclick = () => {
+        const remaining = servers.filter(s => s.id !== server.id);
+        saveExternalMCPServers(remaining);
+        renderExternalMCPServersList();
+        showToast(`Removed MCP server "${server.name}"`, 'info');
+      };
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function initExternalMCPServersUI() {
+  renderExternalMCPServersList();
+
+  const addBtn = document.getElementById('add-mcp-server-btn');
+  if (addBtn) {
+    addBtn.onclick = async () => {
+      const nameInput = document.getElementById('new-mcp-name');
+      const urlInput = document.getElementById('new-mcp-url');
+      const tokenInput = document.getElementById('new-mcp-token');
+
+      const name = nameInput ? nameInput.value.trim() : '';
+      const url = urlInput ? urlInput.value.trim() : '';
+      const token = tokenInput ? tokenInput.value.trim() : '';
+
+      if (!name || !url) {
+        alert('Please provide both Server Name and Server URL.');
+        return;
+      }
+
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        alert('Server URL must start with http:// or https://');
+        return;
+      }
+
+      const id = 'ext_' + Date.now().toString(36);
+      const newServer = {
+        id,
+        name,
+        url,
+        token,
+        enabled: true,
+        status: 'checking',
+        cachedTools: []
+      };
+
+      showToast(`Connecting to ${name}...`, 'info');
+      const discovered = await discoverExternalMCPTools(newServer);
+      newServer.cachedTools = discovered;
+      newServer.status = discovered.length > 0 ? 'connected' : 'online';
+
+      const servers = getExternalMCPServers();
+      servers.push(newServer);
+      saveExternalMCPServers(servers);
+
+      if (nameInput) nameInput.value = '';
+      if (urlInput) urlInput.value = '';
+      if (tokenInput) tokenInput.value = '';
+
+      renderExternalMCPServersList();
+      showToast(`Connected to ${name}! Discovered ${discovered.length} tools.`, 'success');
+    };
+  }
+
+  const refreshAllBtn = document.getElementById('refresh-all-mcp-btn');
+  if (refreshAllBtn) {
+    refreshAllBtn.onclick = async () => {
+      const servers = getExternalMCPServers();
+      if (servers.length === 0) {
+        showToast('No external MCP servers configured.', 'info');
+        return;
+      }
+      showToast('Refreshing external MCP tools...', 'info');
+      let totalTools = 0;
+      for (const s of servers) {
+        const tools = await discoverExternalMCPTools(s);
+        s.cachedTools = tools;
+        s.status = tools.length > 0 ? 'connected' : 'disconnected';
+        totalTools += tools.length;
+      }
+      saveExternalMCPServers(servers);
+      renderExternalMCPServersList();
+      showToast(`Refreshed! Found ${totalTools} total tools across ${servers.length} servers.`, 'success');
+    };
+  }
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initExternalMCPServersUI);
+  } else {
+    setTimeout(initExternalMCPServersUI, 100);
+  }
 }
 
 // Folder Dropdown Population Helper
@@ -4502,6 +4927,381 @@ function startNewAIChatSession() {
   if (typeof showToast === 'function') showToast('Started a new AI chat session.', 'info');
 }
 
+// ==========================================
+// AI ASSISTANT TOOL SCHEMAS & DISPATCHER
+// ==========================================
+const AI_ASSISTANT_RAW_TOOLS = [
+  {
+    name: 'star_article',
+    description: 'Star/favorite an article in Quick RSS. If id is omitted or "active", stars the currently active selected article in the reader pane.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Article ID or URL, or "active" for currently selected article' },
+        title: { type: 'string', description: 'Optional title of the article' }
+      }
+    }
+  },
+  {
+    name: 'unstar_article',
+    description: 'Unstar/unfavorite an article in Quick RSS. If id is omitted or "active", unstars the currently active selected article.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Article ID or URL, or "active" for currently selected article' }
+      }
+    }
+  },
+  {
+    name: 'star_all_articles',
+    description: 'Star/favorite all articles currently loaded in the feed list view.',
+    parameters: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'unstar_all_articles',
+    description: 'Unstar/unfavorite all articles currently loaded in the feed list view.',
+    parameters: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'mark_article_read',
+    description: 'Mark an article as read in Quick RSS. If id is omitted or "active", marks the currently active article as read.',
+    parameters: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Article ID or URL, or "active"' }
+      }
+    }
+  },
+  {
+    name: 'add_rss_feed',
+    description: 'Add and subscribe to a new RSS or Atom feed in Quick RSS.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The RSS or Atom feed URL (e.g. https://news.ycombinator.com/rss)' },
+        title: { type: 'string', description: 'Display title for the RSS feed' },
+        folder_name: { type: 'string', description: 'Optional target folder name to place the feed in' }
+      },
+      required: ['url']
+    }
+  },
+  {
+    name: 'delete_rss_feed',
+    description: 'Delete and unsubscribe from an RSS feed by title or URL.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title_or_url: { type: 'string', description: 'Feed title or feed URL to delete' }
+      },
+      required: ['title_or_url']
+    }
+  },
+  {
+    name: 'create_folder',
+    description: 'Create a new folder in the sidebar subscriptions tree to organize feeds.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The folder name' }
+      },
+      required: ['name']
+    }
+  },
+  {
+    name: 'delete_folder',
+    description: 'Delete a folder in the sidebar subscriptions tree by name or ID.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name_or_id: { type: 'string', description: 'Folder name or folder ID to delete' }
+      },
+      required: ['name_or_id']
+    }
+  },
+  {
+    name: 'search_articles',
+    description: 'Search across all cached RSS articles in all feeds by keyword or topic.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search keywords or topic' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'fetch_full_webpage',
+    description: 'Fetch and scrape the full webpage reader text for an article when the RSS summary is truncated or when full article content is required. If url is omitted or "active", scrapes the currently active selected article.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The webpage URL to fetch, or "active" for current article' }
+      }
+    }
+  }
+];
+
+async function getAllOpenAITools() {
+  const tools = AI_ASSISTANT_RAW_TOOLS.map(t => ({
+    type: 'function',
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters
+    }
+  }));
+
+  const extServers = getExternalMCPServers().filter(s => s.enabled);
+  for (const s of extServers) {
+    if (s.cachedTools && Array.isArray(s.cachedTools)) {
+      s.cachedTools.forEach(extT => {
+        const safeName = `ext_${s.id}__${extT.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        tools.push({
+          type: 'function',
+          function: {
+            name: safeName,
+            description: `[${s.name}] ${extT.description || ''}`,
+            parameters: extT.inputSchema || extT.parameters || { type: 'object', properties: {} }
+          }
+        });
+      });
+    }
+  }
+
+  return tools;
+}
+
+async function getAllClaudeTools() {
+  const tools = AI_ASSISTANT_RAW_TOOLS.map(t => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.parameters
+  }));
+
+  const extServers = getExternalMCPServers().filter(s => s.enabled);
+  for (const s of extServers) {
+    if (s.cachedTools && Array.isArray(s.cachedTools)) {
+      s.cachedTools.forEach(extT => {
+        const safeName = `ext_${s.id}__${extT.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        tools.push({
+          name: safeName,
+          description: `[${s.name}] ${extT.description || ''}`,
+          input_schema: extT.inputSchema || extT.parameters || { type: 'object', properties: {} }
+        });
+      });
+    }
+  }
+
+  return tools;
+}
+
+function formatToolLabel(name) {
+  if (!name) return 'Tool';
+  if (name.startsWith('ext_')) {
+    const parts = name.split('__');
+    return parts.slice(1).join('__');
+  }
+  const map = {
+    star_article: 'Star Article',
+    star: 'Star Article',
+    unstar_article: 'Unstar Article',
+    unstar: 'Unstar Article',
+    star_all_articles: 'Star All Articles',
+    star_all: 'Star All Articles',
+    unstar_all_articles: 'Unstar All Articles',
+    unstar_all: 'Unstar All Articles',
+    mark_article_read: 'Mark as Read',
+    mark_read: 'Mark as Read',
+    add_rss_feed: 'Add RSS Feed',
+    add_feed: 'Add RSS Feed',
+    delete_rss_feed: 'Delete RSS Feed',
+    delete_feed: 'Delete RSS Feed',
+    create_folder: 'Create Folder',
+    add_folder: 'Create Folder',
+    delete_folder: 'Delete Folder',
+    search_articles: 'Search Articles',
+    fetch_full_webpage: 'Scrape Webpage',
+    scrape_webpage: 'Scrape Webpage'
+  };
+  return map[name] || name.replace(/_/g, ' ');
+}
+
+function formatToolSuccess(name, args, result) {
+  if (name.startsWith('ext_')) {
+    return `External tool ${formatToolLabel(name)} completed`;
+  }
+  if (name === 'star' || name === 'star_article') {
+    const title = result?.title ? ` "${result.title.slice(0, 30)}..."` : ' active article';
+    return `Starred${title}`;
+  }
+  if (name === 'unstar' || name === 'unstar_article') {
+    const title = result?.title ? ` "${result.title.slice(0, 30)}..."` : ' active article';
+    return `Unstarred${title}`;
+  }
+  if (name === 'star_all' || name === 'star_all_articles') {
+    return `Starred ${result?.count ?? 'all'} loaded articles`;
+  }
+  if (name === 'unstar_all' || name === 'unstar_all_articles') {
+    return `Unstarred ${result?.count ?? 'all'} loaded articles`;
+  }
+  if (name === 'mark_read' || name === 'mark_article_read') {
+    return `Marked article as read`;
+  }
+  if (name === 'add_feed' || name === 'add_rss_feed') {
+    return `Subscribed to feed "${args?.title || args?.url || ''}"`;
+  }
+  if (name === 'delete_feed' || name === 'delete_rss_feed') {
+    return `Deleted feed "${result?.title || args?.title_or_url || ''}"`;
+  }
+  if (name === 'add_folder' || name === 'create_folder') {
+    return `Created folder "${args?.name || args?.folder_name || ''}"`;
+  }
+  if (name === 'delete_folder') {
+    return `Deleted folder`;
+  }
+  if (name === 'search_articles') {
+    const count = Array.isArray(result) ? result.length : 0;
+    return `Found ${count} articles for "${args?.query || ''}"`;
+  }
+  if (name === 'fetch_full_webpage' || name === 'scrape_webpage') {
+    return `Scraped full article text (${result?.length || 0} characters)`;
+  }
+  return `Executed ${formatToolLabel(name)}`;
+}
+
+function formatToolError(name, err) {
+  return `${formatToolLabel(name)} failed: ${String(err || 'Unknown error').slice(0, 50)}`;
+}
+
+function renderAIToolChip(container, evt, chipMap) {
+  const chipKey = evt.id || (evt.name + '-' + (evt.args?.id || evt.args?.url || evt.args?.name || 'def'));
+  let chip = chipMap.get(chipKey);
+
+  if (evt.status === 'executing') {
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.className = 'ai-tool-chip executing';
+      container.appendChild(chip);
+      chipMap.set(chipKey, chip);
+    } else {
+      chip.className = 'ai-tool-chip executing';
+    }
+    chip.innerHTML = `
+      <span class="ai-tool-chip-spinner"></span>
+      <span class="ai-tool-chip-label">⚡ Calling <b>${formatToolLabel(evt.name)}</b>...</span>
+    `;
+  } else if (evt.status === 'completed') {
+    if (!chip) {
+      chip = document.createElement('div');
+      container.appendChild(chip);
+      chipMap.set(chipKey, chip);
+    }
+    chip.className = 'ai-tool-chip completed';
+    chip.innerHTML = `
+      <span class="ai-tool-chip-icon">✅</span>
+      <span class="ai-tool-chip-label">${formatToolSuccess(evt.name, evt.args, evt.result)}</span>
+    `;
+  } else if (evt.status === 'error') {
+    if (!chip) {
+      chip = document.createElement('div');
+      container.appendChild(chip);
+      chipMap.set(chipKey, chip);
+    }
+    chip.className = 'ai-tool-chip error';
+    chip.innerHTML = `
+      <span class="ai-tool-chip-icon">⚠️</span>
+      <span class="ai-tool-chip-label">${formatToolError(evt.name, evt.error)}</span>
+    `;
+  }
+}
+
+async function executeAIAssistantTool(name, args = {}, onToolCall = null) {
+  if (onToolCall) {
+    onToolCall({ status: 'executing', name, args });
+  }
+
+  try {
+    if (name.startsWith('ext_')) {
+      const parts = name.split('__');
+      const serverId = parts[0].replace('ext_', '');
+      const originalToolName = parts.slice(1).join('__');
+      const servers = getExternalMCPServers();
+      const s = servers.find(srv => srv.id === serverId);
+      if (s) {
+        const extResult = await callExternalMCPTool(s, originalToolName, args);
+        if (onToolCall) onToolCall({ status: 'completed', name, args, result: extResult });
+        return extResult;
+      }
+    }
+
+    let toolResult;
+    if (name === 'star_article' || name === 'star') {
+      toolResult = await window.executeMCPTool('star', args);
+    } else if (name === 'unstar_article' || name === 'unstar') {
+      toolResult = await window.executeMCPTool('unstar', args);
+    } else if (name === 'star_all_articles' || name === 'star_all') {
+      toolResult = await window.executeMCPTool('star_all', args);
+    } else if (name === 'unstar_all_articles' || name === 'unstar_all') {
+      toolResult = await window.executeMCPTool('unstar_all', args);
+    } else if (name === 'mark_article_read' || name === 'mark_read') {
+      toolResult = await window.executeMCPTool('mark_read', args);
+    } else if (name === 'add_rss_feed' || name === 'add_feed') {
+      toolResult = await window.executeMCPTool('add_feed', args);
+    } else if (name === 'delete_rss_feed' || name === 'delete_feed') {
+      toolResult = await window.executeMCPTool('delete_feed', args);
+    } else if (name === 'create_folder' || name === 'add_folder') {
+      toolResult = await window.executeMCPTool('add_folder', args);
+    } else if (name === 'delete_folder') {
+      toolResult = await window.executeMCPTool('delete_folder', args);
+    } else if (name === 'search_articles') {
+      toolResult = await window.executeMCPTool('search_articles', args);
+    } else if (name === 'fetch_full_webpage' || name === 'scrape_webpage') {
+      toolResult = await window.executeMCPTool('fetch_full_webpage', args);
+    } else {
+      toolResult = await window.executeMCPTool(name, args);
+    }
+
+    if (onToolCall) {
+      onToolCall({ status: 'completed', name, args, result: toolResult });
+    }
+    return toolResult;
+  } catch (err) {
+    if (onToolCall) {
+      onToolCall({ status: 'error', name, args, error: err.message || err.toString() });
+    }
+    return { error: err.message || err.toString() };
+  }
+}
+
+async function parseAndExecuteToolBlocks(respText, onToolCall) {
+  if (!respText) return respText;
+  const toolBlockRegex = /```(?:tool_call|json)?\s*(\{[\s\S]*?"(?:tool|name)"[\s\S]*?\})\s*```/g;
+  let match;
+  let cleanedText = respText;
+
+  while ((match = toolBlockRegex.exec(respText)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      const toolName = parsed.tool || parsed.name;
+      const toolArgs = parsed.args || parsed.arguments || parsed.parameters || {};
+      if (toolName) {
+        await executeAIAssistantTool(toolName, toolArgs, onToolCall);
+        cleanedText = cleanedText.replace(match[0], '').trim();
+      }
+    } catch (e) {
+      console.log('Failed to parse and execute tool block:', e);
+    }
+  }
+
+  return cleanedText || 'Action completed.';
+}
+
 async function sendUserAIMessage(userQuery) {
   const thread = document.getElementById('ai-chat-thread');
   if (!thread) return;
@@ -4514,7 +5314,7 @@ async function sendUserAIMessage(userQuery) {
   `;
   thread.appendChild(userMsgDiv);
 
-  // Folo-inspired Animated Thinking State
+  // Folo-inspired Animated Thinking State with live tool execution chips
   const assistantMsgDiv = document.createElement('div');
   assistantMsgDiv.className = 'ai-message assistant thinking-state';
   assistantMsgDiv.innerHTML = `
@@ -4524,15 +5324,34 @@ async function sendUserAIMessage(userQuery) {
         <span class="thinking-spinner"></span>
         <span class="thinking-title">Thinking…</span>
       </div>
-      <div class="thinking-subtext">Analyzing articles, ranking context & generating answer</div>
+      <div class="thinking-subtext">Analyzing articles, ranking context & executing actions</div>
+      <div class="ai-tool-chips-container"></div>
     </div>
   `;
   thread.appendChild(assistantMsgDiv);
   thread.scrollTop = thread.scrollHeight;
 
-  const responseText = await processAIChatQuery(userQuery);
+  const toolChipsContainer = assistantMsgDiv.querySelector('.ai-tool-chips-container');
+  const chipMap = new Map();
+
+  const handleToolEvent = (evt) => {
+    if (!toolChipsContainer) return;
+    renderAIToolChip(toolChipsContainer, evt, chipMap);
+    thread.scrollTop = thread.scrollHeight;
+  };
+
+  const responseText = await processAIChatQuery(userQuery, handleToolEvent);
   assistantMsgDiv.classList.remove('thinking-state');
-  assistantMsgDiv.querySelector('.ai-msg-content').innerHTML = formatAIMarkdown(responseText, currentRAGArticles);
+
+  const msgContentEl = assistantMsgDiv.querySelector('.ai-msg-content');
+  if (msgContentEl) {
+    const hasChips = toolChipsContainer && toolChipsContainer.children.length > 0;
+    const chipsHTML = hasChips ? toolChipsContainer.outerHTML : '';
+    msgContentEl.innerHTML = `
+      ${chipsHTML}
+      <div class="ai-msg-text">${formatAIMarkdown(responseText, currentRAGArticles)}</div>
+    `;
+  }
   thread.scrollTop = thread.scrollHeight;
 }
 
@@ -4578,7 +5397,7 @@ function formatAIMarkdown(text, articles = []) {
   return html;
 }
 
-async function processAIChatQuery(userQuery) {
+async function processAIChatQuery(userQuery, onToolCall = null) {
   const trimmedQuery = userQuery.trim();
   const lowerQuery = trimmedQuery.toLowerCase();
 
@@ -4592,15 +5411,23 @@ async function processAIChatQuery(userQuery) {
 
   // Slash Command 1: /help
   if (lowerQuery === '/help' || lowerQuery === 'help') {
-    return `🤖 **Quick RSS AI Assistant Commands**
+    return `🤖 **Quick RSS AI Assistant Commands & Agentic Tools**
 
 You can type slash commands or ask freeform questions:
 
-- **/summarize**: Summarize active article or top articles in 3 key takeaways with citations.
+- **/summarize**: Summarize active article (automatically scrapes full webpage if truncated).
 - **/recommend**: Suggest top RSS feeds & sources matching your reading context.
 - **/trending**: Deep dive into current Trending Topics & emerging word cloud terms.
 - **/explain**: Explain complex technical terms or entities in the active article.
 - **/help**: Display this command help menu.
+
+⚡ **Agentic Actions & Tools Supported**:
+- *"Star this article"* or *"Unstar this article"*
+- *"Star all loaded articles"*
+- *"Subscribe to https://news.ycombinator.com/rss in Tech folder"*
+- *"Create folder 'AI Research'"*
+- *"Search articles for Quantum Computing"*
+- *"Scrape full webpage text for this article"*
 
 💡 *Tip: Toggle the AI Assistant anytime using \`Cmd+Shift+A\` or \`Cmd+J\`!*`;
   }
@@ -4609,10 +5436,25 @@ You can type slash commands or ask freeform questions:
   if (lowerQuery.startsWith('/summarize') || lowerQuery.startsWith('/summary')) {
     const activeArt = getActiveArticleContext();
     if (activeArt) {
+      let articleText = (activeArt.content || activeArt.summary || '').trim();
+      // Auto-scrape full webpage if RSS summary is truncated (< 250 chars)
+      if (articleText.length < 250 && activeArt.link && activeArt.link.startsWith('http')) {
+        if (onToolCall) onToolCall({ status: 'executing', name: 'fetch_full_webpage', args: { url: activeArt.link } });
+        try {
+          const scraped = await fetchFullWebpageContent(activeArt.link);
+          if (scraped && scraped.content && scraped.content.length > articleText.length) {
+            articleText = scraped.content;
+            if (onToolCall) onToolCall({ status: 'completed', name: 'fetch_full_webpage', args: { url: activeArt.link }, result: scraped });
+          }
+        } catch (e) {
+          console.log('Live web scrape on /summarize failed:', e);
+        }
+      }
+
       userQuery = `Summarize the following active article in detail:
 Title: "${activeArt.title || ''}"
 Feed: ${activeArt.feedTitle || ''}
-Content: ${(activeArt.content || activeArt.summary || '').slice(0, 3000)}
+Content: ${articleText.slice(0, 4500)}
 
 Please format your response with:
 1. 📌 **Executive Summary** (2-3 sentences)
@@ -4823,7 +5665,7 @@ Summary / Content: ${cActContent || 'N/A'}
 `;
   }
 
-  const systemPrompt = `You are the AI News Assistant built into Quick RSS. Answer the user's question accurately using the live news context, currently active selected article, and Trending Topics data provided below. Be concise and informative.
+  const systemPrompt = `You are the AI Assistant built into Quick RSS. Answer the user's questions accurately using the live news context, currently active selected article, and Trending Topics data provided below. Be concise and informative.
 
 CITATION & TOPIC AGGREGATION RULES:
 1. When answering queries about trending topics, news overviews, or specific subject searches: ALWAYS group and aggregate related articles under overarching topic headings or clear bullet points.
@@ -4831,6 +5673,28 @@ CITATION & TOPIC AGGREGATION RULES:
 3. For questions regarding why a specific phrase is or isn't featured in TRENDING TOPICS: compare the phrase against the active featured keywords list, RAKE scores, and title candidate extraction rules.
 4. For each topic/point, cite ALL relevant supporting articles from the provided context (e.g., [Article 1: Title](URL), [Article 3: Title](URL)). Do NOT restrict a topic to only a single citation if multiple articles discuss or relate to that topic.
 5. Use markdown links for citations in the format [Article N: Title](URL) or [Article N](URL).
+
+AGENTIC TOOLS & ACTIONS AVAILABLE:
+You have tools to perform real mutations in Quick RSS:
+- star_article(id: "active" | string, title?: string): Star/favorite current or specified article.
+- unstar_article(id: "active" | string): Unstar current or specified article.
+- star_all_articles(): Star all loaded articles.
+- unstar_all_articles(): Unstar all loaded articles.
+- mark_article_read(id: "active" | string): Mark an article as read.
+- add_rss_feed(url: string, title?: string, folder_name?: string): Subscribe to a new RSS feed.
+- delete_rss_feed(title_or_url: string): Delete an RSS feed subscription.
+- create_folder(name: string): Create a new folder in subscriptions.
+- delete_folder(name_or_id: string): Delete a folder.
+- search_articles(query: string): Search articles across all feeds.
+- fetch_full_webpage(url?: string): Scrape and extract the full webpage reader text for an article.
+
+When the user asks you to perform an action (e.g., "Star this article", "Add feed ...", "Create folder ...", "Fetch full article text"):
+- Execute the tool via native function calling if supported.
+- If in conversational or session mode, include a JSON tool call block in your response:
+\`\`\`tool_call
+{"tool": "star_article", "args": {"id": "active"}}
+\`\`\`
+accompanied by a brief friendly confirmation message.
 
 ${activeArticleSnippet}
 
@@ -4844,20 +5708,20 @@ ${contextSnippet}`;
       if (!token) {
         return "⚠️ OpenAI API Key / OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI key or connect via OAuth.";
       }
-      return await queryOpenAI(systemPrompt, userQuery, modelName, token);
+      return await queryOpenAI(systemPrompt, userQuery, modelName, token, onToolCall);
     } else if (provider === 'claude') {
       const token = getClaudeOAuthToken();
       if (!token) {
         return "⚠️ Claude API Key / OAuth login required. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your Claude key.";
       }
-      return await queryClaude(systemPrompt, userQuery, modelName, token);
+      return await queryClaude(systemPrompt, userQuery, modelName, token, onToolCall);
     } else if (provider === 'openrouter') {
       const apiKey = keys.openrouter;
       if (!apiKey) {
         return "⚠️ OpenRouter API Key is missing. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenRouter key.";
       }
       const actualModel = modelName === 'auto' ? 'anthropic/claude-3.5-sonnet' : modelName;
-      return await queryOpenRouter(systemPrompt, userQuery, actualModel, apiKey);
+      return await queryOpenRouter(systemPrompt, userQuery, actualModel, apiKey, onToolCall);
     }
   } catch (err) {
     const errMsg = err.message || err.toString();
@@ -4998,7 +5862,7 @@ async function queryChatGPTBackend(systemPrompt, userQuery, model, token) {
   return responseText || 'No response received from ChatGPT session.';
 }
 
-async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
+async function queryOpenAI(systemPrompt, userQuery, model, apiKey, onToolCall = null) {
   let tokenToUse = apiKey || getOpenAIOAuthToken();
   if (!tokenToUse) {
     throw new Error("No OpenAI API key or ChatGPT session token found.");
@@ -5007,113 +5871,206 @@ async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
   // Handle ChatGPT Web session token (starts with eyJ) vs standard OpenAI API key (starts with sk-)
   if (tokenToUse.startsWith('eyJ')) {
     try {
-      return await queryChatGPTBackend(systemPrompt, userQuery, model, tokenToUse);
+      const resp = await queryChatGPTBackend(systemPrompt, userQuery, model, tokenToUse);
+      return await parseAndExecuteToolBlocks(resp, onToolCall);
     } catch (e) {
       console.log('ChatGPT Web Backend query failed, trying standard API completions:', e);
     }
   }
 
-  let res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${tokenToUse}`
-    },
-    body: JSON.stringify({
+  const openAITools = await getAllOpenAITools();
+  const messages = [
+    { role: 'system', content: cleanTextForPrompt(systemPrompt, 15000) },
+    { role: 'user', content: cleanTextForPrompt(userQuery, 4000) }
+  ];
+
+  let loopCount = 0;
+  while (loopCount < 4) {
+    loopCount++;
+    const payload = {
       model: model || 'gpt-4o',
-      messages: [
-        { role: 'system', content: cleanTextForPrompt(systemPrompt, 15000) },
-        { role: 'user', content: cleanTextForPrompt(userQuery, 4000) }
-      ],
+      messages: messages,
+      tools: openAITools && openAITools.length > 0 ? openAITools : undefined,
       max_tokens: 1024
-    })
-  });
+    };
 
-  // If initial token failed with 401 or token_expired, try fallback to stored API key (sk-...) if available
-  if (!res.ok && res.status === 401) {
-    const backupKey = getAIKeys().openai;
-    if (backupKey && backupKey !== tokenToUse) {
-      tokenToUse = backupKey;
-      res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenToUse}`
-        },
-        body: JSON.stringify({
-          model: model || 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userQuery }
-          ],
-          max_tokens: 1024
-        })
-      });
+    let res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenToUse}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    // If initial token failed with 401 or token_expired, try fallback to stored API key (sk-...) if available
+    if (!res.ok && res.status === 401) {
+      const backupKey = getAIKeys().openai;
+      if (backupKey && backupKey !== tokenToUse) {
+        tokenToUse = backupKey;
+        res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokenToUse}`
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const rawMsg = errJson.error?.message || `HTTP ${res.status}`;
+      if (res.status === 401 || rawMsg.toLowerCase().includes('expired') || rawMsg.toLowerCase().includes('token') || rawMsg.toLowerCase().includes('api key')) {
+        safeRemoveStorage('quickrss_openai_oauth_token');
+        throw new Error(`Authentication token or API key is expired or invalid. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI API key or re-authenticate via ChatGPT.`);
+      }
+      throw new Error(rawMsg);
+    }
+
+    const json = await res.json();
+    const choice = json.choices?.[0];
+    if (!choice) break;
+
+    const msg = choice.message;
+    messages.push(msg);
+
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      for (const call of msg.tool_calls) {
+        const fnName = call.function?.name;
+        let fnArgs = {};
+        try { fnArgs = JSON.parse(call.function?.arguments || '{}'); } catch (e) {}
+
+        const toolResult = await executeAIAssistantTool(fnName, fnArgs, onToolCall);
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
+        });
+      }
+    } else {
+      return msg.content || 'Action completed.';
     }
   }
 
-  if (!res.ok) {
-    const errJson = await res.json().catch(() => ({}));
-    const rawMsg = errJson.error?.message || `HTTP ${res.status}`;
-    if (res.status === 401 || rawMsg.toLowerCase().includes('expired') || rawMsg.toLowerCase().includes('token') || rawMsg.toLowerCase().includes('api key')) {
-      safeRemoveStorage('quickrss_openai_oauth_token');
-      throw new Error(`Authentication token or API key is expired or invalid. Please click the ⚙️ icon or open Preferences > AI Assistant to enter your OpenAI API key or re-authenticate via ChatGPT.`);
+  return 'Action completed.';
+}
+
+async function queryClaude(systemPrompt, userQuery, model, apiKey, onToolCall = null) {
+  const claudeTools = await getAllClaudeTools();
+  const messages = [
+    { role: 'user', content: userQuery }
+  ];
+
+  let loopCount = 0;
+  while (loopCount < 4) {
+    loopCount++;
+    const res = await performNativeFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: model || 'claude-3-5-sonnet-20241022',
+        system: systemPrompt,
+        max_tokens: 1024,
+        messages: messages,
+        tools: claudeTools && claudeTools.length > 0 ? claudeTools : undefined
+      })
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error?.message || `HTTP ${res.status}`);
     }
-    throw new Error(rawMsg);
+
+    const json = await res.json();
+    const content = json.content || [];
+    const toolUseBlocks = content.filter(b => b.type === 'tool_use');
+
+    if (toolUseBlocks.length > 0) {
+      messages.push({ role: 'assistant', content: content });
+      const toolResults = [];
+      for (const block of toolUseBlocks) {
+        const fnName = block.name;
+        const fnArgs = block.input || {};
+        const toolResult = await executeAIAssistantTool(fnName, fnArgs, onToolCall);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
+        });
+      }
+      messages.push({ role: 'user', content: toolResults });
+    } else {
+      const textBlock = content.find(b => b.type === 'text');
+      return textBlock?.text || 'Action completed.';
+    }
   }
-  const json = await res.json();
-  return json.choices?.[0]?.message?.content || 'No output generated from OpenAI.';
+
+  return 'Action completed.';
 }
 
-async function queryClaude(systemPrompt, userQuery, model, apiKey) {
-  const res = await performNativeFetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: model || 'claude-3-5-sonnet-20241022',
-      system: systemPrompt,
-      max_tokens: 1024,
-      messages: [
-        { role: 'user', content: userQuery }
-      ]
-    })
-  });
-  if (!res.ok) {
-    const errJson = await res.json().catch(() => ({}));
-    throw new Error(errJson.error?.message || `HTTP ${res.status}`);
-  }
-  const json = await res.json();
-  return json.content?.[0]?.text || 'No output generated from Claude.';
-}
+async function queryOpenRouter(systemPrompt, userQuery, model, apiKey, onToolCall = null) {
+  const openAITools = await getAllOpenAITools();
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userQuery }
+  ];
 
-async function queryOpenRouter(systemPrompt, userQuery, model, apiKey) {
-  const res = await performNativeFetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://quickrss.app',
-      'X-Title': 'Quick RSS Desktop'
-    },
-    body: JSON.stringify({
-      model: model || 'anthropic/claude-3.5-sonnet',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userQuery }
-      ],
-      max_tokens: 1024
-    })
-  });
-  if (!res.ok) {
-    const errJson = await res.json().catch(() => ({}));
-    throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+  let loopCount = 0;
+  while (loopCount < 4) {
+    loopCount++;
+    const res = await performNativeFetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://quickrss.app',
+        'X-Title': 'Quick RSS Desktop'
+      },
+      body: JSON.stringify({
+        model: model || 'anthropic/claude-3.5-sonnet',
+        messages: messages,
+        tools: openAITools && openAITools.length > 0 ? openAITools : undefined,
+        max_tokens: 1024
+      })
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error?.message || `HTTP ${res.status}`);
+    }
+
+    const json = await res.json();
+    const choice = json.choices?.[0];
+    if (!choice) break;
+
+    const msg = choice.message;
+    messages.push(msg);
+
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      for (const call of msg.tool_calls) {
+        const fnName = call.function?.name;
+        let fnArgs = {};
+        try { fnArgs = JSON.parse(call.function?.arguments || '{}'); } catch (e) {}
+
+        const toolResult = await executeAIAssistantTool(fnName, fnArgs, onToolCall);
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
+        });
+      }
+    } else {
+      return msg.content || 'Action completed.';
+    }
   }
-  const json = await res.json();
-  return json.choices?.[0]?.message?.content || 'No output generated from OpenRouter.';
+
+  return 'Action completed.';
 }
 
 

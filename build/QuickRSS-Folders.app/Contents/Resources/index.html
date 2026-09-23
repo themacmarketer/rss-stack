@@ -476,6 +476,32 @@
               <pre class="code-box" id="mcp-code-snippet">grok mcp add --transport http quickrss "http://127.0.0.1:8745/mcp?token=MLfMryTZiBNUrk-t18VeJG3MMR7CXJr1"</pre>
               <button class="btn-sm" id="copy-mcp-cmd-btn">Copy Command</button>
             </div>
+
+            <!-- External MCP Servers (Outbound Client) Section -->
+            <div class="setting-block" style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label style="font-weight: 600; font-size: 13px; margin: 0; color: var(--text-primary);">🌐 External MCP Servers (Outbound Client)</label>
+                <button type="button" class="btn-sm" id="refresh-all-mcp-btn" style="font-size: 11px;">🔄 Refresh Tools</button>
+              </div>
+              <p class="help-text" style="margin-bottom: 10px;">Connect Quick RSS to external MCP servers to give the AI Assistant additional tool capabilities and external APIs.</p>
+
+              <div id="external-mcp-list" class="external-mcp-list">
+                <!-- Dynamically populated external MCP server cards -->
+              </div>
+
+              <!-- Add New External Server Form -->
+              <div class="add-mcp-server-box" style="margin-top: 12px; padding: 10px; background: rgba(0,0,0,0.02); border: 1px dashed var(--border-color); border-radius: 8px;">
+                <div style="font-weight: 600; font-size: 11.5px; margin-bottom: 8px; color: var(--text-primary);">+ Connect New External MCP Server</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                  <input type="text" id="new-mcp-name" placeholder="Server Name (e.g. Postgres DB)" style="flex: 1; font-size: 12px; padding: 5px 8px;" />
+                  <input type="text" id="new-mcp-url" placeholder="http://127.0.0.1:3000/mcp" style="flex: 2; font-size: 12px; padding: 5px 8px;" />
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <input type="password" id="new-mcp-token" placeholder="Optional Bearer Token / API Key" style="flex: 2; font-size: 12px; padding: 5px 8px;" />
+                  <button type="button" class="btn-secondary" id="add-mcp-server-btn" style="flex: 1; font-weight: 600; font-size: 12px;">+ Add Server</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Tab 3: OPML & Sync -->

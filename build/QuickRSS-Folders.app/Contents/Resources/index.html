@@ -304,7 +304,46 @@
           </div>
         </div>
         <div class="ai-chat-input-bar">
-          <input type="text" id="ai-chat-input" placeholder="Ask AI about news content..." />
+          <div class="ai-input-container">
+            <div id="ai-slash-menu" class="ai-slash-menu hidden">
+              <div class="slash-item" data-cmd="/summarize">
+                <span class="slash-icon">📖</span>
+                <div class="slash-info">
+                  <span class="slash-name">/summarize</span>
+                  <span class="slash-desc">Summarize active article or selected feeds</span>
+                </div>
+              </div>
+              <div class="slash-item" data-cmd="/recommend">
+                <span class="slash-icon">💡</span>
+                <div class="slash-info">
+                  <span class="slash-name">/recommend</span>
+                  <span class="slash-desc">Recommend feeds matching your reading context</span>
+                </div>
+              </div>
+              <div class="slash-item" data-cmd="/trending">
+                <span class="slash-icon">🔥</span>
+                <div class="slash-info">
+                  <span class="slash-name">/trending</span>
+                  <span class="slash-desc">Analyze current Trending Topics & word cloud terms</span>
+                </div>
+              </div>
+              <div class="slash-item" data-cmd="/explain">
+                <span class="slash-icon">🧠</span>
+                <div class="slash-info">
+                  <span class="slash-name">/explain</span>
+                  <span class="slash-desc">Explain key concepts, terms or entities in active article</span>
+                </div>
+              </div>
+              <div class="slash-item" data-cmd="/help">
+                <span class="slash-icon">❓</span>
+                <div class="slash-info">
+                  <span class="slash-name">/help</span>
+                  <span class="slash-desc">Show available AI slash commands and capabilities</span>
+                </div>
+              </div>
+            </div>
+            <input type="text" id="ai-chat-input" placeholder="Ask AI or type / for commands..." autocomplete="off" />
+          </div>
           <button id="ai-chat-send-btn" class="ai-send-btn">Send ➔</button>
           <button id="ai-chat-clear-btn" class="ai-clear-btn" title="Clear chat history">🗑️</button>
         </div>
@@ -465,6 +504,13 @@
               <label>iCloud Subscription Sync</label>
               <input type="checkbox" id="icloud-sync-toggle" checked>
             </div>
+            <div class="setting-block" style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-color);">
+              <label style="font-weight:600; color:var(--text-primary); font-size:13px;">🔄 Reset & Restore Subscriptions</label>
+              <p class="help-text">If your RSS feed tree appears empty or lost, click below to immediately restore all default RSS feeds & folders.</p>
+              <button type="button" class="btn-secondary" id="restore-default-feeds-btn" style="margin-top:6px; font-weight:600; width:100%; border-color:rgba(112,182,67,0.4);">
+                🔄 Restore Default Subscriptions Tree
+              </button>
+            </div>
           </div>
 
           <!-- Tab 4: AI Assistant Authentication -->
@@ -478,7 +524,10 @@
               <p class="help-text">Use your active logged-in ChatGPT browser session (`chatgpt.com`) or API Key.</p>
               <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:8px;">
                 <button type="button" class="btn-secondary" id="openai-session-btn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;">
-                  <span>🌐 1-Click Get ChatGPT Session Token</span>
+                  <span>⚡ 1-Click Get & Insert Token</span>
+                </button>
+                <button type="button" class="btn-secondary" id="openai-paste-btn" title="Auto-detect & paste accessToken from clipboard" style="display:flex; align-items:center; gap:4px; font-size:11.5px;">
+                  <span>📋 Auto-Detect Token</span>
                 </button>
                 <button type="button" class="btn-secondary" id="openai-disconnect-btn" style="display:none; color:#ff3b30;">Disconnect</button>
               </div>

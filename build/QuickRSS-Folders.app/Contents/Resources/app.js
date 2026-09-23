@@ -3136,6 +3136,10 @@ if (confirmDeleteFolderBtn) {
 
 // Column Resizing Engine
 function setupColumnResizers() {
+  if (window._columnResizersInitialized) {
+    return;
+  }
+
   const sidebar = document.querySelector('.sidebar');
   const articleColumn = document.querySelector('.article-list-column');
   const aiColumn = document.getElementById('ai-column');
@@ -3144,6 +3148,7 @@ function setupColumnResizers() {
   const resizer3 = document.getElementById('resizer-3');
 
   if (!resizer1 || !resizer2) return;
+  window._columnResizersInitialized = true;
 
   function checkCompact() {
     if (sidebar) {
@@ -3151,74 +3156,127 @@ function setupColumnResizers() {
       sidebar.classList.toggle('compact-toolbar', w < 170);
     }
   }
-  checkCompact();
 
-  let isResizing1 = false;
-  let isResizing2 = false;
-  let isResizing3 = false;
-
-  // Restore saved AI Column width
+  // Restore saved column widths
+  if (sidebar) {
+    const savedSidebarWidth = safeGetStorage('quickrss_sidebar_width', null);
+    if (savedSidebarWidth) sidebar.style.width = `${savedSidebarWidth}px`;
+  }
+  if (articleColumn) {
+    const savedArticleWidth = safeGetStorage('quickrss_article_list_width', null);
+    if (savedArticleWidth) articleColumn.style.width = `${savedArticleWidth}px`;
+  }
   if (aiColumn) {
     const savedAIWidth = safeGetStorage('quickrss_ai_column_width', 340);
     if (savedAIWidth) aiColumn.style.width = `${savedAIWidth}px`;
   }
 
-  // Resizer 1: Sidebar Width
-  resizer1.addEventListener('mousedown', (e) => {
-    isResizing1 = true;
-    resizer1.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  });
+  checkCompact();
 
-  // Resizer 2: Article List Column Width
-  resizer2.addEventListener('mousedown', (e) => {
-    isResizing2 = true;
-    resizer2.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  });
+  let activeResizer = null;
+  let activePointerId = null;
 
-  // Resizer 3: AI Assistant Column 4 Width
-  if (resizer3 && aiColumn) {
-    resizer3.addEventListener('mousedown', (e) => {
-      isResizing3 = true;
-      resizer3.classList.add('dragging');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+  function onMove(clientX) {
+    if (!activeResizer) return;
+
+    if (activeResizer === resizer1) {
+      const maxW = Math.min(500, Math.floor(window.innerWidth * 0.45));
+      const newWidth = Math.max(160, Math.min(maxW, clientX));
+      sidebar.style.width = `${newWidth}px`;
+      checkCompact();
+    } else if (activeResizer === resizer2) {
+      const sidebarWidth = sidebar ? sidebar.getBoundingClientRect().width : 275;
+      const maxW = Math.min(750, Math.floor(window.innerWidth * 0.55));
+      const newWidth = Math.max(220, Math.min(maxW, clientX - sidebarWidth));
+      articleColumn.style.width = `${newWidth}px`;
+    } else if (activeResizer === resizer3 && aiColumn) {
+      const windowWidth = window.innerWidth;
+      const maxAllowed = Math.min(1200, Math.max(300, windowWidth - 500));
+      const newWidth = Math.max(260, Math.min(maxAllowed, windowWidth - clientX));
+      aiColumn.style.width = `${newWidth}px`;
+    }
+  }
+
+  function onPointerMove(e) {
+    if (!activeResizer) return;
+    onMove(e.clientX);
+  }
+
+  function stopResize(e) {
+    if (!activeResizer) return;
+
+    const currentResizer = activeResizer;
+    activeResizer = null;
+
+    if (activePointerId !== null && currentResizer && typeof currentResizer.releasePointerCapture === 'function') {
+      try {
+        currentResizer.releasePointerCapture(activePointerId);
+      } catch (err) {}
+    }
+    activePointerId = null;
+
+    document.body.classList.remove('is-resizing');
+    resizer1.classList.remove('dragging');
+    resizer2.classList.remove('dragging');
+    if (resizer3) resizer3.classList.remove('dragging');
+
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    // Persist widths to localStorage
+    if (sidebar) {
+      safeSetStorage('quickrss_sidebar_width', Math.round(sidebar.getBoundingClientRect().width));
+      checkCompact();
+    }
+    if (articleColumn) {
+      safeSetStorage('quickrss_article_list_width', Math.round(articleColumn.getBoundingClientRect().width));
+    }
+    if (aiColumn) {
+      safeSetStorage('quickrss_ai_column_width', Math.round(aiColumn.getBoundingClientRect().width));
+    }
+  }
+
+  function bindResizer(resizerEl) {
+    if (!resizerEl) return;
+
+    // Pointer events (modern WebKit, supports setPointerCapture)
+    resizerEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      activeResizer = resizerEl;
+      activePointerId = e.pointerId;
+      resizerEl.classList.add('dragging');
+      document.body.classList.add('is-resizing');
+
+      try {
+        resizerEl.setPointerCapture(e.pointerId);
+      } catch (err) {}
+    });
+
+    // Fallback mousedown
+    resizerEl.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      activeResizer = resizerEl;
+      resizerEl.classList.add('dragging');
+      document.body.classList.add('is-resizing');
     });
   }
 
-  document.addEventListener('mousemove', (e) => {
-    if (isResizing1) {
-      const newWidth = Math.max(160, Math.min(480, e.clientX));
-      sidebar.style.width = `${newWidth}px`;
-      checkCompact();
-    } else if (isResizing2) {
-      const sidebarWidth = sidebar.getBoundingClientRect().width;
-      const newWidth = Math.max(220, Math.min(650, e.clientX - sidebarWidth));
-      articleColumn.style.width = `${newWidth}px`;
-    } else if (isResizing3 && aiColumn) {
-      const windowWidth = window.innerWidth;
-      const newWidth = Math.max(260, Math.min(650, windowWidth - e.clientX));
-      aiColumn.style.width = `${newWidth}px`;
-      safeSetStorage('quickrss_ai_column_width', newWidth);
-    }
-  });
+  bindResizer(resizer1);
+  bindResizer(resizer2);
+  if (resizer3) bindResizer(resizer3);
 
-  document.addEventListener('mouseup', () => {
-    if (isResizing1 || isResizing2 || isResizing3) {
-      isResizing1 = false;
-      isResizing2 = false;
-      isResizing3 = false;
-      resizer1.classList.remove('dragging');
-      resizer2.classList.remove('dragging');
-      if (resizer3) resizer3.classList.remove('dragging');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      checkCompact();
-    }
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', stopResize);
+  window.addEventListener('pointercancel', stopResize);
+  window.addEventListener('mousemove', (e) => {
+    if (activeResizer) onMove(e.clientX);
   });
+  window.addEventListener('mouseup', stopResize);
 }
 
 setupColumnResizers();
@@ -3414,6 +3472,19 @@ if (exportOpmlBtn) {
   };
 }
 
+const restoreDefaultFeedsBtn = document.getElementById('restore-default-feeds-btn');
+if (restoreDefaultFeedsBtn) {
+  restoreDefaultFeedsBtn.onclick = () => {
+    if (confirm('Are you sure you want to restore default subscriptions? This will reload all default RSS feeds & folders.')) {
+      treeData = JSON.parse(JSON.stringify(defaultTreeData));
+      saveTreeData();
+      if (typeof renderTree === 'function') renderTree();
+      if (typeof refreshAllFeeds === 'function') refreshAllFeeds(true);
+      if (typeof showToast === 'function') showToast('✅ Restored default RSS feeds & folder tree!', 'success');
+    }
+  };
+}
+
 
 // AI Chatbot Engine & Preferences Storage
 const AI_KEYS_STORAGE_KEY = 'quickrss_ai_keys';
@@ -3540,6 +3611,76 @@ function extractOAuthCode(rawInput) {
   return trimmed;
 }
 
+async function tryAutoFetchChatGPTToken() {
+  try {
+    if (typeof performNativeFetch === 'function') {
+      const res = await performNativeFetch('https://chatgpt.com/api/auth/session', 'GET');
+      if (res && (res.status === 200 || res.status === 0) && res.data) {
+        let dataObj = null;
+        if (typeof res.data === 'string') {
+          try { dataObj = JSON.parse(res.data); } catch(e) {}
+        } else if (typeof res.data === 'object') {
+          dataObj = res.data;
+        }
+        if (dataObj && dataObj.accessToken) {
+          return dataObj.accessToken;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Native auto fetch session error:', e);
+  }
+  return null;
+}
+
+async function detectTokenFromClipboard() {
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const trimmed = text.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (parsed.accessToken) return parsed.accessToken;
+          } catch(e) {}
+        }
+        const match = trimmed.match(/"accessToken"\s*:\s*"([^"]+)"/);
+        if (match && match[1]) return match[1];
+
+        if (trimmed.startsWith('eyJ') && trimmed.includes('.') && trimmed.length > 80) {
+          return trimmed;
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Clipboard read error:', e);
+  }
+  return null;
+}
+
+function handleSaveChatGPTToken(token, sourceMsg) {
+  const inputOpenAI = document.getElementById('ai-token-openai');
+  if (inputOpenAI) inputOpenAI.value = token;
+  safeSetStorage('quickrss_openai_oauth_token', token);
+  saveAIKeys({ openai: token });
+  updateOAuthStatusUI();
+  if (typeof showToast === 'function') {
+    showToast(sourceMsg || '✓ ChatGPT Session Token saved successfully!', 'success');
+  }
+}
+
+function startTokenAutoCheckPoll() {
+  const checkFn = async () => {
+    const token = await tryAutoFetchChatGPTToken() || await detectTokenFromClipboard();
+    if (token) {
+      window.removeEventListener('focus', checkFn);
+      handleSaveChatGPTToken(token, '✓ ChatGPT Session Token auto-detected & inserted!');
+    }
+  };
+  window.addEventListener('focus', checkFn, { once: true });
+}
+
 // Load AI credentials & ChatGPT session token into Settings UI
 function initAISettingsUI() {
   const keys = getAIKeys();
@@ -3563,11 +3704,51 @@ function initAISettingsUI() {
 
   updateOAuthStatusUI();
 
-  // 1-Click ChatGPT Session Endpoint Handler
+  // 1-Click ChatGPT Session Endpoint & Token Auto-Detect Handlers
   if (openaiSessionBtn) {
-    openaiSessionBtn.onclick = () => {
+    openaiSessionBtn.onclick = async () => {
+      const originalText = openaiSessionBtn.innerHTML;
+      openaiSessionBtn.innerHTML = '<span>⚡ Auto-fetching token...</span>';
+
+      // Attempt 1: Direct native HTTP fetch
+      const nativeToken = await tryAutoFetchChatGPTToken();
+      if (nativeToken) {
+        openaiSessionBtn.innerHTML = originalText;
+        handleSaveChatGPTToken(nativeToken, '✓ ChatGPT Session Token automatically fetched & saved!');
+        return;
+      }
+
+      // Attempt 2: Clipboard auto-detect
+      const clipToken = await detectTokenFromClipboard();
+      if (clipToken) {
+        openaiSessionBtn.innerHTML = originalText;
+        handleSaveChatGPTToken(clipToken, '✓ ChatGPT Session Token detected from clipboard & saved!');
+        return;
+      }
+
+      // Attempt 3: Open browser and start focus auto-check poll
+      openaiSessionBtn.innerHTML = originalText;
       openInDefaultBrowser('https://chatgpt.com/api/auth/session');
-      showToast('Opened ChatGPT Session page! Copy the "accessToken" value and paste below.', 'info');
+      showToast('Opened ChatGPT Session page. Copy session JSON or return to QuickRSS to auto-insert token!', 'info');
+
+      startTokenAutoCheckPoll();
+    };
+  }
+
+  const openaiPasteBtn = document.getElementById('openai-paste-btn');
+  if (openaiPasteBtn) {
+    openaiPasteBtn.onclick = async () => {
+      const clipToken = await detectTokenFromClipboard();
+      if (clipToken) {
+        handleSaveChatGPTToken(clipToken, '✓ ChatGPT Session Token detected from clipboard & inserted!');
+      } else {
+        const inputVal = (document.getElementById('ai-token-openai')?.value || '').trim();
+        if (inputVal) {
+          handleSaveChatGPTToken(inputVal, '✓ OpenAI Token saved!');
+        } else {
+          showToast('No token found in clipboard. Please copy token from ChatGPT session page.', 'warning');
+        }
+      }
     };
   }
 
@@ -4108,6 +4289,7 @@ function setupAIChatbotUI() {
   const clearBtn = document.getElementById('ai-chat-clear-btn');
   const chatInput = document.getElementById('ai-chat-input');
   const chatThread = document.getElementById('ai-chat-thread');
+  const slashMenu = document.getElementById('ai-slash-menu');
 
   if (!aiColumn) return;
 
@@ -4167,19 +4349,115 @@ function setupAIChatbotUI() {
     };
   }
 
+  // Slash Command Menu & Input Interactions
+  if (chatInput && slashMenu) {
+    let activeSlashIndex = -1;
+
+    const hideSlashMenu = () => {
+      slashMenu.classList.add('hidden');
+      activeSlashIndex = -1;
+      slashMenu.querySelectorAll('.slash-item').forEach(item => item.classList.remove('selected'));
+    };
+
+    const updateSlashMenuSelection = (items) => {
+      items.forEach((item, idx) => {
+        if (idx === activeSlashIndex) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    };
+
+    chatInput.oninput = () => {
+      const val = chatInput.value;
+      if (val.startsWith('/')) {
+        const filter = val.slice(1).toLowerCase();
+        const items = slashMenu.querySelectorAll('.slash-item');
+        let visibleCount = 0;
+        items.forEach(item => {
+          const cmd = item.dataset.cmd || '';
+          if (cmd.toLowerCase().includes(filter)) {
+            item.style.display = 'flex';
+            visibleCount++;
+          } else {
+            item.style.display = 'none';
+          }
+        });
+        if (visibleCount > 0) {
+          slashMenu.classList.remove('hidden');
+        } else {
+          hideSlashMenu();
+        }
+      } else {
+        hideSlashMenu();
+      }
+    };
+
+    chatInput.onkeydown = (e) => {
+      if (!slashMenu.classList.contains('hidden')) {
+        const visibleItems = Array.from(slashMenu.querySelectorAll('.slash-item')).filter(i => i.style.display !== 'none');
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeSlashIndex = (activeSlashIndex + 1) % visibleItems.length;
+          updateSlashMenuSelection(visibleItems);
+          return;
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeSlashIndex = (activeSlashIndex - 1 + visibleItems.length) % visibleItems.length;
+          updateSlashMenuSelection(visibleItems);
+          return;
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+          if (activeSlashIndex >= 0 && visibleItems[activeSlashIndex]) {
+            e.preventDefault();
+            const cmd = visibleItems[activeSlashIndex].dataset.cmd;
+            chatInput.value = cmd + ' ';
+            hideSlashMenu();
+            chatInput.focus();
+            return;
+          }
+        } else if (e.key === 'Escape') {
+          hideSlashMenu();
+          return;
+        }
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        hideSlashMenu();
+        const q = chatInput.value.trim();
+        if (!q) return;
+        chatInput.value = '';
+        sendUserAIMessage(q);
+      }
+    };
+
+    slashMenu.querySelectorAll('.slash-item').forEach(item => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        const cmd = item.dataset.cmd;
+        chatInput.value = cmd + ' ';
+        hideSlashMenu();
+        chatInput.focus();
+      };
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!aiColumn.contains(e.target)) {
+        hideSlashMenu();
+      }
+    });
+  }
+
   if (sendBtn && chatInput) {
-    const doSend = () => {
+    sendBtn.onclick = () => {
+      const slashMenu = document.getElementById('ai-slash-menu');
+      if (slashMenu) slashMenu.classList.add('hidden');
       const q = chatInput.value.trim();
       if (!q) return;
       chatInput.value = '';
       sendUserAIMessage(q);
-    };
-    sendBtn.onclick = doSend;
-    chatInput.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        doSend();
-      }
     };
   }
 
@@ -4189,7 +4467,7 @@ function setupAIChatbotUI() {
         <div class="ai-message assistant">
           <div class="ai-avatar">🤖</div>
           <div class="ai-msg-content">
-            Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+            Hello! I'm your AI News Assistant. Type <code>/</code> for slash commands or ask me anything about your feeds!
           </div>
         </div>
       `;
@@ -4214,7 +4492,7 @@ function startNewAIChatSession() {
       <div class="ai-message assistant">
         <div class="ai-avatar">🤖</div>
         <div class="ai-msg-content">
-          Hello! I'm your AI News Assistant. Ask me anything about your news articles or choose a quick prompt above!
+          Hello! I'm your AI News Assistant. Type <code>/</code> for slash commands or ask me anything about your feeds!
         </div>
       </div>
     `;
@@ -4236,18 +4514,24 @@ async function sendUserAIMessage(userQuery) {
   `;
   thread.appendChild(userMsgDiv);
 
+  // Folo-inspired Animated Thinking State
   const assistantMsgDiv = document.createElement('div');
-  assistantMsgDiv.className = 'ai-message assistant';
+  assistantMsgDiv.className = 'ai-message assistant thinking-state';
   assistantMsgDiv.innerHTML = `
     <div class="ai-avatar">🤖</div>
-    <div class="ai-msg-content">
-      <span style="color:#8e8e93;">⏳ Analyzing news articles & querying LLM...</span>
+    <div class="ai-msg-content thinking-content">
+      <div class="thinking-header">
+        <span class="thinking-spinner"></span>
+        <span class="thinking-title">Thinking…</span>
+      </div>
+      <div class="thinking-subtext">Analyzing articles, ranking context & generating answer</div>
     </div>
   `;
   thread.appendChild(assistantMsgDiv);
   thread.scrollTop = thread.scrollHeight;
 
   const responseText = await processAIChatQuery(userQuery);
+  assistantMsgDiv.classList.remove('thinking-state');
   assistantMsgDiv.querySelector('.ai-msg-content').innerHTML = formatAIMarkdown(responseText, currentRAGArticles);
   thread.scrollTop = thread.scrollHeight;
 }
@@ -4295,6 +4579,98 @@ function formatAIMarkdown(text, articles = []) {
 }
 
 async function processAIChatQuery(userQuery) {
+  const trimmedQuery = userQuery.trim();
+  const lowerQuery = trimmedQuery.toLowerCase();
+
+  // Helper to get currently active article context
+  function getActiveArticleContext() {
+    if (typeof loadedArticles !== 'undefined' && loadedArticles && typeof currentArticleIndex !== 'undefined' && currentArticleIndex >= 0 && loadedArticles[currentArticleIndex]) {
+      return loadedArticles[currentArticleIndex];
+    }
+    return null;
+  }
+
+  // Slash Command 1: /help
+  if (lowerQuery === '/help' || lowerQuery === 'help') {
+    return `🤖 **Quick RSS AI Assistant Commands**
+
+You can type slash commands or ask freeform questions:
+
+- **/summarize**: Summarize active article or top articles in 3 key takeaways with citations.
+- **/recommend**: Suggest top RSS feeds & sources matching your reading context.
+- **/trending**: Deep dive into current Trending Topics & emerging word cloud terms.
+- **/explain**: Explain complex technical terms or entities in the active article.
+- **/help**: Display this command help menu.
+
+💡 *Tip: Toggle the AI Assistant anytime using \`Cmd+Shift+A\` or \`Cmd+J\`!*`;
+  }
+
+  // Slash Command 2: /summarize
+  if (lowerQuery.startsWith('/summarize') || lowerQuery.startsWith('/summary')) {
+    const activeArt = getActiveArticleContext();
+    if (activeArt) {
+      userQuery = `Summarize the following active article in detail:
+Title: "${activeArt.title || ''}"
+Feed: ${activeArt.feedTitle || ''}
+Content: ${(activeArt.content || activeArt.summary || '').slice(0, 3000)}
+
+Please format your response with:
+1. 📌 **Executive Summary** (2-3 sentences)
+2. 🔑 **Key Takeaways** (3-4 bullet points)
+3. 💬 **Important Quotes & Facts**
+4. 🌐 **Context & Implications**`;
+    } else {
+      userQuery = `Summarize the top 5 newest articles currently loaded in the feed view. Provide an Executive Summary and 3 Key Takeaways per article.`;
+    }
+  }
+
+  // Slash Command 3: /recommend
+  if (lowerQuery.startsWith('/recommend')) {
+    const allFeeds = typeof getAllFeedsFromTree === 'function' ? getAllFeedsFromTree(treeData) : [];
+    const feedTitles = allFeeds.map(f => f.title).filter(Boolean);
+    const activeArt = getActiveArticleContext();
+
+    userQuery = `The user is using Quick RSS reader and is currently subscribed to these RSS feeds:
+${feedTitles.join(', ')}
+
+${activeArt ? `They are currently reading an article titled "${activeArt.title}" from feed "${activeArt.feedTitle}".` : ''}
+
+Based on their feed subscriptions and reading interests, recommend 5-7 high-quality RSS feeds, tech blogs, YouTube channels, or newsletters they should add to Quick RSS.
+For each recommendation, provide:
+1. **Feed Name**
+2. **Category / Topic**
+3. **Suggested RSS Feed URL** (e.g. https://example.com/rss)
+4. **Why it's recommended** (1 sentence)`;
+  }
+
+  // Slash Command 4: /trending
+  if (lowerQuery.startsWith('/trending') || lowerQuery.startsWith('/trends')) {
+    const trendingTopics = window.currentTrendingTopics || [];
+    const topTerms = trendingTopics.slice(0, 10).map(t => `"${t.word}" (${t.count} articles)`).join(', ');
+
+    userQuery = `The following top terms are currently trending in the user's RSS reader word cloud:
+${topTerms || 'Jev, AI, OpenAI, Apple, Tech, Security, Cloud, Market'}
+
+Analyze these emerging trends and explain:
+1. 🔥 **Top Emerging Topics**
+2. 📰 **Why these keywords are spiking**
+3. 💡 **Key takeaway for the reader**
+Reference specific relevant articles from the candidate news articles.`;
+  }
+
+  // Slash Command 5: /explain
+  if (lowerQuery.startsWith('/explain')) {
+    const activeArt = getActiveArticleContext();
+    const subQuery = trimmedQuery.slice(8).trim();
+    if (activeArt) {
+      userQuery = `Explain ${subQuery ? `"${subQuery}"` : 'the key concepts, technical terms, and entities'} in the following article:
+Title: "${activeArt.title}"
+Content: ${(activeArt.content || activeArt.summary || '').slice(0, 2500)}`;
+    } else {
+      userQuery = `Explain ${subQuery ? `"${subQuery}"` : 'the main concepts'} in plain English based on current news articles.`;
+    }
+  }
+
   const modelSelect = document.getElementById('ai-model-select');
   const rawModelVal = modelSelect ? modelSelect.value : 'openai:gpt-4o';
   const parts = rawModelVal.split(':');
@@ -4348,7 +4724,7 @@ async function processAIChatQuery(userQuery) {
 
   if (typeof loadedArticles !== 'undefined' && loadedArticles && loadedArticles.length > 0) {
     loadedArticles.forEach(art => {
-      if (finalArticles.length < 50) {
+      if (finalArticles.length < 12) {
         const key = art.id || (art.title + '---' + art.feedTitle);
         if (!addedKeys.has(key)) {
           addedKeys.add(key);
@@ -4359,7 +4735,7 @@ async function processAIChatQuery(userQuery) {
   }
 
   uniquePool.forEach(art => {
-    if (finalArticles.length < 50) {
+    if (finalArticles.length < 12) {
       const key = art.id || (art.title + '---' + art.feedTitle);
       if (!addedKeys.has(key)) {
         addedKeys.add(key);
@@ -4377,7 +4753,7 @@ async function processAIChatQuery(userQuery) {
   if (currentCloud && currentCloud.selectedKeys && currentCloud.selectedKeys.length > 0) {
     trendingSnippet += `Active Featured Keyword Topics (Ranked by RAKE Frequency Score across ${currentCloud.totalArticles || 120} recent article titles):\n`;
     currentCloud.selectedKeys.forEach((k, idx) => {
-      const disp = currentCloud.phraseDisplayMap[k] || k;
+      const disp = cleanTextForPrompt(currentCloud.phraseDisplayMap[k] || k, 60);
       const score = currentCloud.phraseScores[k] ? currentCloud.phraseScores[k].toFixed(1) : 'N/A';
       trendingSnippet += `  ${idx + 1}. "${disp}" (Score: ${score})\n`;
     });
@@ -4387,7 +4763,7 @@ async function processAIChatQuery(userQuery) {
     if (tags.length > 0) {
       trendingSnippet += 'Active Featured Keyword Topics:\n';
       tags.forEach((t, idx) => {
-        trendingSnippet += `  ${idx + 1}. "${t.textContent}" (${t.title || ''})\n`;
+        trendingSnippet += `  ${idx + 1}. "${cleanTextForPrompt(t.textContent, 60)}"\n`;
       });
     } else {
       trendingSnippet += 'No active trending topics generated yet.\n';
@@ -4404,7 +4780,7 @@ async function processAIChatQuery(userQuery) {
         const baselineTerms = new Set();
         baselineSnaps.forEach(s => s.terms.forEach(t => baselineTerms.add(t.term)));
 
-        const newlyEmerging = latestSnap.terms.filter(t => !baselineTerms.has(t.term)).map(t => t.displayName);
+        const newlyEmerging = latestSnap.terms.filter(t => !baselineTerms.has(t.term)).map(t => cleanTextForPrompt(t.displayName, 50));
         if (newlyEmerging.length > 0) {
           trendingSnippet += `Newly Emerging Keyword Topics (First seen in recent snapshot): ${newlyEmerging.slice(0, 10).join(', ')}\n`;
         }
@@ -4424,19 +4800,26 @@ Trending Topic Formulation & Filtering Rules:
 
   let contextSnippet = 'Here are the relevant RSS news articles currently available in Quick RSS:\n';
   finalArticles.forEach((art, idx) => {
-    contextSnippet += `\n[Article ${idx + 1}] Title: "${art.title}" | Feed: ${art.feedTitle} | Date: ${art.pubDate}\nSummary: ${art.summary || 'N/A'}\nURL: ${art.link || ''}\n`;
+    const cTitle = cleanTextForPrompt(art.title, 150);
+    const cFeed = cleanTextForPrompt(art.feedTitle, 60);
+    const cSummary = cleanTextForPrompt(art.summary || art.content, 250);
+    const cUrl = (art.link || '').trim();
+    contextSnippet += `\n[Article ${idx + 1}] Title: "${cTitle}" | Feed: ${cFeed} | Date: ${art.pubDate || 'N/A'}\nSummary: ${cSummary || 'N/A'}\nURL: ${cUrl}\n`;
   });
 
   let activeArticleSnippet = '';
   if (typeof currentArticle !== 'undefined' && currentArticle && currentArticle.title) {
+    const cActTitle = cleanTextForPrompt(currentArticle.title, 200);
+    const cActFeed = cleanTextForPrompt(currentArticle.feedTitle, 80);
+    const cActContent = cleanTextForPrompt(currentArticle.summary || currentArticle.content || currentArticle.htmlContent, 1500);
     activeArticleSnippet = `
 📌 CURRENTLY ACTIVE SELECTED ARTICLE IN READER PANE:
-Title: "${currentArticle.title}"
-Feed: ${currentArticle.feedTitle || 'N/A'}
+Title: "${cActTitle}"
+Feed: ${cActFeed}
 Date: ${currentArticle.pubDate || 'N/A'}
-Author: ${currentArticle.author || 'N/A'}
-URL: ${currentArticle.link || 'N/A'}
-Summary / Content: ${currentArticle.summary || currentArticle.content || 'N/A'}
+Author: ${cleanTextForPrompt(currentArticle.author, 50) || 'N/A'}
+URL: ${(currentArticle.link || '').trim()}
+Summary / Content: ${cActContent || 'N/A'}
 `;
   }
 
@@ -4538,8 +4921,98 @@ async function performNativeFetch(url, options = {}) {
   return fetch(url, options);
 }
 
+function cleanTextForPrompt(str, maxLen = 300) {
+  if (!str) return '';
+  let text = String(str)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (maxLen && text.length > maxLen) {
+    text = text.slice(0, maxLen) + '...';
+  }
+  return text;
+}
+
+async function queryChatGPTBackend(systemPrompt, userQuery, model, token) {
+  const uuid = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+  const parentUuid = '00000000-0000-0000-0000-000000000000';
+
+  const fullPrompt = `${cleanTextForPrompt(systemPrompt, 12000)}\n\nUSER QUERY:\n${cleanTextForPrompt(userQuery, 3000)}`;
+
+  const res = await performNativeFetch('https://chatgpt.com/backend-api/conversation', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      action: 'next',
+      messages: [
+        {
+          id: uuid,
+          author: { role: 'user' },
+          content: { content_type: 'text', parts: [fullPrompt] }
+        }
+      ],
+      model: model || 'gpt-4o',
+      parent_message_id: parentUuid
+    })
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    let errJson = {};
+    try { errJson = JSON.parse(errText); } catch(e) {}
+    const rawMsg = errJson.detail?.message || errJson.error?.message || `HTTP ${res.status}`;
+    if (res.status === 401 || res.status === 403) {
+      safeRemoveStorage('quickrss_openai_oauth_token');
+      throw new Error(`ChatGPT session token expired (HTTP ${res.status}). Please re-authenticate in Preferences > AI Assistant.`);
+    }
+    throw new Error(rawMsg || `ChatGPT Session API Error (HTTP ${res.status})`);
+  }
+
+  const responseText = await res.text();
+  const lines = responseText.split('\n');
+  let finalParts = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+      try {
+        const json = JSON.parse(line.slice(6));
+        const parts = json.message?.content?.parts;
+        if (parts && parts.length > 0) {
+          finalParts = parts;
+          break;
+        }
+      } catch(e) {}
+    }
+  }
+
+  if (finalParts.length > 0) {
+    return finalParts.join('\n');
+  }
+
+  return responseText || 'No response received from ChatGPT session.';
+}
+
 async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
   let tokenToUse = apiKey || getOpenAIOAuthToken();
+  if (!tokenToUse) {
+    throw new Error("No OpenAI API key or ChatGPT session token found.");
+  }
+
+  // Handle ChatGPT Web session token (starts with eyJ) vs standard OpenAI API key (starts with sk-)
+  if (tokenToUse.startsWith('eyJ')) {
+    try {
+      return await queryChatGPTBackend(systemPrompt, userQuery, model, tokenToUse);
+    } catch (e) {
+      console.log('ChatGPT Web Backend query failed, trying standard API completions:', e);
+    }
+  }
+
   let res = await performNativeFetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -4549,8 +5022,8 @@ async function queryOpenAI(systemPrompt, userQuery, model, apiKey) {
     body: JSON.stringify({
       model: model || 'gpt-4o',
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userQuery }
+        { role: 'system', content: cleanTextForPrompt(systemPrompt, 15000) },
+        { role: 'user', content: cleanTextForPrompt(userQuery, 4000) }
       ],
       max_tokens: 1024
     })
@@ -4847,16 +5320,21 @@ async function executeAutoRecovery() {
 
   let repairsPerformed = [];
 
-  // 1. Repair Tree JSON if corrupted
+  // 1. Repair Tree JSON if corrupted or empty
   try {
     const treeRaw = localStorage.getItem('quickrss_user_tree');
-    if (treeRaw) JSON.parse(treeRaw);
+    if (treeRaw) {
+      const parsed = JSON.parse(treeRaw);
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Empty tree array');
+    } else {
+      throw new Error('No tree stored');
+    }
   } catch (e) {
     localStorage.removeItem('quickrss_user_tree');
-    if (typeof defaultTree !== 'undefined') {
-      treeData = JSON.parse(JSON.stringify(defaultTree));
+    if (typeof defaultTreeData !== 'undefined') {
+      treeData = JSON.parse(JSON.stringify(defaultTreeData));
       saveTreeData();
-      repairsPerformed.push('Reset corrupted subscriptions tree to default structure.');
+      repairsPerformed.push('Reset corrupted/empty subscriptions tree to default structure.');
     }
   }
 
@@ -5962,6 +6440,7 @@ function startApp() {
   updateBadges();
   initGeneralSettingsUI();
   initAISettingsUI();
+  if (typeof setupColumnResizers === 'function') setupColumnResizers();
   if (typeof setupSearchUI === 'function') setupSearchUI();
   if (typeof setupAIChatbotUI === 'function') setupAIChatbotUI();
   if (typeof setupAutoRefreshTimer === 'function') setupAutoRefreshTimer();

@@ -3136,6 +3136,10 @@ if (confirmDeleteFolderBtn) {
 
 // Column Resizing Engine
 function setupColumnResizers() {
+  if (window._columnResizersInitialized) {
+    return;
+  }
+
   const sidebar = document.querySelector('.sidebar');
   const articleColumn = document.querySelector('.article-list-column');
   const aiColumn = document.getElementById('ai-column');
@@ -3144,6 +3148,7 @@ function setupColumnResizers() {
   const resizer3 = document.getElementById('resizer-3');
 
   if (!resizer1 || !resizer2) return;
+  window._columnResizersInitialized = true;
 
   function checkCompact() {
     if (sidebar) {
@@ -3151,74 +3156,127 @@ function setupColumnResizers() {
       sidebar.classList.toggle('compact-toolbar', w < 170);
     }
   }
-  checkCompact();
 
-  let isResizing1 = false;
-  let isResizing2 = false;
-  let isResizing3 = false;
-
-  // Restore saved AI Column width
+  // Restore saved column widths
+  if (sidebar) {
+    const savedSidebarWidth = safeGetStorage('quickrss_sidebar_width', null);
+    if (savedSidebarWidth) sidebar.style.width = `${savedSidebarWidth}px`;
+  }
+  if (articleColumn) {
+    const savedArticleWidth = safeGetStorage('quickrss_article_list_width', null);
+    if (savedArticleWidth) articleColumn.style.width = `${savedArticleWidth}px`;
+  }
   if (aiColumn) {
     const savedAIWidth = safeGetStorage('quickrss_ai_column_width', 340);
     if (savedAIWidth) aiColumn.style.width = `${savedAIWidth}px`;
   }
 
-  // Resizer 1: Sidebar Width
-  resizer1.addEventListener('mousedown', (e) => {
-    isResizing1 = true;
-    resizer1.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  });
+  checkCompact();
 
-  // Resizer 2: Article List Column Width
-  resizer2.addEventListener('mousedown', (e) => {
-    isResizing2 = true;
-    resizer2.classList.add('dragging');
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  });
+  let activeResizer = null;
+  let activePointerId = null;
 
-  // Resizer 3: AI Assistant Column 4 Width
-  if (resizer3 && aiColumn) {
-    resizer3.addEventListener('mousedown', (e) => {
-      isResizing3 = true;
-      resizer3.classList.add('dragging');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+  function onMove(clientX) {
+    if (!activeResizer) return;
+
+    if (activeResizer === resizer1) {
+      const maxW = Math.min(500, Math.floor(window.innerWidth * 0.45));
+      const newWidth = Math.max(160, Math.min(maxW, clientX));
+      sidebar.style.width = `${newWidth}px`;
+      checkCompact();
+    } else if (activeResizer === resizer2) {
+      const sidebarWidth = sidebar ? sidebar.getBoundingClientRect().width : 275;
+      const maxW = Math.min(750, Math.floor(window.innerWidth * 0.55));
+      const newWidth = Math.max(220, Math.min(maxW, clientX - sidebarWidth));
+      articleColumn.style.width = `${newWidth}px`;
+    } else if (activeResizer === resizer3 && aiColumn) {
+      const windowWidth = window.innerWidth;
+      const maxAllowed = Math.min(1200, Math.max(300, windowWidth - 500));
+      const newWidth = Math.max(260, Math.min(maxAllowed, windowWidth - clientX));
+      aiColumn.style.width = `${newWidth}px`;
+    }
+  }
+
+  function onPointerMove(e) {
+    if (!activeResizer) return;
+    onMove(e.clientX);
+  }
+
+  function stopResize(e) {
+    if (!activeResizer) return;
+
+    const currentResizer = activeResizer;
+    activeResizer = null;
+
+    if (activePointerId !== null && currentResizer && typeof currentResizer.releasePointerCapture === 'function') {
+      try {
+        currentResizer.releasePointerCapture(activePointerId);
+      } catch (err) {}
+    }
+    activePointerId = null;
+
+    document.body.classList.remove('is-resizing');
+    resizer1.classList.remove('dragging');
+    resizer2.classList.remove('dragging');
+    if (resizer3) resizer3.classList.remove('dragging');
+
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    // Persist widths to localStorage
+    if (sidebar) {
+      safeSetStorage('quickrss_sidebar_width', Math.round(sidebar.getBoundingClientRect().width));
+      checkCompact();
+    }
+    if (articleColumn) {
+      safeSetStorage('quickrss_article_list_width', Math.round(articleColumn.getBoundingClientRect().width));
+    }
+    if (aiColumn) {
+      safeSetStorage('quickrss_ai_column_width', Math.round(aiColumn.getBoundingClientRect().width));
+    }
+  }
+
+  function bindResizer(resizerEl) {
+    if (!resizerEl) return;
+
+    // Pointer events (modern WebKit, supports setPointerCapture)
+    resizerEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      activeResizer = resizerEl;
+      activePointerId = e.pointerId;
+      resizerEl.classList.add('dragging');
+      document.body.classList.add('is-resizing');
+
+      try {
+        resizerEl.setPointerCapture(e.pointerId);
+      } catch (err) {}
+    });
+
+    // Fallback mousedown
+    resizerEl.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      activeResizer = resizerEl;
+      resizerEl.classList.add('dragging');
+      document.body.classList.add('is-resizing');
     });
   }
 
-  document.addEventListener('mousemove', (e) => {
-    if (isResizing1) {
-      const newWidth = Math.max(160, Math.min(480, e.clientX));
-      sidebar.style.width = `${newWidth}px`;
-      checkCompact();
-    } else if (isResizing2) {
-      const sidebarWidth = sidebar.getBoundingClientRect().width;
-      const newWidth = Math.max(220, Math.min(650, e.clientX - sidebarWidth));
-      articleColumn.style.width = `${newWidth}px`;
-    } else if (isResizing3 && aiColumn) {
-      const windowWidth = window.innerWidth;
-      const newWidth = Math.max(260, Math.min(650, windowWidth - e.clientX));
-      aiColumn.style.width = `${newWidth}px`;
-      safeSetStorage('quickrss_ai_column_width', newWidth);
-    }
-  });
+  bindResizer(resizer1);
+  bindResizer(resizer2);
+  if (resizer3) bindResizer(resizer3);
 
-  document.addEventListener('mouseup', () => {
-    if (isResizing1 || isResizing2 || isResizing3) {
-      isResizing1 = false;
-      isResizing2 = false;
-      isResizing3 = false;
-      resizer1.classList.remove('dragging');
-      resizer2.classList.remove('dragging');
-      if (resizer3) resizer3.classList.remove('dragging');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      checkCompact();
-    }
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', stopResize);
+  window.addEventListener('pointercancel', stopResize);
+  window.addEventListener('mousemove', (e) => {
+    if (activeResizer) onMove(e.clientX);
   });
+  window.addEventListener('mouseup', stopResize);
 }
 
 setupColumnResizers();
@@ -6382,6 +6440,7 @@ function startApp() {
   updateBadges();
   initGeneralSettingsUI();
   initAISettingsUI();
+  if (typeof setupColumnResizers === 'function') setupColumnResizers();
   if (typeof setupSearchUI === 'function') setupSearchUI();
   if (typeof setupAIChatbotUI === 'function') setupAIChatbotUI();
   if (typeof setupAutoRefreshTimer === 'function') setupAutoRefreshTimer();

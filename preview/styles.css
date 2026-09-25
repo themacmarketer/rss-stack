@@ -927,7 +927,8 @@ body.is-resizing .article-list-column {
 
 .modal-card {
   background: var(--bg-reader);
-  border-radius: 10px;
+  color: var(--text-primary);
+  border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   border: 1px solid var(--border-color);
   display: flex;
@@ -1166,11 +1167,13 @@ body.is-resizing .article-list-column {
   justify-content: space-between;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-sidebar);
+  color: var(--text-primary);
 }
 
 .modal-header h3 {
   font-size: 14px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .close-modal-btn {
@@ -1323,18 +1326,50 @@ body.is-resizing .article-list-column {
 }
 
 .modal-body {
-  padding: 16px;
+  padding: 18px 20px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.modal-body input {
+.modal-body p {
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.modal-body label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.modal-body label:first-child {
+  margin-top: 0;
+}
+
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
   width: 100%;
-  padding: 6px 8px;
-  border-radius: 5px;
+  padding: 8px 10px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   background: var(--bg-sidebar);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 12.5px;
   margin-top: 4px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
 }
 
 .modal-footer {
@@ -1344,6 +1379,7 @@ body.is-resizing .article-list-column {
   gap: 8px;
   background: var(--bg-sidebar);
   border-top: 1px solid var(--border-color);
+  color: var(--text-primary);
 }
 
 /* Context Menu */
@@ -1530,6 +1566,36 @@ body.is-resizing .article-list-column {
   background: rgba(0, 122, 255, 0.15);
   border: 1px solid rgba(0, 122, 255, 0.4);
   color: #0051a8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .opml-status-box.success {
+    color: #8ce152;
+    border-color: rgba(112, 182, 67, 0.5);
+  }
+  :root:not([data-theme="light"]) .opml-status-box.error {
+    color: #ff6961;
+    border-color: rgba(255, 59, 48, 0.5);
+  }
+  :root:not([data-theme="light"]) .opml-status-box.info {
+    color: #64d2ff;
+    border-color: rgba(0, 122, 255, 0.5);
+  }
+}
+
+html[data-theme="dark"] .opml-status-box.success {
+  color: #8ce152;
+  border-color: rgba(112, 182, 67, 0.5);
+}
+
+html[data-theme="dark"] .opml-status-box.error {
+  color: #ff6961;
+  border-color: rgba(255, 59, 48, 0.5);
+}
+
+html[data-theme="dark"] .opml-status-box.info {
+  color: #64d2ff;
+  border-color: rgba(0, 122, 255, 0.5);
 }
 
 .opml-status-box.hidden {
@@ -1971,18 +2037,18 @@ body.is-resizing .article-list-column {
 .toast-notification {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 13px;
+  gap: 12px;
+  padding: 11px 18px;
+  border-radius: 14px;
+  font-size: 13.5px;
   font-weight: 500;
-  line-height: 1.4;
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  line-height: 1.45;
+  color: #ffffff !important;
+  background: rgba(22, 22, 24, 0.94) !important;
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35);
   opacity: 0;
   transform: translateY(-12px) scale(0.96);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1991,16 +2057,16 @@ body.is-resizing .article-list-column {
 
 @media (prefers-color-scheme: dark) {
   .toast-notification {
-    background: rgba(36, 36, 38, 0.90);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+    background: rgba(18, 18, 20, 0.96) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.4);
   }
 }
 
 html[data-theme="dark"] .toast-notification {
-  background: rgba(36, 36, 38, 0.90);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: rgba(18, 18, 20, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .toast-notification.visible {
@@ -2012,35 +2078,44 @@ html[data-theme="dark"] .toast-notification {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .toast-success .toast-icon {
-  background: rgba(112, 182, 67, 0.15);
-  color: #70b643;
+  background: rgba(48, 209, 88, 0.25);
+  border: 1px solid rgba(48, 209, 88, 0.5);
+  color: #30d158;
 }
 
 .toast-info .toast-icon {
-  background: rgba(0, 122, 255, 0.15);
-  color: #007aff;
+  background: rgba(10, 132, 255, 0.28);
+  border: 1px solid rgba(10, 132, 255, 0.5);
+  color: #64d2ff;
 }
 
 .toast-warning .toast-icon {
-  background: rgba(255, 149, 0, 0.15);
-  color: #ff9500;
+  background: rgba(255, 159, 10, 0.28);
+  border: 1px solid rgba(255, 159, 10, 0.5);
+  color: #ffd60a;
 }
 
 .toast-error .toast-icon {
-  background: rgba(255, 59, 48, 0.15);
-  color: #ff3b30;
+  background: rgba(255, 69, 58, 0.28);
+  border: 1px solid rgba(255, 69, 58, 0.5);
+  color: #ff453a;
 }
 
 .toast-message {
   flex: 1;
   word-break: break-word;
+  color: #ffffff !important;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* Modal Title with Header Icon & Danger Alert Card */

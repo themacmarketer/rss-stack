@@ -188,6 +188,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.userContentController.add(self, name: "reportCrash")
         config.userContentController.add(self, name: "triggerTestCrash")
         config.userContentController.add(self, name: "nativeHTTPRequest")
+        config.userContentController.add(self, name: "savePreferredBrowser")
 
         // Inject stored UserDefault states and global JS error handler into WKWebView at DocumentStart
         var initScript = """
@@ -318,14 +319,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             UserDefaults.standard.set(json, forKey: "quickrss_starred_articles")
         } else if message.name == "saveReadArticles", let json = message.body as? String {
             UserDefaults.standard.set(json, forKey: "quickrss_read_article_ids")
-        } else if message.name == "saveUserTree", let json = message.body as? String {
-            UserDefaults.standard.set(json, forKey: "quickrss_user_tree")
-        } else if message.name == "openExternal", let urlString = message.body as? String, let url = URL(string: urlString) {
-            let scheme = url.scheme?.lowercased() ?? ""
-            if scheme == "quickrss" || scheme == "quick-rss" {
-                handleDeepLink(url)
-            } else {
-                NSWorkspace.shared.open(url)
+        } else if message.name == "savePreferredBrowser", let browser = message.body as? String {
+            UserDefaults.standard.set(browser, forKey: "quickrss_preferred_browser")
+        } else if message.name == "openExternal" {
+            var targetUrl: URL? = nil
+            var requestedBrowser: String? = nil
+            if let urlString = message.body as? String {
+                targetUrl = URL(string: urlString)
+            } else if let dict = message.body as? [String: Any], let urlString = dict["url"] as? String {
+                targetUrl = URL(string: urlString)
+                requestedBrowser = dict["browser"] as? String
+            }
+            if let url = targetUrl {
+                let scheme = url.scheme?.lowercased() ?? ""
+                if scheme == "quickrss" || scheme == "quick-rss" {
+                    handleDeepLink(url)
+                } else {
+                    let preferred = requestedBrowser ?? UserDefaults.standard.string(forKey: "quickrss_preferred_browser") ?? "chrome"
+                    var appUrl: URL? = nil
+                    if preferred == "chrome" {
+                        appUrl = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome")
+                    } else if preferred == "safari" {
+                        appUrl = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari")
+                    } else if preferred == "arc" {
+                        appUrl = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "company.thebrowser.Browser")
+                    }
+
+                    if let appUrl = appUrl {
+                        NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+                    } else {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
             }
         } else if message.name == "saveOPML", let xmlContent = message.body as? String {
             let savePanel = NSSavePanel()

@@ -714,11 +714,12 @@ function saveTreeData() {
 
 
 
-// Helper to open links natively in default browser (Safari/Chrome/Arc) via Swift message handler
-function openInDefaultBrowser(url) {
+// Helper to open links natively in preferred browser (Chrome/Safari/Arc/System) via Swift message handler
+function openInDefaultBrowser(url, preferBrowser) {
   if (!url || url === '#' || url.startsWith('javascript:')) return;
+  const browser = preferBrowser || safeGetStorage('quickrss_browser_choice', 'chrome');
   if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.openExternal) {
-    window.webkit.messageHandlers.openExternal.postMessage(url);
+    window.webkit.messageHandlers.openExternal.postMessage({ url: url, browser: browser });
   } else {
     window.open(url, '_blank');
   }
@@ -4153,7 +4154,7 @@ function initAISettingsUI() {
 
       // Attempt 3: Open browser and start focus auto-check poll
       openaiSessionBtn.innerHTML = originalText;
-      openInDefaultBrowser('https://chatgpt.com/api/auth/session');
+      openInDefaultBrowser('https://chatgpt.com/api/auth/session', 'chrome');
       showToast('Opened ChatGPT Session page. Copy session JSON or return to QuickRSS to auto-insert token!', 'info');
 
       startTokenAutoCheckPoll();
@@ -4190,8 +4191,8 @@ function initAISettingsUI() {
   // 1-Click Claude Session Handler
   if (claudeSessionBtn) {
     claudeSessionBtn.onclick = () => {
-      openInDefaultBrowser('https://claude.ai');
-      showToast('Opened Claude in browser! Copy your session key and paste below.', 'info');
+      openInDefaultBrowser('https://claude.ai', 'chrome');
+      showToast('Opened Claude in Chrome! Copy sessionKey cookie and paste below.', 'info');
     };
   }
 
@@ -4208,7 +4209,7 @@ function initAISettingsUI() {
   // OpenRouter Portal Handler
   if (openrouterPortalBtn) {
     openrouterPortalBtn.onclick = () => {
-      openInDefaultBrowser('https://openrouter.ai/keys');
+      openInDefaultBrowser('https://openrouter.ai/keys', 'chrome');
     };
   }
 
@@ -4304,14 +4305,23 @@ function initGeneralSettingsUI() {
     };
   }
 
-  // 4. Article Link Opening (Default Mac Browser vs App)
+  // 4. Article Link Opening (Chrome vs Safari vs Arc vs System vs App)
   const openLinkSelect = document.getElementById('setting-open-link');
   if (openLinkSelect) {
-    const savedOpenLink = safeGetStorage('quickrss_open_link', 'browser');
-    openLinkSelect.value = savedOpenLink;
+    let savedChoice = safeGetStorage('quickrss_browser_choice', '');
+    if (!savedChoice) {
+      const legacyOpen = safeGetStorage('quickrss_open_link', 'chrome');
+      savedChoice = (legacyOpen === 'app') ? 'app' : 'chrome';
+    }
+    openLinkSelect.value = savedChoice;
 
     openLinkSelect.onchange = (e) => {
-      safeSetStorage('quickrss_open_link', e.target.value);
+      const val = e.target.value;
+      safeSetStorage('quickrss_browser_choice', val);
+      safeSetStorage('quickrss_open_link', val === 'app' ? 'app' : 'browser');
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.savePreferredBrowser) {
+        window.webkit.messageHandlers.savePreferredBrowser.postMessage(val);
+      }
     };
   }
 
